@@ -1,0 +1,224 @@
+// src/components/UploadImagePage.jsx
+import React, { useState, useCallback, useEffect } from 'react';
+import { useDropzone } from 'react-dropzone';
+import {
+  FiImage,
+  FiUploadCloud,
+  FiPlus,
+  FiTrash2
+} from 'react-icons/fi';
+
+import './UploadImagePage.css';
+
+// --- Funções Auxiliares ---
+
+// Formata bytes para KB, MB, GB
+function formatBytes(bytes, decimals = 2) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+// --- Componente Principal ---
+
+const UploadImagePage = () => {
+  // Estado para guardar os arquivos (que são objetos File)
+  const [files, setFiles] = useState([]);
+
+  // Função chamada ao soltar ou selecionar arquivos
+  const onDrop = useCallback((acceptedFiles) => {
+    
+    // Adiciona os novos arquivos, criando um ID e uma URL de miniatura
+    const newFiles = acceptedFiles.map(file => Object.assign(file, {
+      id: Math.random().toString(36).substring(7),
+      preview: URL.createObjectURL(file) // Cria URL para a miniatura
+    }));
+    
+    setFiles(prevFiles => [...prevFiles, ...newFiles]);
+  }, []);
+
+  // Remove um arquivo da lista
+  const removeFile = (fileId) => {
+    // Encontra o arquivo para revogar a URL da miniatura
+    const fileToRemove = files.find(file => file.id === fileId);
+    if (fileToRemove) {
+      URL.revokeObjectURL(fileToRemove.preview);
+    }
+    setFiles(prevFiles => prevFiles.filter(file => file.id !== fileId));
+  };
+
+  // Remove todos os arquivos ("Cancelar")
+  const removeAllFiles = () => {
+    // Revoga todas as URLs de miniatura antes de limpar
+    files.forEach(file => URL.revokeObjectURL(file.preview));
+    setFiles([]);
+  };
+
+  // [IMPORTANTE] Limpeza de Memória
+  // Revoga as URLs de miniatura quando o componente é desmontado
+  useEffect(() => {
+    return () => {
+      files.forEach(file => URL.revokeObjectURL(file.preview));
+    };
+  }, [files]);
+
+
+  // Configuração do Dropzone
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+    onDrop,
+    accept: { // Aceita apenas os principais tipos de imagem
+      'image/png': ['.png'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/webp': ['.webp'],
+    },
+    noClick: true,
+    noKeyboard: true,
+  });
+
+  // [IMPORTANTE] Função de envio para a API
+  const handleSubmit = () => {
+    console.log("Iniciando envio das imagens...");
+
+    // 1. Criar um objeto FormData
+    // FormData é a forma correta de enviar arquivos (multipart/form-data)
+    const formData = new FormData();
+
+    // 2. Adicionar cada arquivo ao FormData
+    // 'images' é o nome do "campo" que a sua API vai esperar
+    files.forEach((file) => {
+      formData.append('images', file, file.name);
+    });
+    
+    // 3. Simulação do envio (aqui você faria o 'fetch')
+    console.log("FormData pronto para enviar para a API:", formData);
+    alert(`Enviando ${files.length} imagens! (Verifique o console)`);
+    
+    /* // Exemplo de como enviar para a API:
+    fetch('https://sua-api.com/upload', {
+      method: 'POST',
+      body: formData,
+      // headers: { 'Authorization': 'Bearer SEU_TOKEN_AQUI' } // Se precisar de auth
+    })
+    .then(response => response.json())
+    .then(data => {
+      console.log('Sucesso:', data);
+      alert('Upload concluído com sucesso!');
+      removeAllFiles(); // Limpa a lista após o sucesso
+    })
+    .catch(error => {
+      console.error('Erro no upload:', error);
+      alert('Erro ao fazer upload.');
+    });
+    */
+  };
+
+  return (
+    <div className="upload-image-container">
+      {/* --- CABEÇALHO --- */}
+      <div className="upload-header">
+        <FiImage className="icon" />
+        <h2>Upload de Imagens</h2>
+      </div>
+
+      {/* --- ÁREA DE DROPZONE --- */}
+      <div
+        {...getRootProps()}
+        className={`dropzone ${isDragActive ? 'active' : ''}`}
+      >
+        <input {...getInputProps()} />
+        <FiUploadCloud className="drop-icon" />
+        {isDragActive ? (
+          <p>Solte as imagens aqui ...</p>
+        ) : (
+          <p>Solte aqui as imagens que deseja analisar</p>
+        )}
+      </div>
+
+      {/* --- CABEÇALHO DA LISTA DE ARQUIVOS (com botão Adicionar) --- */}
+      <div className="file-list-header">
+        <h3>Imagens</h3>
+        <button className="add-button" onClick={open}>
+          <FiPlus />
+          ADICIONAR IMAGEM
+        </button>
+      </div>
+
+      {/* --- LISTA DE ARQUIVOS --- */}
+      <div className="file-list">
+        {files.length === 0 && (
+          <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+            Nenhuma imagem adicionada ainda.
+          </p>
+        )}
+
+        {files.map((file) => (
+          <ImageFileItem
+            key={file.id}
+            file={file}
+            onRemove={removeFile}
+          />
+        ))}
+      </div>
+
+      {/* --- RODAPÉ COM BOTÕES --- */}
+      <div className="upload-footer">
+        <button
+          className="footer-button cancel-button"
+          onClick={removeAllFiles}
+        >
+          Cancelar
+        </button>
+        <button
+          className="footer-button submit-button"
+          onClick={handleSubmit}
+          disabled={files.length === 0} // Desativa se não houver arquivos
+        >
+          Concluir
+        </button>
+      </div>
+    </div>
+  );
+};
+
+
+// --- Componente de Item de Arquivo (separado) ---
+
+const ImageFileItem = ({ file, onRemove }) => {
+  return (
+    <div className="image-file-item">
+      {/* Miniatura */}
+      <div className="image-thumbnail">
+        {file.preview ? (
+          <img 
+            src={file.preview} 
+            alt={file.name}
+            onLoad={() => { 
+              // Opcional: só para garantir que a URL é válida
+              // Se a imagem quebrar, podemos revogar
+            }}
+          />
+        ) : (
+          <FiImage className="icon" /> // Ícone placeholder
+        )}
+      </div>
+      
+      {/* Detalhes (nome, tamanho) */}
+      <div className="image-details">
+        <p className="filename">{file.name}</p>
+        <p className="filesize">
+          {formatBytes(file.size)}
+        </p>
+      </div>
+
+      {/* Ações (lixeira) */}
+      <div className="image-actions">
+        <FiTrash2 className="icon-button" onClick={() => onRemove(file.id)} />
+      </div>
+    </div>
+  );
+};
+
+export default UploadImagePage;

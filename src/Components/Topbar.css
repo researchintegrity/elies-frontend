@@ -1,0 +1,45 @@
+/* src/components/Topbar.css */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 2rem; /* Espaço antes do conteúdo principal */
+  
+  /* Opcional: Se quiser que a topbar tenha o fundo do card, 
+    descomente as linhas abaixo. Na sua imagem, ela parece 
+    "flutuar" sobre o fundo mais escuro. 
+  */
+  /*
+  background-color: var(--color-bg-card);
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  */
+}
+
+.topbar-title h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text-light);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s ease;
+}
+
+.icon-button:hover {
+  color: var(--color-text-light);
+}

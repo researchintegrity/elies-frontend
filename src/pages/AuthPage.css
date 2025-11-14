@@ -1,0 +1,133 @@
+/* src/pages/AuthPage.css */
+
+.auth-page-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  
+  /* 1. SUBSTITUA 'seu-wallpaper.jpg' PELO NOME DO SEU ARQUIVO */
+  background-image: url('./walllogin.jpg');
+  
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: var(--color-bg-deep-dark); /* Fallback caso a imagem não carregue */
+}
+
+.auth-card {
+  /* Efeito de vidro fosco (frost) */
+  background-color: rgba(60, 60, 70, 0.7); /* Fundo semitransparente */
+  backdrop-filter: blur(10px);              /* Desfoque do fundo */
+  
+  padding: 3rem 3.5rem; /* Aumenta o padding interno */
+  border-radius: 18px; /* Borda mais arredondada */
+  width: 100%;
+  max-width: 480px; /* Um pouco mais largo */
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.1); /* Borda mais suave */
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2); /* Sombra difusa */
+}
+
+.auth-card h2 {
+  font-size: 2.2rem; /* Título maior */
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  color: var(--color-text-light); /* Cor clara para destacar */
+}
+
+.auth-card p {
+  color: var(--color-text-secondary);
+  font-size: 1.1rem; /* Descrição maior */
+  margin-bottom: 3rem; /* Mais espaço antes do form */
+}
+
+.input-group {
+  margin-bottom: 1.8rem; /* Espaço entre os campos */
+  text-align: left;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 0.6rem;
+  font-weight: 600; /* Label mais bold */
+  color: var(--color-text-light); /* Label mais visível */
+  font-size: 1rem;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 1rem 1.2rem; /* Mais padding no input */
+  border-radius: 10px; /* Bordas suaves */
+  border: 1px solid var(--color-primary-accent);
+  background-color: var(--color-bg-deep-dark);
+  color: var(--color-text-light);
+  font-size: 1.1rem; /* Texto maior no input */
+  transition: border-color 0.3s ease, box-shadow 0.3s ease; /* Transições */
+}
+
+.input-group input::placeholder {
+  color: var(--color-text-secondary); /* Estiliza o placeholder */
+  opacity: 0.7;
+}
+
+.input-group input:focus {
+  outline: none;
+  border-color: var(--color-toggle-accent); /* Borda roxa ao focar */
+  box-shadow: 0 0 0 3px rgba(138, 99, 210, 0.3); /* Sombra roxa sutil */
+}
+
+.auth-button {
+  width: 100%;
+  padding: 1.1rem 1.5rem; /* Botão maior */
+  border: none;
+  border-radius: 10px;
+  background-color: var(--color-toggle-accent);
+  color: var(--color-text-light);
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  margin-top: 1.5rem; /* Espaço antes do botão */
+}
+
+.auth-button:hover {
+  background-color: #7a52c3; /* Cor mais clara no hover */
+  transform: translateY(-2px); /* Efeito lift */
+}
+
+.auth-button:disabled {
+  background-color: var(--color-primary-accent);
+  cursor: not-allowed;
+  transform: translateY(0);
+}
+
+.error-message {
+  color: #ff6b6b;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.toggle-auth {
+  margin-top: 2rem; /* Mais espaço */
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+}
+
+.toggle-auth button {
+  background: none;
+  border: none;
+  color: var(--color-toggle-accent);
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 0.6rem;
+  font-size: 1rem;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  transition: color 0.3s ease;
+}
+
+.toggle-auth button:hover {
+  color: var(--color-text-light);
+}

@@ -1,0 +1,108 @@
+/* src/pages/ViewImagesPage.css */
+
+.view-images-container {
+  width: 100%;
+}
+
+.view-images-container h2 {
+  font-size: 1.75rem;
+  color: var(--color-text-light);
+  margin-bottom: 0.5rem;
+}
+
+.view-images-container p {
+  font-size: 1.1rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 2.5rem;
+}
+
+/* --- Grid de Imagens --- */
+.image-grid {
+  display: grid;
+  /* Cria colunas responsivas:
+     - Tenta encaixar o máximo de colunas de 280px
+     - Cada coluna terá no mínimo 280px e no máximo 1fr (ocupa espaço igual)
+  */
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.image-card {
+  background-color: var(--color-bg-card);
+  border-radius: 12px;
+  overflow: hidden; /* Garante que a imagem não vaze */
+  border: 1px solid var(--color-primary-accent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: pointer;
+}
+
+.image-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.image-card-img {
+  width: 100%;
+  height: 200px; /* Altura fixa para todas as imagens */
+  object-fit: cover; /* Garante que a imagem cubra o espaço */
+  display: block;
+  background-color: var(--color-bg-deep-dark); /* Cor de fundo enquanto carrega */
+}
+
+.image-card-info {
+  padding: 1.25rem;
+}
+
+.image-card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* Adiciona "..." em nomes longos */
+  margin-bottom: 0.5rem;
+}
+
+.image-card-date {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+/* --- Status de Loading / Erro / Vazio --- */
+.page-status-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  background-color: var(--color-bg-card);
+  border-radius: 12px;
+  color: var(--color-text-secondary);
+  border: 1px dashed var(--color-primary-accent);
+}
+
+.page-status-container.error {
+  color: #ff6b6b;
+  border-color: #ff6b6b;
+}
+
+.page-status-container h3 {
+  font-size: 1.5rem;
+  margin: 1rem 0 0.5rem 0;
+}
+
+.loading-spinner {
+  font-size: 3rem;
+  color: var(--color-toggle-accent);
+  animation: spin 1.5s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

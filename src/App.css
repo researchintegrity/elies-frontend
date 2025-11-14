@@ -1,0 +1,15 @@
+/* src/App.css */
+.app-container {
+  display: grid;
+  grid-template-columns: 260px 1fr; /* Largura da sidebar e o resto */
+  min-height: 100vh;
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg-deep-dark);
+  padding: 2rem;
+}
+
+/* O espaço do grid da sidebar será preenchido pelo componente Sidebar */

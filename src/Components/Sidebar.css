@@ -1,0 +1,68 @@
+/* src/components/Sidebar.css */
+.sidebar {
+  background-color: var(--color-bg-dark);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.sidebar-header h3 {
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.sidebar-header p {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-light);
+  margin-top: 0.5rem;
+}
+
+.sidebar-menu,
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.section-title {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+}
+
+.menu-item svg {
+  font-size: 1.25rem;
+}
+
+.menu-item:hover {
+  background-color: var(--color-bg-card);
+  color: var(--color-text-light);
+}
+
+/* Estilo do item ativo, como no seu design */
+.menu-item.active {
+  background-color: var(--color-primary-accent);
+  color: var(--color-text-light);
+  font-weight: 600;
+}

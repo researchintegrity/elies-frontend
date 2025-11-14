@@ -1,0 +1,52 @@
+/* src/components/Toggle.css */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px; /* Largura do toggle */
+  height: 28px; /* Altura do toggle */
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--color-bg-card); /* Cor quando desligado */
+  transition: 0.4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 20px; /* Tamanho da bolinha */
+  width: 20px;  /* Tamanho da bolinha */
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: 0.4s;
+}
+
+input:checked + .slider {
+  background-color: var(--color-toggle-accent); /* Cor roxa do seu design */
+}
+
+input:checked + .slider:before {
+  transform: translateX(22px); /* Distância que a bolinha se move */
+}
+
+/* Formato redondo */
+.slider.round {
+  border-radius: 34px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}

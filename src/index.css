@@ -1,0 +1,26 @@
+/* src/index.css */
+:root {
+  /* Paleta de Cores (extraída da imagem) */
+  --color-bg-deep-dark: #1E1E2F; /* Fundo principal do conteúdo */
+  --color-bg-dark: #2C2F36;       /* Fundo da Sidebar e Topbar */
+  --color-bg-card: #383B42;       /* Fundo dos cards (e da Topbar, parecem iguais) */
+  --color-primary-accent: #4A4A6A; /* Item ativo na Sidebar */
+  --color-toggle-accent: #8A63D2; /* Cor do botão toggle */
+  --color-text-light: #F0F0F0;    /* Texto claro principal */
+  --color-text-secondary: #A0A0A0; /* Texto cinza (descrições) */
+  --color-text-dark: #333333;      /* Texto escuro (não usado no dark mode) */
+}
+
+/* Reset básico e fontes */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  background-color: var(--color-bg-deep-dark);
+  color: var(--color-text-light);
+}
