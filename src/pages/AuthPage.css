@@ -6,80 +6,113 @@
   justify-content: center;
   min-height: 100vh;
   
-  /* 1. SUBSTITUA 'seu-wallpaper.jpg' PELO NOME DO SEU ARQUIVO */
-  background-image: url('./walllogin.jpg');
+  /* make sure to change 'seu-wallpaper.jpg' to your real file */
+  background-image: url('/seu-wallpaper.jpg');
   
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  background-color: var(--color-bg-deep-dark); /* Fallback caso a imagem não carregue */
+  background-color: var(--color-bg-deep-dark); /* fallback */
 }
 
 .auth-card {
-  /* Efeito de vidro fosco (frost) */
-  background-color: rgba(60, 60, 70, 0.7); /* Fundo semitransparente */
-  backdrop-filter: blur(10px);              /* Desfoque do fundo */
+  /* frost/glass effect */
+  background-color: rgba(60, 60, 70, 0.7); /* semi-transparent */
+  backdrop-filter: blur(10px);              /* blur the background */
   
-  padding: 3rem 3.5rem; /* Aumenta o padding interno */
-  border-radius: 18px; /* Borda mais arredondada */
+  padding: 3rem 3.5rem;
+  border-radius: 18px;
   width: 100%;
-  max-width: 480px; /* Um pouco mais largo */
+  max-width: 480px;
   text-align: center;
-  border: 1px solid rgba(255, 255, 255, 0.1); /* Borda mais suave */
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2); /* Sombra difusa */
+  border: 1px solid rgba(255, 255, 255, 0.1); /* soft border */
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
 }
 
 .auth-card h2 {
-  font-size: 2.2rem; /* Título maior */
+  font-size: 2.2rem;
   font-weight: 700;
   margin-bottom: 0.75rem;
-  color: var(--color-text-light); /* Cor clara para destacar */
+  color: var(--color-text-light);
 }
 
 .auth-card p {
   color: var(--color-text-secondary);
-  font-size: 1.1rem; /* Descrição maior */
-  margin-bottom: 3rem; /* Mais espaço antes do form */
+  font-size: 1.1rem;
+  margin-bottom: 3rem;
 }
 
+/* --- new error alert box --- */
+.error-alert {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  background-color: rgba(255, 107, 107, 0.1); /* light red bg */
+  border: 1px solid #ff6b6b; /* red border */
+  border-radius: 8px;
+  color: #ffc2c2; /* lighter red text */
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-align: left; /* make sure text is left-aligned */
+}
+
+.error-icon {
+  font-size: 1.25rem;
+  margin-right: 0.75rem;
+  flex-shrink: 0;
+  color: #ff6b6b; /* red icon */
+}
+
+/* --- old error message (just in case) --- */
+.error-message {
+  color: #ff6b6b;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-align: center;
+}
+/* --- end of error styles --- */
+
+
 .input-group {
-  margin-bottom: 1.8rem; /* Espaço entre os campos */
+  margin-bottom: 1.8rem;
   text-align: left;
 }
 
 .input-group label {
   display: block;
   margin-bottom: 0.6rem;
-  font-weight: 600; /* Label mais bold */
-  color: var(--color-text-light); /* Label mais visível */
+  font-weight: 600;
+  color: var(--color-text-light);
   font-size: 1rem;
 }
 
 .input-group input {
   width: 100%;
-  padding: 1rem 1.2rem; /* Mais padding no input */
-  border-radius: 10px; /* Bordas suaves */
+  padding: 1rem 1.2rem;
+  border-radius: 10px;
   border: 1px solid var(--color-primary-accent);
   background-color: var(--color-bg-deep-dark);
   color: var(--color-text-light);
-  font-size: 1.1rem; /* Texto maior no input */
-  transition: border-color 0.3s ease, box-shadow 0.3s ease; /* Transições */
+  font-size: 1.1rem;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .input-group input::placeholder {
-  color: var(--color-text-secondary); /* Estiliza o placeholder */
+  color: var(--color-text-secondary);
   opacity: 0.7;
 }
 
 .input-group input:focus {
   outline: none;
-  border-color: var(--color-toggle-accent); /* Borda roxa ao focar */
-  box-shadow: 0 0 0 3px rgba(138, 99, 210, 0.3); /* Sombra roxa sutil */
+  border-color: var(--color-toggle-accent);
+  box-shadow: 0 0 0 3px rgba(138, 99, 210, 0.3);
 }
 
 .auth-button {
   width: 100%;
-  padding: 1.1rem 1.5rem; /* Botão maior */
+  padding: 1.1rem 1.5rem;
   border: none;
   border-radius: 10px;
   background-color: var(--color-toggle-accent);
@@ -88,12 +121,12 @@
   font-weight: 700;
   cursor: pointer;
   transition: background-color 0.3s ease, transform 0.2s ease;
-  margin-top: 1.5rem; /* Espaço antes do botão */
+  margin-top: 1.5rem;
 }
 
 .auth-button:hover {
-  background-color: #7a52c3; /* Cor mais clara no hover */
-  transform: translateY(-2px); /* Efeito lift */
+  background-color: #7a52c3;
+  transform: translateY(-2px);
 }
 
 .auth-button:disabled {
@@ -102,15 +135,8 @@
   transform: translateY(0);
 }
 
-.error-message {
-  color: #ff6b6b;
-  margin-bottom: 1.5rem;
-  font-size: 0.95rem;
-  font-weight: 500;
-}
-
 .toggle-auth {
-  margin-top: 2rem; /* Mais espaço */
+  margin-top: 2rem;
   color: var(--color-text-secondary);
   font-size: 1rem;
 }
