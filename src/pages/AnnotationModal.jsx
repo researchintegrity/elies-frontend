@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
 import './AnnotationModal.css'; // Vamos criar este
 import { FiLoader, FiTrash2, FiSave, FiX } from 'react-icons/fi';
 
@@ -20,8 +21,6 @@ const AnnotationModal = ({ image, onClose }) => {
   // Estado para a anotação que está sendo digitada
   const [newAnnotationText, setNewAnnotationText] = useState('');
   
-  const API_BASE_URL = 'http://localhost:8000';
-
   // ----- LÓGICA DA API -----
 
   // 1. BUSCAR anotações quando o modal abre

@@ -1,8 +1,6 @@
 // src/context/authcontext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react';
-
-// our api url (from the readme, right?)
-const API_BASE_URL = 'http://localhost:8000';
+import { API_BASE_URL } from '../config/api';
 
 // 1. just creating the context here
 const AuthContext = createContext();

@@ -2,9 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import AnnotationModal from './AnnotationModal'; 
-import { FiLoader, FiAlertTriangle } from 'react-icons/fi';
-// Vamos reutilizar o CSS da ViewImagesPage para o grid, para não duplicar código
-import './ViewImagesPage.css'; 
+import { API_BASE_URL } from '../config/api';
+import { FiLoader, FiAlertTriangle } from 'react-icons/fi'; 
 
 // ############ DADOS MOCKADOS (Substitua pela sua API) ############
 // Sua API real deve retornar algo parecido com isso:
@@ -36,7 +35,6 @@ const AnnotationPage = () => {
   const [selectedImage, setSelectedImage] = useState(null);
   
   const { token } = useAuth();
-  const API_BASE_URL = 'http://localhost:8000';
 
   useEffect(() => {
     const fetchImages = async () => {
