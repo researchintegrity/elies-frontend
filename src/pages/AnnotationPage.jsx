@@ -8,23 +8,23 @@ import './ViewImagesPage.css';
 
 // ############ DADOS MOCKADOS (Substitua pela sua API) ############
 // Sua API real deve retornar algo parecido com isso:
-const fakeApiData = [
-  {
-    id: 'img1',
-    title: 'Amostra_Celular_01.png',
-    url: 'https://images.unsplash.com/photo-1578496781379-7dcfb995290f?w=600',
-  },
-  {
-    id: 'img2',
-    title: 'Placa_de_Petri_02.jpg',
-    url: 'https://images.unsplash.com/photo-1579154204601-01588f351e67?w=600',
-  },
-  {
-    id: 'img3',
-    title: 'Microscopio_03.webp',
-    url: 'https://images.unsplash.com/photo-1554106198-471a9e334335?w=600',
-  },
-];
+// const fakeApiData = [
+//   {
+//     id: 'img1',
+//     title: 'Amostra_Celular_01.png',
+//     url: 'https://images.unsplash.com/photo-1578496781379-7dcfb995290f?w=600',
+//   },
+//   {
+//     id: 'img2',
+//     title: 'Placa_de_Petri_02.jpg',
+//     url: 'https://images.unsplash.com/photo-1579154204601-01588f351e67?w=600',
+//   },
+//   {
+//     id: 'img3',
+//     title: 'Microscopio_03.webp',
+//     url: 'https://images.unsplash.com/photo-1554106198-471a9e334335?w=600',
+//   },
+// ];
 // ############ FIM DOS DADOS MOCKADOS ############
 
 const AnnotationPage = () => {
@@ -36,34 +36,74 @@ const AnnotationPage = () => {
   const [selectedImage, setSelectedImage] = useState(null);
   
   const { token } = useAuth();
+  const API_BASE_URL = 'http://localhost:8000';
 
   useEffect(() => {
     const fetchImages = async () => {
       setLoading(true);
       setError(null);
       
-      /* // ############ API AQUI (Este é o código real) ############
       try {
-        const response = await fetch('https://SUA-API.com/get-images-to-annotate', {
+        // Fetch extracted images only (source_type=extracted)
+        const response = await fetch(`${API_BASE_URL}/images?source_type=extracted`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
-        if (!response.ok) throw new Error('Falha ao buscar imagens');
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch extracted images: ${response.statusText}`);
+        }
+        
         const data = await response.json();
-        setImages(data);
+        console.log('Fetched images:', data);
+        
+        if (!data || data.length === 0) {
+          setImages([]);
+          setLoading(false);
+          return;
+        }
+        
+        // Transform the image data to include image blob URLs
+        const imagesWithBlobs = await Promise.all(
+          data.map(async (image) => {
+            try {
+              // Fetch the image blob using the download endpoint
+              const imageResponse = await fetch(`${API_BASE_URL}/images/${image._id}/download`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+              });
+              
+              if (imageResponse.ok) {
+                const blob = await imageResponse.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                console.log(`Loaded image: ${image.filename}`);
+                return {
+                  ...image,
+                  url: blobUrl,
+                  id: image._id,
+                  title: image.filename,
+                };
+              } else {
+                console.warn(`Failed to load image ${image._id}: ${imageResponse.statusText}`);
+              }
+            } catch (err) {
+              console.error(`Error loading image ${image._id}:`, err);
+            }
+            
+            return {
+              ...image,
+              id: image._id,
+              title: image.filename,
+              url: null,
+            };
+          })
+        );
+        
+        setImages(imagesWithBlobs);
       } catch (err) {
         setError(err.message);
+        console.error('Error fetching images:', err);
       } finally {
         setLoading(false);
       }
-      // ########################################################
-      */
-
-      // --- SIMULAÇÃO (Remova isso quando conectar sua API) ---
-      setTimeout(() => {
-        setImages(fakeApiData);
-        setLoading(false);
-      }, 1000);
-      // --- FIM DA SIMULAÇÃO ---
     };
 
     fetchImages();
