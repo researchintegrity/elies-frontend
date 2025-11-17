@@ -1,82 +1,89 @@
 // src/pages/ViewImagesPage.jsx
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext'; // Para pegar o token
-import './ViewImagesPage.css'; // Criaremos este CSS
-import { FiLoader, FiAlertTriangle } from 'react-icons/fi';
+import './ViewImagesPage.css';
+import { FiLoader, FiAlertTriangle, FiRefreshCw } from 'react-icons/fi';
+import { useAuth } from '../context/AuthContext';
 
-// --- DADOS SIMULADOS (Substitua pela sua API) ---
-// Sua API real deve retornar algo parecido com isso:
-const fakeApiData = [
-  {
-    id: 'img1',
-    title: 'Imagem_Processada_001.png',
-    url: 'https://images.unsplash.com/photo-1599420186946-7b6fb4e297f0?w=400',
-    processedAt: '2025-11-04T14:30:00Z',
-  },
-  {
-    id: 'img2',
-    title: 'Analise_Microscopica.jpg',
-    url: 'https://images.unsplash.com/photo-1574169208507-84376144848b?w=400',
-    processedAt: '2025-11-03T11:15:00Z',
-  },
-  {
-    id: 'img3',
-    title: 'DNA_Scan_03.webp',
-    url: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=400',
-    processedAt: '2025-11-02T09:05:00Z',
-  },
-];
-// --- FIM DOS DADOS SIMULADOS ---
-
+const API_BASE_URL = 'http://localhost:8000';
 
 const ViewImagesPage = () => {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Pegue o token do seu AuthContext para enviar na requisição
+  // Get authentication token from context
   const { token } = useAuth();
 
-  // Esta função será chamada quando a página carregar
-  useEffect(() => {
-    const fetchImages = async () => {
-      setLoading(true);
-      setError(null);
-      
-      /* // ############ API AQUI (Este é o código real) ############
-      try {
-        const response = await fetch('https://SUA-API.com/get-images', {
-          headers: {
-            'Authorization': `Bearer ${token}`, // Envia o token
-          },
-        });
-        
-        if (!response.ok) {
-          throw new Error('Não foi possível buscar as imagens.');
-        }
-        
-        const data = await response.json();
-        setImages(data); // Salva os dados da API no estado
-
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
+  // Fetch images from the API
+  const fetchImages = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      if (!token) {
+        throw new Error('Você não está autenticado. Por favor, faça login novamente.');
       }
-      // ########################################################
-      */
 
-      // --- SIMULAÇÃO (Remova isso quando conectar sua API) ---
-      console.log("Simulando fetch da API com token:", token);
-      setTimeout(() => {
-        setImages(fakeApiData);
-        setLoading(false);
-      }, 1500); // Simula 1.5s de loading
-      // --- FIM DA SIMULAÇÃO ---
-    };
+      const url = `${API_BASE_URL}/api/images?page=1&per_page=100`;
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+      
+      console.log('=== Fetching Images ===');
+      console.log('Token present:', !!token);
+      console.log('Token preview:', token.substring(0, 20) + '...');
+      console.log('Request URL:', url);
+      console.log('Request headers:', headers);
 
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: headers
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.log('Error data:', errorData);
+        const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: Não foi possível buscar as imagens.`;
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log('Response data:', data);
+      
+      if (data.success && data.data) {
+        // Transform API data to match the component's expected format
+        const transformedImages = data.data.map(img => ({
+          id: img._id,
+          title: img.filename,
+          filename: img.filename,
+          url: `${API_BASE_URL}/images/${img._id}/download`,
+          uploadedDate: img.uploaded_date,
+          fileSize: img.file_size,
+          sourceType: img.source_type
+        }));
+        
+        console.log('Transformed images:', transformedImages);
+        setImages(transformedImages);
+      } else {
+        throw new Error('Formato de resposta inválido da API');
+      }
+
+    } catch (err) {
+      console.error('❌ Error fetching images:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch images when component mounts
+  useEffect(() => {
     fetchImages();
-  }, [token]); // Roda o 'fetch' quando o componente carregar (e se o token mudar)
+  }, [token]);
 
   // --- Renderização de Loading, Erro e Sucesso ---
 
@@ -95,32 +102,72 @@ const ViewImagesPage = () => {
         <FiAlertTriangle size={40} />
         <h3>Erro ao carregar</h3>
         <p>{error}</p>
+        <button 
+          className="retry-button"
+          onClick={fetchImages}
+          style={{
+            marginTop: '1rem',
+            padding: '0.75rem 1.5rem',
+            backgroundColor: 'var(--color-toggle-accent)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <FiRefreshCw /> Tentar novamente
+        </button>
       </div>
     );
   }
 
   return (
     <div className="view-images-container">
-      <h2>Imagens Carregadas</h2>
-      <p>Aqui estão todas as imagens processadas pela plataforma.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <div>
+          <h2>Imagens Carregadas</h2>
+          <p>Total: {images.length} imagem(ns)</p>
+        </div>
+        <button 
+          onClick={fetchImages}
+          style={{
+            padding: '0.75rem 1.5rem',
+            backgroundColor: 'var(--color-primary-accent)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <FiRefreshCw /> Atualizar
+        </button>
+      </div>
       
       {images.length === 0 ? (
         <div className="page-status-container">
-          <p>Nenhuma imagem encontrada.</p>
+          <p>Nenhuma imagem encontrada. Envie uma imagem primeiro!</p>
         </div>
       ) : (
         <div className="image-grid">
           {images.map((image) => (
             <div 
               key={image.id} 
-              className="image-card" 
-              onClick={() => alert(`Você clicou na Imagem ID: ${image.id}`)}
+              className="image-card"
             >
               <img src={image.url} alt={image.title} className="image-card-img" />
               <div className="image-card-info">
-                <h4 className="image-card-title">{image.title}</h4>
+                <h4 className="image-card-title">{image.filename}</h4>
                 <p className="image-card-date">
-                  Processada em: {new Date(image.processedAt).toLocaleDateString()}
+                  {new Date(image.uploadedDate).toLocaleDateString('pt-BR')}
+                </p>
+                <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+                  {(image.fileSize / 1024).toFixed(2)} KB • {image.sourceType}
                 </p>
               </div>
             </div>

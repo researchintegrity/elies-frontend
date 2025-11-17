@@ -7,7 +7,8 @@ import Topbar from './components/Topbar';
 import UploadPDFPage from './pages/UploadPDFPage'; 
 import UploadImagePage from './pages/UploadImagePage';
 import ViewImagesPage from './pages/ViewImagesPage';
-import AnnotationPage from './pages/AnnotationPage'; // 1. IMPORTE A NOVA PÁGINA
+import ViewPDFPage from './pages/ViewPDFPage';
+import AnnotationPage from './pages/AnnotationPage';
 
 import './App.css'; 
 
@@ -32,16 +33,15 @@ function AppLayout() {
         return <UploadImagePage />;
       case PAGES.VIEW_IMAGES:
         return <ViewImagesPage />;
-      case PAGES.ANNOTATION: // 4. ADICIONE O 'CASE' PARA ELA
+      case PAGES.ANNOTATION:
         return <AnnotationPage />;
       case PAGES.UPLOAD_PDF:
         return <UploadPDFPage />;
       case PAGES.VIEW_PDFS:
-        return <div>Página "View PDFs" (Em breve)</div>;
+        return <ViewPDFPage />;
       case PAGES.SEARCH:
         return <div>Página "Search" (Em breve)</div>;
       default:
-        // Define 'ANNOTATION' como padrão se algo der errado
         return <AnnotationPage />;
     }
   };
