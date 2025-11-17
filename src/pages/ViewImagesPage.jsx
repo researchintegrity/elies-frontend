@@ -1,10 +1,79 @@
-// src/pages/ViewImagesPage.jsx
 import React, { useState, useEffect } from 'react';
 import './ViewImagesPage.css';
 import { FiLoader, FiAlertTriangle, FiRefreshCw } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 
 const API_BASE_URL = 'http://localhost:8000';
+
+// Image card component that handles blob loading
+const ImageCard = ({ image, token, API_BASE_URL }) => {
+  const [imageUrl, setImageUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadImage = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/images/${image.imageId}/download`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) {
+          console.error(`Failed to fetch image ${image.imageId}: ${response.status}`);
+          setImageUrl(null);
+          setLoading(false);
+          return;
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        setImageUrl(url);
+        setLoading(false);
+      } catch (err) {
+        console.error(`Error loading image ${image.imageId}:`, err);
+        setLoading(false);
+      }
+    };
+
+    if (token && image.imageId) {
+      loadImage();
+    }
+
+    // Cleanup blob URL on unmount
+    return () => {
+      if (imageUrl) {
+        URL.revokeObjectURL(imageUrl);
+      }
+    };
+  }, [image.imageId, token, API_BASE_URL]);
+
+  return (
+    <div key={image.id} className="image-card">
+      {loading ? (
+        <div style={{ width: '100%', height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f0f0' }}>
+          <FiLoader style={{ animation: 'spin 1s linear infinite' }} />
+        </div>
+      ) : imageUrl ? (
+        <img src={imageUrl} alt={image.title} className="image-card-img" />
+      ) : (
+        <div style={{ width: '100%', height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffebee' }}>
+          <span style={{ color: 'red' }}>Erro ao carregar</span>
+        </div>
+      )}
+      <div className="image-card-info">
+        <h4 className="image-card-title">{image.filename}</h4>
+        <p className="image-card-date">
+          {new Date(image.uploadedDate).toLocaleDateString('pt-BR')}
+        </p>
+        <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+          {(image.fileSize / 1024).toFixed(2)} KB • {image.sourceType}
+        </p>
+      </div>
+    </div>
+  );
+};
 
 const ViewImagesPage = () => {
   const [images, setImages] = useState([]);
@@ -56,11 +125,13 @@ const ViewImagesPage = () => {
       
       if (data.success && data.data) {
         // Transform API data to match the component's expected format
+        // Create blob URLs for images so we can pass auth via fetch
         const transformedImages = data.data.map(img => ({
           id: img._id,
           title: img.filename,
           filename: img.filename,
-          url: `${API_BASE_URL}/images/${img._id}/download`,
+          imageId: img._id,  // Store ID for fetching blob later
+          url: null,  // Will be fetched with auth
           uploadedDate: img.uploaded_date,
           fileSize: img.file_size,
           sourceType: img.source_type
@@ -156,21 +227,12 @@ const ViewImagesPage = () => {
       ) : (
         <div className="image-grid">
           {images.map((image) => (
-            <div 
+            <ImageCard 
               key={image.id} 
-              className="image-card"
-            >
-              <img src={image.url} alt={image.title} className="image-card-img" />
-              <div className="image-card-info">
-                <h4 className="image-card-title">{image.filename}</h4>
-                <p className="image-card-date">
-                  {new Date(image.uploadedDate).toLocaleDateString('pt-BR')}
-                </p>
-                <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-                  {(image.fileSize / 1024).toFixed(2)} KB • {image.sourceType}
-                </p>
-              </div>
-            </div>
+              image={image} 
+              token={token}
+              API_BASE_URL={API_BASE_URL}
+            />
           ))}
         </div>
       )}
