@@ -96,8 +96,35 @@ const ViewPDFPage = () => {
   };
 
   // Download document
-  const downloadDocument = (docId, filename) => {
-    window.open(`${API_BASE_URL}/documents/${docId}/download`, '_blank');
+  const downloadDocument = async (docId, filename) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/documents/${docId}/download`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to download document: ${response.statusText}`);
+      }
+
+      // Get the blob from response
+      const blob = await response.blob();
+
+      // Create a temporary download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename || 'document.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error downloading document:', err);
+      alert(`❌ Erro ao baixar: ${err.message}`);
+    }
   };
 
   // Fetch documents when component mounts
