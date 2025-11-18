@@ -42,13 +42,13 @@ const AnnotationPage = () => {
       setError(null);
       
       try {
-        // Fetch extracted images only (source_type=extracted)
-        const response = await fetch(`${API_BASE_URL}/images?source_type=extracted`, {
+        // Fetch all images (both extracted and uploaded) for annotation
+        const response = await fetch(`${API_BASE_URL}/images`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         
         if (!response.ok) {
-          throw new Error(`Failed to fetch extracted images: ${response.statusText}`);
+          throw new Error(`Failed to fetch images: ${response.statusText}`);
         }
         
         const data = await response.json();
@@ -140,11 +140,11 @@ const AnnotationPage = () => {
   return (
     <div className="view-images-container"> {/* Reutilizando classe CSS */}
       <h2>Anotação de Imagens</h2>
-      <p>Selecione uma imagem para adicionar ou revisar anotações.</p>
+      <p>Selecione uma imagem para adicionar ou revisar anotações (funciona com imagens extraídas e enviadas).</p>
       
       {images.length === 0 ? (
         <div className="page-status-container">
-          <p>Nenhuma imagem para anotar encontrada.</p>
+          <p>Nenhuma imagem para anotar encontrada. Carregue imagens extraídas ou enviadas.</p>
         </div>
       ) : (
         <div className="image-grid"> {/* Reutilizando classe CSS */}
