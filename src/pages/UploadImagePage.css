@@ -11,7 +11,7 @@
 }
 
 .upload-image-container {
-  background-color: rgba(30, 30, 46, 0.95);
+  background-color: var(--modal-bg);
   /* Fundo escuro semi-transparente */
   backdrop-filter: blur(12px);
   /* Efeito de vidro */
@@ -20,13 +20,14 @@
   width: 100%;
   max-width: 900px;
   margin: 0 auto;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--modal-border);
   /* Borda sutil */
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   /* Sombra profunda */
   display: flex;
   flex-direction: column;
   gap: 2rem;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 /* --- Cabeçalho --- */
@@ -69,12 +70,12 @@
 
 /* --- Hero Dropzone --- */
 .dropzone.hero-dropzone {
-  border: 2px dashed rgba(255, 255, 255, 0.15);
+  border: 2px dashed var(--dropzone-border);
   border-radius: 20px;
   padding: 4rem 2rem;
   text-align: center;
   cursor: pointer;
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: var(--dropzone-bg);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   min-height: 300px;
   display: flex;
@@ -100,13 +101,13 @@
 .icon-circle {
   width: 80px;
   height: 80px;
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--icon-bg);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 1rem;
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, background-color 0.3s ease;
 }
 
 .dropzone:hover .icon-circle {
@@ -133,8 +134,9 @@
 .file-types {
   margin-top: 1rem;
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.4);
-  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-secondary);
+  opacity: 0.7;
+  background-color: var(--icon-bg);
   padding: 0.5rem 1rem;
   border-radius: 20px;
 }
@@ -172,7 +174,7 @@
 
 .add-more-button {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--surface-border);
   color: var(--color-text-secondary);
   padding: 0.5rem 1rem;
   border-radius: 8px;
@@ -185,9 +187,9 @@
 }
 
 .add-more-button:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--surface-hover);
   color: var(--color-text-light);
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--color-text-secondary);
 }
 
 .file-list {
@@ -204,15 +206,15 @@
   display: flex;
   align-items: center;
   padding: 1rem;
-  background-color: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background-color: var(--surface-bg);
+  border: 1px solid var(--surface-border);
   border-radius: 12px;
   gap: 1.5rem;
   transition: background-color 0.2s;
 }
 
 .image-file-item:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--surface-hover);
 }
 
 .image-thumbnail {
@@ -258,7 +260,7 @@
 .progress-bar-container {
   width: 100%;
   height: 4px;
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--icon-bg);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -317,7 +319,7 @@
 
 .cancel-button:hover {
   color: var(--color-text-light);
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--surface-hover);
 }
 
 .submit-button {
@@ -350,10 +352,10 @@
 }
 
 .file-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--icon-bg);
   border-radius: 10px;
 }
 
 .file-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--surface-border);
 }

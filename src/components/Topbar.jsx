@@ -1,4 +1,3 @@
-
 // src/components/Topbar.jsx
 import React from 'react';
 import './Topbar.css';
@@ -22,6 +21,7 @@ const Topbar = () => {
           <FiEdit />
         </button>
 
+        {/* Toggle de Tema - Temporariamente desativado
         <label className="toggle-switch">
           <input
             type="checkbox"
@@ -33,6 +33,7 @@ const Topbar = () => {
             <span className="icon-moon"><FiMoon /></span>
           </span>
         </label>
+        */}
 
         <button className="icon-button">
           <FiUser />

@@ -1,3 +1,5 @@
+```css
+
 /* src/index.css */
 :root {
   /* Paleta de Cores - Light Mode (Default) */
@@ -27,6 +29,16 @@
   --sidebar-hover-bg: #f3f4f6;
   --sidebar-search-bg: #f3f4f6;
   --sidebar-border-radius: 8px;
+
+  /* Variáveis Semânticas para Glassmorphism/Surfaces (Light) */
+  --modal-bg: rgba(255, 255, 255, 0.85);
+  --modal-border: rgba(0, 0, 0, 0.05);
+  --surface-bg: rgba(0, 0, 0, 0.03);
+  --surface-border: rgba(0, 0, 0, 0.08);
+  --surface-hover: rgba(0, 0, 0, 0.05);
+  --icon-bg: rgba(0, 0, 0, 0.05);
+  --dropzone-bg: rgba(0, 0, 0, 0.02);
+  --dropzone-border: rgba(0, 0, 0, 0.1);
 }
 
 html.dark {
@@ -49,6 +61,16 @@ html.dark {
   --sidebar-hover-bg: rgba(255, 255, 255, 0.05);
   --sidebar-search-bg: #181825;
   --sidebar-border-radius: 8px;
+
+  /* Variáveis Semânticas para Glassmorphism/Surfaces (Dark) */
+  --modal-bg: rgba(30, 30, 46, 0.95);
+  --modal-border: rgba(255, 255, 255, 0.08);
+  --surface-bg: rgba(255, 255, 255, 0.03);
+  --surface-border: rgba(255, 255, 255, 0.05);
+  --surface-hover: rgba(255, 255, 255, 0.05);
+  --icon-bg: rgba(255, 255, 255, 0.05);
+  --dropzone-bg: rgba(255, 255, 255, 0.02);
+  --dropzone-border: rgba(255, 255, 255, 0.15);
 }
 
 /* Reset básico e fontes */
