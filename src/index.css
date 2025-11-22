@@ -1,14 +1,54 @@
 /* src/index.css */
 :root {
-  /* Paleta de Cores (extraída da imagem) */
-  --color-bg-deep-dark: #1E1E2F; /* Fundo principal do conteúdo */
-  --color-bg-dark: #2C2F36;       /* Fundo da Sidebar e Topbar */
-  --color-bg-card: #383B42;       /* Fundo dos cards (e da Topbar, parecem iguais) */
-  --color-primary-accent: #4A4A6A; /* Item ativo na Sidebar */
-  --color-toggle-accent: #8A63D2; /* Cor do botão toggle */
-  --color-text-light: #F0F0F0;    /* Texto claro principal */
-  --color-text-secondary: #A0A0A0; /* Texto cinza (descrições) */
-  --color-text-dark: #333333;      /* Texto escuro (não usado no dark mode) */
+  /* Paleta de Cores - Light Mode (Default) */
+  --color-bg-deep-dark: #f3f4f6;
+  /* Fundo principal claro */
+  --color-bg-dark: #ffffff;
+  /* Fundo da Sidebar e Topbar claro */
+  --color-bg-card: #ffffff;
+  /* Fundo dos cards claro */
+  --color-primary-accent: #e5e7eb;
+  /* Item ativo na Sidebar claro */
+  --color-toggle-accent: #8A63D2;
+  /* Mantém o roxo como accent */
+  --color-text-light: #111827;
+  /* Texto principal escuro */
+  --color-text-secondary: #6b7280;
+  /* Texto secundário cinza */
+  --color-text-dark: #f9fafb;
+  /* Texto claro (para contraste se necessário) */
+
+  /* Variáveis específicas da Sidebar (Light) */
+  --sidebar-bg: #ffffff;
+  --sidebar-text-primary: #111827;
+  --sidebar-text-secondary: #6b7280;
+  --sidebar-accent: #6e56cf;
+  --sidebar-accent-bg: rgba(110, 86, 207, 0.1);
+  --sidebar-hover-bg: #f3f4f6;
+  --sidebar-search-bg: #f3f4f6;
+  --sidebar-border-radius: 8px;
+}
+
+html.dark {
+  /* Paleta de Cores - Dark Mode */
+  --color-bg-deep-dark: #1E1E2F;
+  --color-bg-dark: #2C2F36;
+  --color-bg-card: #383B42;
+  --color-primary-accent: #4A4A6A;
+  --color-toggle-accent: #8A63D2;
+  --color-text-light: #F0F0F0;
+  --color-text-secondary: #A0A0A0;
+  --color-text-dark: #333333;
+
+  /* Variáveis específicas da Sidebar (Dark) */
+  --sidebar-bg: #1e1e2e;
+  --sidebar-text-primary: #ffffff;
+  --sidebar-text-secondary: #a6accd;
+  --sidebar-accent: #6e56cf;
+  --sidebar-accent-bg: rgba(110, 86, 207, 0.15);
+  --sidebar-hover-bg: rgba(255, 255, 255, 0.05);
+  --sidebar-search-bg: #181825;
+  --sidebar-border-radius: 8px;
 }
 
 /* Reset básico e fontes */
@@ -23,4 +63,5 @@ body {
     Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   background-color: var(--color-bg-deep-dark);
   color: var(--color-text-light);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
