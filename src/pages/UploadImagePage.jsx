@@ -1,3 +1,4 @@
+
 // src/components/UploadImagePage.jsx
 import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
@@ -5,7 +6,8 @@ import {
   FiImage,
   FiUploadCloud,
   FiPlus,
-  FiTrash2
+  FiTrash2,
+  FiCheck
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 
@@ -30,19 +32,19 @@ function formatBytes(bytes, decimals = 2) {
 const UploadImagePage = () => {
   // Estado para guardar os arquivos (que são objetos File)
   const [files, setFiles] = useState([]);
-  
+
   // Get authentication token from context
   const { token } = useAuth();
 
   // Função chamada ao soltar ou selecionar arquivos
   const onDrop = useCallback((acceptedFiles) => {
-    
+
     // Adiciona os novos arquivos, criando um ID e uma URL de miniatura
     const newFiles = acceptedFiles.map(file => Object.assign(file, {
       id: Math.random().toString(36).substring(7),
       preview: URL.createObjectURL(file) // Cria URL para a miniatura
     }));
-    
+
     setFiles(prevFiles => [...prevFiles, ...newFiles]);
   }, []);
 
@@ -80,7 +82,7 @@ const UploadImagePage = () => {
       'image/jpeg': ['.jpg', '.jpeg'],
       'image/webp': ['.webp'],
     },
-    noClick: true,
+    noClick: false, // Permite clique no dropzone
     noKeyboard: true,
   });
 
@@ -92,7 +94,7 @@ const UploadImagePage = () => {
     }
 
     console.log("Iniciando envio das imagens...");
-    
+
     if (!token) {
       alert('Você não está autenticado. Por favor, faça login novamente.');
       return;
@@ -107,12 +109,12 @@ const UploadImagePage = () => {
         const formData = new FormData();
         formData.append('file', file);
 
-        console.log(`Uploading: ${file.name}`);
+        console.log(`Uploading: ${file.name} `);
 
-        const response = await fetch(`${API_BASE_URL}/images/upload`, {
+        const response = await fetch(`${API_BASE_URL} /images/upload`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${token} `
           },
           body: formData
         });
@@ -120,94 +122,108 @@ const UploadImagePage = () => {
         const data = await response.json();
 
         if (response.ok) {
-          console.log(`✅ Success: ${file.name}`, data);
+          console.log(`✅ Success: ${file.name} `, data);
           successCount++;
         } else {
-          console.error(`❌ Failed: ${file.name}`, data);
+          console.error(`❌ Failed: ${file.name} `, data);
           failureCount++;
-          alert(`Erro ao upload ${file.name}: ${data.detail || data.message || 'Unknown error'}`);
+          alert(`Erro ao upload ${file.name}: ${data.detail || data.message || 'Unknown error'} `);
         }
       } catch (error) {
-        console.error(`Error uploading ${file.name}:`, error);
+        console.error(`Error uploading ${file.name}: `, error);
         failureCount++;
-        alert(`Erro na requisição para ${file.name}: ${error.message}`);
+        alert(`Erro na requisição para ${file.name}: ${error.message} `);
       }
     }
 
     // Show summary
     if (successCount > 0) {
-      alert(`✅ Upload concluído: ${successCount} imagem(ns) enviada(s) com sucesso${failureCount > 0 ? `, ${failureCount} falhou` : ''}!`);
+      alert(`✅ Upload concluído: ${successCount} imagem(ns) enviada(s) com sucesso${failureCount > 0 ? `, ${failureCount} falhou` : ''} !`);
       if (failureCount === 0) {
         removeAllFiles(); // Clear list only if all uploads succeeded
       }
     } else {
-      alert(`❌ Nenhuma imagem foi enviada. Tente novamente.`);
+      alert(`❌ Nenhuma imagem foi enviada.Tente novamente.`);
     }
   };
 
+  const hasFiles = files.length > 0;
+
   return (
-    <div className="upload-image-container">
-      {/* --- CABEÇALHO --- */}
-      <div className="upload-header">
-        <FiImage className="icon" />
-        <h2>Upload de Imagens</h2>
-      </div>
+    <div className="upload-modal">
+      <div className="upload-image-container">
+        {/* --- CABEÇALHO --- */}
+        <div className="upload-header">
+          <div className="header-icon-wrapper">
+            <FiImage className="icon" />
+          </div>
+          <h2>Upload de Imagens</h2>
+          <p className="upload-subtitle">Adicione imagens para análise de integridade</p>
+        </div>
 
-      {/* --- ÁREA DE DROPZONE --- */}
-      <div
-        {...getRootProps()}
-        className={`dropzone ${isDragActive ? 'active' : ''}`}
-      >
-        <input {...getInputProps()} />
-        <FiUploadCloud className="drop-icon" />
-        {isDragActive ? (
-          <p>Solte as imagens aqui ...</p>
+        {/* --- ÁREA DE DROPZONE (HERO) --- */}
+        {/* Se não tiver arquivos, mostra o Dropzone grande. Se tiver, mostra um botão menor ou mantém o dropzone acessível? 
+            O user pediu: "Fundir o botão 'Adicionar Imagem' com a Dropzone quando a lista estiver vazia".
+            Vou manter o Dropzone sempre visível mas ajustado, ou ocultar se a lista estiver cheia?
+            Melhor: Se vazio -> Hero Dropzone. Se tem arquivos -> Lista + Botão "Adicionar mais" (que pode ser um mini dropzone ou botão normal).
+        */}
+
+        {!hasFiles ? (
+          <div
+            {...getRootProps()}
+            className={`dropzone hero - dropzone ${isDragActive ? 'active' : ''} `}
+          >
+            <input {...getInputProps()} />
+            <div className="dropzone-content">
+              <div className="icon-circle">
+                <FiUploadCloud className="drop-icon" />
+              </div>
+              <h3>Arraste e solte suas imagens aqui</h3>
+              <p>ou clique para selecionar do computador</p>
+              <span className="file-types">Suporta: PNG, JPG, WEBP</span>
+            </div>
+          </div>
         ) : (
-          <p>Solte aqui as imagens que deseja analisar</p>
+          <>
+            {/* --- LISTA DE ARQUIVOS --- */}
+            <div className="file-list-container">
+              <div className="file-list-header">
+                <h3>Arquivos Selecionados ({files.length})</h3>
+                <button className="add-more-button" onClick={open}>
+                  <FiPlus /> Adicionar mais
+                </button>
+              </div>
+
+              <div className="file-list">
+                {files.map((file) => (
+                  <ImageFileItem
+                    key={file.id}
+                    file={file}
+                    onRemove={removeFile}
+                  />
+                ))}
+              </div>
+            </div>
+          </>
         )}
-      </div>
 
-      {/* --- CABEÇALHO DA LISTA DE ARQUIVOS (com botão Adicionar) --- */}
-      <div className="file-list-header">
-        <h3>Imagens</h3>
-        <button className="add-button" onClick={open}>
-          <FiPlus />
-          ADICIONAR IMAGEM
-        </button>
-      </div>
-
-      {/* --- LISTA DE ARQUIVOS --- */}
-      <div className="file-list">
-        {files.length === 0 && (
-          <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-            Nenhuma imagem adicionada ainda.
-          </p>
-        )}
-
-        {files.map((file) => (
-          <ImageFileItem
-            key={file.id}
-            file={file}
-            onRemove={removeFile}
-          />
-        ))}
-      </div>
-
-      {/* --- RODAPÉ COM BOTÕES --- */}
-      <div className="upload-footer">
-        <button
-          className="footer-button cancel-button"
-          onClick={removeAllFiles}
-        >
-          Cancelar
-        </button>
-        <button
-          className="footer-button submit-button"
-          onClick={handleSubmit}
-          disabled={files.length === 0} // Desativa se não houver arquivos
-        >
-          Concluir
-        </button>
+        {/* --- RODAPÉ COM BOTÕES --- */}
+        <div className="upload-footer">
+          <button
+            className="footer-button cancel-button"
+            onClick={removeAllFiles}
+            disabled={!hasFiles}
+          >
+            Cancelar
+          </button>
+          <button
+            className="footer-button submit-button"
+            onClick={handleSubmit}
+            disabled={!hasFiles}
+          >
+            <FiCheck /> Concluir Upload
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -222,30 +238,32 @@ const ImageFileItem = ({ file, onRemove }) => {
       {/* Miniatura */}
       <div className="image-thumbnail">
         {file.preview ? (
-          <img 
-            src={file.preview} 
+          <img
+            src={file.preview}
             alt={file.name}
-            onLoad={() => { 
-              // Opcional: só para garantir que a URL é válida
-              // Se a imagem quebrar, podemos revogar
-            }}
           />
         ) : (
-          <FiImage className="icon" /> // Ícone placeholder
+          <FiImage className="icon" />
         )}
       </div>
-      
+
       {/* Detalhes (nome, tamanho) */}
       <div className="image-details">
-        <p className="filename">{file.name}</p>
-        <p className="filesize">
-          {formatBytes(file.size)}
-        </p>
+        <div className="file-info">
+          <p className="filename">{file.name}</p>
+          <span className="filesize">{formatBytes(file.size)}</span>
+        </div>
+        {/* Barra de progresso visual (mock) */}
+        <div className="progress-bar-container">
+          <div className="progress-bar" style={{ width: '100%' }}></div>
+        </div>
       </div>
 
       {/* Ações (lixeira) */}
       <div className="image-actions">
-        <FiTrash2 className="icon-button" onClick={() => onRemove(file.id)} />
+        <button className="action-icon-button delete" onClick={() => onRemove(file.id)}>
+          <FiTrash2 />
+        </button>
       </div>
     </div>
   );

@@ -1,221 +1,359 @@
 /* src/components/UploadImagePage.css */
-/* É 90% igual ao UploadPDFPage.css, com mudanças nos itens da lista */
 
-.upload-image-container {
-  background-color: var(--color-bg-card);
-  border-radius: 16px;
-  padding: 2.5rem;
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  border: 1px solid #4a4a6a;
+/* Container Principal (Modal) */
+.upload-modal {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 80vh;
+  /* Garante que o modal fique centralizado verticalmente */
+  padding: 2rem;
 }
 
+.upload-image-container {
+  background-color: rgba(30, 30, 46, 0.95);
+  /* Fundo escuro semi-transparente */
+  backdrop-filter: blur(12px);
+  /* Efeito de vidro */
+  border-radius: 24px;
+  padding: 3rem;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* Borda sutil */
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  /* Sombra profunda */
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* --- Cabeçalho --- */
 .upload-header {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 2rem;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.header-icon-wrapper {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, rgba(110, 86, 207, 0.2), rgba(110, 86, 207, 0.05));
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+  border: 1px solid rgba(110, 86, 207, 0.2);
 }
 
 .upload-header .icon {
-  font-size: 3rem;
-  color: var(--color-text-secondary);
+  font-size: 2rem;
+  color: var(--color-toggle-accent);
 }
 
 .upload-header h2 {
   font-size: 1.75rem;
+  font-weight: 700;
   color: var(--color-text-light);
-  margin-top: 1rem;
+  margin-bottom: 0.5rem;
 }
 
-/* --- Dropzone (igual) --- */
-.dropzone {
-  border: 2px dashed var(--color-primary-accent);
-  border-radius: 12px;
-  padding: 2rem;
+.upload-subtitle {
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+}
+
+/* --- Hero Dropzone --- */
+.dropzone.hero-dropzone {
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 4rem 2rem;
   text-align: center;
   cursor: pointer;
-  background-color: var(--color-bg-deep-dark);
-  transition: all 0.3s ease;
-  min-height: 200px;
+  background-color: rgba(255, 255, 255, 0.02);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 300px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
 }
 
-.dropzone.active {
-  background-color: var(--color-primary-accent);
+.dropzone.hero-dropzone:hover,
+.dropzone.hero-dropzone.active {
+  background-color: rgba(110, 86, 207, 0.05);
   border-color: var(--color-toggle-accent);
+  transform: translateY(-2px);
+}
+
+.dropzone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.icon-circle {
+  width: 80px;
+  height: 80px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  transition: transform 0.3s ease;
+}
+
+.dropzone:hover .icon-circle {
+  transform: scale(1.1);
+  background-color: rgba(110, 86, 207, 0.2);
+}
+
+.drop-icon {
+  font-size: 2.5rem;
+  color: var(--color-text-light);
+}
+
+.dropzone h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-light);
 }
 
 .dropzone p {
-  font-size: 1.1rem;
   color: var(--color-text-secondary);
+  font-size: 1rem;
 }
 
-.dropzone .drop-icon {
-  font-size: 3rem;
-  color: var(--color-text-light);
-  margin-bottom: 1rem;
+.file-types {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.4);
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
 }
 
-/* --- Cabeçalho da Lista (igual) --- */
+/* --- Lista de Arquivos --- */
+.file-list-container {
+  width: 100%;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .file-list-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 2.5rem;
   margin-bottom: 1.5rem;
 }
 
 .file-list-header h3 {
-  font-size: 1.25rem;
-  color: var(--color-text-light);
-}
-
-.add-button {
-  background-color: var(--color-toggle-accent);
+  font-size: 1.1rem;
   color: var(--color-text-light);
   font-weight: 600;
-  border: none;
+}
+
+.add-more-button {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--color-text-secondary);
+  padding: 0.5rem 1rem;
   border-radius: 8px;
-  padding: 0.75rem 1.25rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  transition: background-color 0.3s ease;
+  font-size: 0.9rem;
+  transition: all 0.2s;
 }
 
-.add-button:hover {
-  background-color: #7a52c3;
+.add-more-button:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-light);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
-/* --- Lista de Arquivos (igual) --- */
 .file-list {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  max-height: 300px; /* Altura máxima para a lista rolar */
+  max-height: 400px;
   overflow-y: auto;
-  padding-right: 10px;
+  padding-right: 0.5rem;
 }
 
-/* --- Scrollbar (igual) --- */
-.file-list::-webkit-scrollbar { width: 6px; }
-.file-list::-webkit-scrollbar-track { background: var(--color-bg-deep-dark); border-radius: 10px; }
-.file-list::-webkit-scrollbar-thumb { background: var(--color-primary-accent); border-radius: 10px; }
-.file-list::-webkit-scrollbar-thumb:hover { background: var(--color-toggle-accent); }
-
-/* --- [MUDANÇA] Item Individual da Imagem --- */
-
+/* Item da Lista */
 .image-file-item {
   display: flex;
   align-items: center;
   padding: 1rem;
-  /* Cor de fundo mais escura, como no seu design */
-  background-color: var(--color-bg-deep-dark); 
-  border-radius: 8px;
-  gap: 1.5rem; /* Espaço entre miniatura e texto */
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  gap: 1.5rem;
+  transition: background-color 0.2s;
+}
+
+.image-file-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
 }
 
 .image-thumbnail {
-  width: 80px;  /* Tamanho da miniatura */
-  height: 60px; /* Proporção 4:3 */
+  width: 70px;
+  height: 50px;
   border-radius: 8px;
-  background-color: var(--color-primary-accent); /* Cor do placeholder */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden; /* Garante que a imagem não vaze */
+  background-color: rgba(0, 0, 0, 0.2);
+  overflow: hidden;
   flex-shrink: 0;
 }
 
 .image-thumbnail img {
   width: 100%;
   height: 100%;
-  object-fit: cover; /* Faz a imagem cobrir o espaço */
-}
-
-.image-thumbnail .icon {
-  font-size: 2.5rem;
-  color: var(--color-text-secondary);
+  object-fit: cover;
 }
 
 .image-details {
-  flex-grow: 1; /* Ocupa o espaço */
+  flex-grow: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem; /* Espaço entre nome e descrição */
+  gap: 0.5rem;
 }
 
-.image-details .filename {
-  font-size: 1.1rem;
-  font-weight: 600;
+.file-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.filename {
+  font-weight: 500;
   color: var(--color-text-light);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 0.95rem;
 }
 
-.image-details .filesize {
-  font-size: 0.9rem;
+.filesize {
+  font-size: 0.85rem;
   color: var(--color-text-secondary);
 }
 
-.image-actions {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
+/* Barra de Progresso */
+.progress-bar-container {
+  width: 100%;
+  height: 4px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
 }
 
-.image-actions .icon-button {
-  font-size: 1.25rem;
+.progress-bar {
+  height: 100%;
+  background-color: var(--color-toggle-accent);
+  border-radius: 2px;
+}
+
+/* Ações */
+.action-icon-button {
+  background: transparent;
+  border: none;
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: color 0.2s ease;
+  padding: 0.5rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.image-actions .icon-button:hover {
-  color: var(--color-text-light);
+.action-icon-button:hover {
+  background-color: rgba(255, 50, 50, 0.1);
+  color: #ff4d4d;
 }
 
-
-/* --- Rodapé (igual) --- */
+/* --- Rodapé --- */
 .upload-footer {
   display: flex;
   justify-content: flex-end;
   gap: 1rem;
-  margin-top: 2.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--color-primary-accent);
+  margin-top: auto;
+  padding-top: 1rem;
 }
 
 .footer-button {
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
+  padding: 0.875rem 1.75rem;
+  border-radius: 10px;
   font-weight: 600;
+  font-size: 0.95rem;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .cancel-button {
   background-color: transparent;
-  border: none;
+  border: 1px solid transparent;
   color: var(--color-text-secondary);
 }
+
 .cancel-button:hover {
   color: var(--color-text-light);
+  background-color: rgba(255, 255, 255, 0.05);
 }
 
-/* Renomeado para 'submit' para ser genérico */
 .submit-button {
   background-color: var(--color-toggle-accent);
   border: none;
-  color: var(--color-text-light);
+  color: white;
+  box-shadow: 0 4px 12px rgba(110, 86, 207, 0.3);
 }
+
 .submit-button:hover {
   background-color: #7a52c3;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(110, 86, 207, 0.4);
+}
+
+.submit-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Scrollbar */
+.file-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.file-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.file-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.file-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
