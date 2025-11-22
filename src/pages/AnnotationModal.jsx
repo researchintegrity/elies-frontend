@@ -2,22 +2,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
 import './AnnotationModal.css'; // Vamos criar este
 import { FiLoader, FiTrash2, FiSave, FiX } from 'react-icons/fi';
-
-// ############ DADOS MOCKADOS (Substitua pela sua API) ############
-const fakeAnnotationData = {
-  'img1': [
-    { id: 'anno1', imageId: 'img1', text: 'Núcleo celular identificado', coords: { x: 25.5, y: 30.1, width: 10.2, height: 15.8, unit: '%' } },
-    { id: 'anno2', imageId: 'img1', text: 'Possível mitocôndria', coords: { x: 60.1, y: 55.2, width: 5.0, height: 8.5, unit: '%' } },
-  ],
-  'img2': [
-    { id: 'anno3', imageId: 'img2', text: 'Colônia de bactérias A', coords: { x: 10, y: 15, width: 20, height: 20, unit: '%' } },
-  ],
-  'img3': [], // Imagem sem anotações
-};
-// ############ FIM DOS DADOS MOCKADOS ############
-
 
 const AnnotationModal = ({ image, onClose }) => {
   const { token } = useAuth();
@@ -33,7 +20,7 @@ const AnnotationModal = ({ image, onClose }) => {
   
   // Estado para a anotação que está sendo digitada
   const [newAnnotationText, setNewAnnotationText] = useState('');
-
+  
   // ----- LÓGICA DA API -----
 
   // 1. BUSCAR anotações quando o modal abre
@@ -43,29 +30,26 @@ const AnnotationModal = ({ image, onClose }) => {
       setLoading(true);
       setError(null);
 
-      /* // ############ API GET AQUI ############
       try {
-        const response = await fetch(`https://SUA-API.com/annotations?imageId=${image.id}`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (!response.ok) throw new Error('Falha ao buscar anotações');
+        const response = await fetch(
+          `${API_BASE_URL}/annotations?image_id=${image.id}`,
+          {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }
+        );
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch annotations');
+        }
+        
         const data = await response.json();
         setAnnotations(data);
       } catch (err) {
         setError(err.message);
+        console.error('Error fetching annotations:', err);
       } finally {
         setLoading(false);
       }
-      // ######################################
-      */
-
-      // --- SIMULAÇÃO (Remova ao conectar) ---
-      console.log(`Buscando anotações para imageId: ${image.id}`);
-      setTimeout(() => {
-        setAnnotations(fakeAnnotationData[image.id] || []);
-        setLoading(false);
-      }, 800);
-      // --- FIM DA SIMULAÇÃO ---
     };
 
     fetchAnnotations();
@@ -73,17 +57,29 @@ const AnnotationModal = ({ image, onClose }) => {
 
   // 2. SALVAR uma nova anotação
   const handleSaveAnnotation = async () => {
-    if (!selection || !newAnnotationText) return;
+    if (!selection || !newAnnotationText) {
+      console.warn('Cannot save: selection or text missing', { selection, newAnnotationText });
+      return;
+    }
 
-    const newAnnotation = {
-      imageId: image.id,
-      text: newAnnotationText,
-      coords: selection, // 'selection' já está em { x, y, width, height, unit: '%' }
+    // Ensure all coordinates are valid numbers (not undefined, NaN, or Infinity)
+    const cleanCoords = {
+      x: Number.isFinite(selection.x) ? selection.x : 0,
+      y: Number.isFinite(selection.y) ? selection.y : 0,
+      width: Number.isFinite(selection.width) ? selection.width : 0,
+      height: Number.isFinite(selection.height) ? selection.height : 0,
     };
 
-    /* // ############ API POST AQUI ############
+    const newAnnotation = {
+      image_id: image.id,
+      text: newAnnotationText,
+      coords: cleanCoords,
+    };
+
+    console.log('Saving annotation:', newAnnotation);
+
     try {
-      const response = await fetch(`https://SUA-API.com/annotations`, {
+      const response = await fetch(`${API_BASE_URL}/annotations`, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -91,51 +87,48 @@ const AnnotationModal = ({ image, onClose }) => {
         },
         body: JSON.stringify(newAnnotation),
       });
-      if (!response.ok) throw new Error('Falha ao salvar anotação');
       
-      const savedData = await response.json(); // API deve retornar a anotação com 'id'
-      setAnnotations([...annotations, savedData]); // Adiciona à lista
-
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to save annotation: ${response.status} - ${errorText}`);
+      }
+      
+      const savedData = await response.json();
+      console.log('Saved annotation response:', savedData);
+      
+      // Limpa os campos ANTES de atualizar a lista
+      setNewAnnotationText('');
+      setSelection(null);
+      
+      // Atualiza a lista de anotações
+      setAnnotations([...annotations, savedData]);
+      console.log('Annotations list updated:', [...annotations, savedData]);
+      
     } catch (err) {
-      alert(`Erro: ${err.message}`);
+      alert(`Error: ${err.message}`);
+      console.error('Error saving annotation:', err);
     }
-    // ######################################
-    */
-
-    // --- SIMULAÇÃO (Remova ao conectar) ---
-    console.log("Salvando anotação:", newAnnotation);
-    const savedData = { ...newAnnotation, id: `anno_${Math.random()}` }; // Simula um ID
-    setAnnotations([...annotations, savedData]);
-    // --- FIM DA SIMULAÇÃO ---
-
-    // Limpa os campos
-    setNewAnnotationText('');
-    setSelection(null);
   };
 
   // 3. DELETAR uma anotação
   const handleDeleteAnnotation = async (annotationId) => {
-    /* // ############ API DELETE AQUI ############
     try {
-      const response = await fetch(`https://SUA-API.com/annotations/${annotationId}`, {
+      const response = await fetch(`${API_BASE_URL}/annotations/${annotationId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });
-      if (!response.ok) throw new Error('Falha ao deletar anotação');
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete annotation');
+      }
       
       // Remove da lista no UI
-      setAnnotations(annotations.filter(a => a.id !== annotationId));
+      setAnnotations(annotations.filter(a => a._id !== annotationId));
 
     } catch (err) {
-      alert(`Erro: ${err.message}`);
+      alert(`Error: ${err.message}`);
+      console.error('Error deleting annotation:', err);
     }
-    // ######################################
-    */
-
-    // --- SIMULAÇÃO (Remova ao conectar) ---
-    console.log("Deletando anotação:", annotationId);
-    setAnnotations(annotations.filter(a => a.id !== annotationId));
-    // --- FIM DA SIMULAÇÃO ---
   };
 
 
@@ -148,7 +141,14 @@ const AnnotationModal = ({ image, onClose }) => {
   
   // Chamado ao clicar em uma anotação salva (para destacá-la)
   const handleAnnotationClick = (annotation) => {
-    setSelection(annotation.coords);
+    // Ensure all coordinates are valid numbers
+    const cleanCoords = {
+      x: Number.isFinite(annotation.coords.x) ? annotation.coords.x : 0,
+      y: Number.isFinite(annotation.coords.y) ? annotation.coords.y : 0,
+      width: Number.isFinite(annotation.coords.width) ? annotation.coords.width : 0,
+      height: Number.isFinite(annotation.coords.height) ? annotation.coords.height : 0,
+    };
+    setSelection(cleanCoords);
   };
 
   return (
@@ -179,19 +179,26 @@ const AnnotationModal = ({ image, onClose }) => {
               
               {/* Camada para desenhar as anotações JÁ SALVAS */}
               <div className="saved-annotations-layer">
-                {annotations.map(anno => (
-                  <div
-                    key={anno.id}
-                    className="saved-box"
-                    style={{
-                      left: `${anno.coords.x}%`,
-                      top: `${anno.coords.y}%`,
-                      width: `${anno.coords.width}%`,
-                      height: `${anno.coords.height}%`,
-                    }}
-                    onClick={() => handleAnnotationClick(anno)}
-                  />
-                ))}
+                {annotations.map(anno => {
+                  const x = Number.isFinite(anno.coords?.x) ? anno.coords.x : 0;
+                  const y = Number.isFinite(anno.coords?.y) ? anno.coords.y : 0;
+                  const width = Number.isFinite(anno.coords?.width) ? anno.coords.width : 0;
+                  const height = Number.isFinite(anno.coords?.height) ? anno.coords.height : 0;
+                  
+                  return (
+                    <div
+                      key={anno._id}
+                      className="saved-box"
+                      style={{
+                        left: `${x}%`,
+                        top: `${y}%`,
+                        width: `${width}%`,
+                        height: `${height}%`,
+                      }}
+                      onClick={() => handleAnnotationClick(anno)}
+                    />
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -228,11 +235,11 @@ const AnnotationModal = ({ image, onClose }) => {
                 <div className="list-status">Nenhuma anotação.</div>
               ) : (
                 annotations.map(anno => (
-                  <div key={anno.id} className="annotation-item">
+                  <div key={anno._id} className="annotation-item">
                     <span onClick={() => handleAnnotationClick(anno)}>
                       {anno.text}
                     </span>
-                    <button onClick={() => handleDeleteAnnotation(anno.id)}>
+                    <button onClick={() => handleDeleteAnnotation(anno._id)}>
                       <FiTrash2 />
                     </button>
                   </div>

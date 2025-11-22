@@ -7,8 +7,11 @@ import {
   FiPlus,
   FiTrash2
 } from 'react-icons/fi';
+import { useAuth } from '../context/AuthContext';
 
 import './UploadImagePage.css';
+
+const API_BASE_URL = 'http://localhost:8000';
 
 // --- Funções Auxiliares ---
 
@@ -27,6 +30,9 @@ function formatBytes(bytes, decimals = 2) {
 const UploadImagePage = () => {
   // Estado para guardar os arquivos (que são objetos File)
   const [files, setFiles] = useState([]);
+  
+  // Get authentication token from context
+  const { token } = useAuth();
 
   // Função chamada ao soltar ou selecionar arquivos
   const onDrop = useCallback((acceptedFiles) => {
@@ -79,40 +85,64 @@ const UploadImagePage = () => {
   });
 
   // [IMPORTANTE] Função de envio para a API
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (files.length === 0) {
+      alert('Por favor, selecione pelo menos uma imagem.');
+      return;
+    }
+
     console.log("Iniciando envio das imagens...");
-
-    // 1. Criar um objeto FormData
-    // FormData é a forma correta de enviar arquivos (multipart/form-data)
-    const formData = new FormData();
-
-    // 2. Adicionar cada arquivo ao FormData
-    // 'images' é o nome do "campo" que a sua API vai esperar
-    files.forEach((file) => {
-      formData.append('images', file, file.name);
-    });
     
-    // 3. Simulação do envio (aqui você faria o 'fetch')
-    console.log("FormData pronto para enviar para a API:", formData);
-    alert(`Enviando ${files.length} imagens! (Verifique o console)`);
-    
-    /* // Exemplo de como enviar para a API:
-    fetch('https://sua-api.com/upload', {
-      method: 'POST',
-      body: formData,
-      // headers: { 'Authorization': 'Bearer SEU_TOKEN_AQUI' } // Se precisar de auth
-    })
-    .then(response => response.json())
-    .then(data => {
-      console.log('Sucesso:', data);
-      alert('Upload concluído com sucesso!');
-      removeAllFiles(); // Limpa a lista após o sucesso
-    })
-    .catch(error => {
-      console.error('Erro no upload:', error);
-      alert('Erro ao fazer upload.');
-    });
-    */
+    if (!token) {
+      alert('Você não está autenticado. Por favor, faça login novamente.');
+      return;
+    }
+
+    // Upload each file individually to the backend
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (const file of files) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        console.log(`Uploading: ${file.name}`);
+
+        const response = await fetch(`${API_BASE_URL}/images/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          console.log(`✅ Success: ${file.name}`, data);
+          successCount++;
+        } else {
+          console.error(`❌ Failed: ${file.name}`, data);
+          failureCount++;
+          alert(`Erro ao upload ${file.name}: ${data.detail || data.message || 'Unknown error'}`);
+        }
+      } catch (error) {
+        console.error(`Error uploading ${file.name}:`, error);
+        failureCount++;
+        alert(`Erro na requisição para ${file.name}: ${error.message}`);
+      }
+    }
+
+    // Show summary
+    if (successCount > 0) {
+      alert(`✅ Upload concluído: ${successCount} imagem(ns) enviada(s) com sucesso${failureCount > 0 ? `, ${failureCount} falhou` : ''}!`);
+      if (failureCount === 0) {
+        removeAllFiles(); // Clear list only if all uploads succeeded
+      }
+    } else {
+      alert(`❌ Nenhuma imagem foi enviada. Tente novamente.`);
+    }
   };
 
   return (

@@ -1,6 +1,7 @@
 // src/components/Sidebar.jsx
 import React from 'react';
 import './Sidebar.css';
+import { useAuth } from '../context/AuthContext';
 import { 
   FiImage, 
   FiFileText, 
@@ -14,6 +15,7 @@ import {
 
 // 1. Recebe os props (activePage, onNavigate, pages) do AppLayout
 const Sidebar = ({ activePage, onNavigate, pages }) => {
+  const { user } = useAuth();
   
   // 2. Função helper para definir a classe 'active'
   const getItemClass = (pageKey) => {
@@ -24,7 +26,7 @@ const Sidebar = ({ activePage, onNavigate, pages }) => {
     <nav className="sidebar">
       <div className="sidebar-header">
         <h3>Plataforma de Análise</h3>
-        <p>Bem-vindo, Guilherme</p>
+        <p>Bem-vindo, {user?.username || 'Usuário'}</p>
       </div>
 
       <div className="sidebar-menu">
