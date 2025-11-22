@@ -1,29 +1,87 @@
 /* src/components/Sidebar.css */
+:root {
+  --sidebar-bg: #1e1e2e;
+  --sidebar-text-primary: #ffffff;
+  --sidebar-text-secondary: #a6accd;
+  --sidebar-accent: #6e56cf;
+  /* Roxo suave */
+  --sidebar-accent-bg: rgba(110, 86, 207, 0.15);
+  --sidebar-hover-bg: rgba(255, 255, 255, 0.05);
+  --sidebar-search-bg: #181825;
+  --sidebar-border-radius: 8px;
+}
+
 .sidebar {
-  background-color: var(--color-bg-dark);
+  background-color: var(--sidebar-bg);
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 2rem;
   height: 100vh;
   overflow-y: auto;
+  color: var(--sidebar-text-secondary);
+  font-family: 'Inter', sans-serif;
+  /* Assumindo Inter ou fonte do sistema */
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+/* Header */
 .sidebar-header h3 {
-  font-size: 1rem;
-  color: var(--color-text-secondary);
-  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--sidebar-text-secondary);
+  font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+  opacity: 0.7;
 }
 
 .sidebar-header p {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 600;
-  color: var(--color-text-light);
-  margin-top: 0.5rem;
+  color: var(--sidebar-text-primary);
 }
 
-.sidebar-menu,
+/* Search Input */
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  background-color: var(--sidebar-search-bg);
+  padding: 0.75rem 1rem;
+  border-radius: var(--sidebar-border-radius);
+  gap: 0.75rem;
+  transition: box-shadow 0.2s;
+}
+
+.sidebar-search:focus-within {
+  box-shadow: 0 0 0 2px var(--sidebar-accent);
+}
+
+.search-icon {
+  color: var(--sidebar-text-secondary);
+  font-size: 1.1rem;
+}
+
+.search-input {
+  background: transparent;
+  border: none;
+  color: var(--sidebar-text-primary);
+  font-size: 0.9rem;
+  width: 100%;
+  outline: none;
+}
+
+.search-input::placeholder {
+  color: rgba(166, 172, 205, 0.5);
+}
+
+/* Sections & Menu */
+.sidebar-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
 .sidebar-section {
   display: flex;
   flex-direction: column;
@@ -31,38 +89,72 @@
 }
 
 .section-title {
-  font-size: 0.9rem;
-  color: var(--color-text-secondary);
-  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--sidebar-text-secondary);
+  font-weight: 600;
   text-transform: uppercase;
-  margin-top: 1rem;
+  letter-spacing: 0.05em;
   margin-bottom: 0.5rem;
+  padding-left: 1rem;
+  /* Alinhamento visual com o texto dos botões */
+  opacity: 0.6;
 }
 
+/* Menu Items (Buttons & Links) */
 .menu-item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
+  gap: 1rem;
+  padding: 0.875rem 1rem;
+  border-radius: var(--sidebar-border-radius);
   text-decoration: none;
-  color: var(--color-text-secondary);
+  color: var(--sidebar-text-secondary);
   font-weight: 500;
-  transition: all 0.2s ease-in-out;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
 }
 
 .menu-item svg {
   font-size: 1.25rem;
+  transition: color 0.2s;
 }
 
+/* Hover State */
 .menu-item:hover {
-  background-color: var(--color-bg-card);
-  color: var(--color-text-light);
+  background-color: var(--sidebar-hover-bg);
+  color: var(--sidebar-text-primary);
 }
 
-/* Estilo do item ativo, como no seu design */
+.menu-item:hover svg {
+  color: var(--sidebar-text-primary);
+}
+
+/* Active State */
 .menu-item.active {
-  background-color: var(--color-primary-accent);
-  color: var(--color-text-light);
+  background-color: var(--sidebar-accent-bg);
+  color: var(--sidebar-accent);
   font-weight: 600;
+}
+
+.menu-item.active svg {
+  color: var(--sidebar-accent);
+}
+
+/* Scrollbar customizada (opcional, para combinar com o tema dark) */
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
 }
