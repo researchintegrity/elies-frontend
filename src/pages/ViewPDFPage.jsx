@@ -10,7 +10,7 @@ const ViewPDFPage = () => {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // Get authentication token from context
   const { token } = useAuth();
 
@@ -18,7 +18,7 @@ const ViewPDFPage = () => {
   const fetchDocuments = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       if (!token) {
         throw new Error('Você não está autenticado. Por favor, faça login novamente.');
@@ -26,7 +26,7 @@ const ViewPDFPage = () => {
 
       console.log('Fetching documents with token:', token ? '✅ Present' : '❌ Missing');
 
-      const response = await fetch(`${API_BASE_URL}/api/documents?page=1&per_page=100`, {
+      const response = await fetch(`${API_BASE_URL}/documents?page=1&per_page=100`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -35,7 +35,7 @@ const ViewPDFPage = () => {
       });
 
       console.log('Response status:', response.status);
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: Não foi possível buscar os documentos.`;
@@ -43,7 +43,7 @@ const ViewPDFPage = () => {
       }
 
       const data = await response.json();
-      
+
       if (data.success && data.data) {
         // Transform API data to match the component's expected format
         const transformedDocs = data.data.map(doc => ({
@@ -54,7 +54,7 @@ const ViewPDFPage = () => {
           extractionStatus: doc.extraction_status || 'pending',
           extractedImageCount: doc.extracted_image_count || 0
         }));
-        
+
         setDocuments(transformedDocs);
       } else {
         throw new Error('Formato de resposta inválido da API');
@@ -75,7 +75,7 @@ const ViewPDFPage = () => {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/documents/${docId}`, {
+      const response = await fetch(`${API_BASE_URL}/documents/${docId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -149,7 +149,7 @@ const ViewPDFPage = () => {
         <FiAlertTriangle size={40} />
         <h3>Erro ao carregar</h3>
         <p>{error}</p>
-        <button 
+        <button
           className="retry-button"
           onClick={fetchDocuments}
           style={{
@@ -178,7 +178,7 @@ const ViewPDFPage = () => {
           <h2>Documentos PDF</h2>
           <p>Total: {documents.length} documento(s)</p>
         </div>
-        <button 
+        <button
           onClick={fetchDocuments}
           style={{
             padding: '0.75rem 1.5rem',
@@ -195,7 +195,7 @@ const ViewPDFPage = () => {
           <FiRefreshCw /> Atualizar
         </button>
       </div>
-      
+
       {documents.length === 0 ? (
         <div className="page-status-container">
           <p>Nenhum documento encontrado. Envie um PDF primeiro!</p>
@@ -203,8 +203,8 @@ const ViewPDFPage = () => {
       ) : (
         <div className="documents-grid">
           {documents.map((doc) => (
-            <div 
-              key={doc.id} 
+            <div
+              key={doc.id}
               className="document-card"
             >
               <div className="document-icon">📄</div>
@@ -218,9 +218,9 @@ const ViewPDFPage = () => {
                 </p>
                 <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
                   <span className={`status-badge status-${doc.extractionStatus}`}>
-                    {doc.extractionStatus === 'completed' ? '✅ Completo' : 
-                     doc.extractionStatus === 'processing' ? '⏳ Processando' : 
-                     '⏸️ Aguardando'}
+                    {doc.extractionStatus === 'completed' ? '✅ Completo' :
+                      doc.extractionStatus === 'processing' ? '⏳ Processando' :
+                        '⏸️ Aguardando'}
                   </span>
                   {doc.extractedImageCount > 0 && (
                     <span style={{ marginLeft: '0.5rem' }}>
@@ -230,14 +230,14 @@ const ViewPDFPage = () => {
                 </p>
               </div>
               <div className="document-actions">
-                <button 
+                <button
                   className="action-button download-btn"
                   onClick={() => downloadDocument(doc.id, doc.filename)}
                   title="Download"
                 >
                   <FiDownload />
                 </button>
-                <button 
+                <button
                   className="action-button delete-btn"
                   onClick={() => deleteDocument(doc.id)}
                   title="Deletar"

@@ -111,7 +111,7 @@ const UploadImagePage = () => {
 
         console.log(`Uploading: ${file.name} `);
 
-        const response = await fetch(`${API_BASE_URL} /images/upload`, {
+        const response = await fetch(`${API_BASE_URL}/images/upload`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token} `
@@ -162,10 +162,7 @@ const UploadImagePage = () => {
         </div>
 
         {/* --- ÁREA DE DROPZONE (HERO) --- */}
-        {/* Se não tiver arquivos, mostra o Dropzone grande. Se tiver, mostra um botão menor ou mantém o dropzone acessível? 
-            O user pediu: "Fundir o botão 'Adicionar Imagem' com a Dropzone quando a lista estiver vazia".
-            Vou manter o Dropzone sempre visível mas ajustado, ou ocultar se a lista estiver cheia?
-            Melhor: Se vazio -> Hero Dropzone. Se tem arquivos -> Lista + Botão "Adicionar mais" (que pode ser um mini dropzone ou botão normal).
+        {/* S
         */}
 
         {!hasFiles ? (
