@@ -26,7 +26,8 @@ const ViewPDFPage = () => {
 
       console.log('Fetching documents with token:', token ? '✅ Present' : '❌ Missing');
 
-      const response = await fetch(`${API_BASE_URL}/documents?page=1&per_page=100`, {
+      // Use Core API endpoint which returns a direct list of documents
+      const response = await fetch(`${API_BASE_URL}/documents?limit=100&offset=0`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -44,9 +45,10 @@ const ViewPDFPage = () => {
 
       const data = await response.json();
 
-      if (data.success && data.data) {
+      // Core API returns a direct array of documents
+      if (Array.isArray(data)) {
         // Transform API data to match the component's expected format
-        const transformedDocs = data.data.map(doc => ({
+        const transformedDocs = data.map(doc => ({
           id: doc._id,
           filename: doc.filename,
           uploadedDate: doc.uploaded_date,
@@ -57,7 +59,8 @@ const ViewPDFPage = () => {
 
         setDocuments(transformedDocs);
       } else {
-        throw new Error('Formato de resposta inválido da API');
+        console.error('Unexpected API response format:', data);
+        throw new Error('Formato de resposta inválido da API: Esperado um array.');
       }
 
     } catch (err) {
