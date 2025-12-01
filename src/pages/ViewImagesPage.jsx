@@ -182,7 +182,7 @@ const ViewImagesPage = () => {
     try {
       if (!token) throw new Error('Autenticação necessária');
 
-      const response = await fetch(`${API_BASE_URL}/images?page=1&per_page=100`, {
+      const response = await fetch(`${API_BASE_URL}/api/images?page=1&per_page=100`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 

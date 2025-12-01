@@ -122,10 +122,10 @@ const UploadImagePage = () => {
         const data = await response.json();
 
         if (response.ok) {
-          console.log(`✅ Success: ${file.name} `, data);
+          console.log(`Success: ${file.name} `, data);
           successCount++;
         } else {
-          console.error(`❌ Failed: ${file.name} `, data);
+          console.error(`Failed: ${file.name} `, data);
           failureCount++;
           alert(`Erro ao upload ${file.name}: ${data.detail || data.message || 'Unknown error'} `);
         }
@@ -138,12 +138,12 @@ const UploadImagePage = () => {
 
     // Show summary
     if (successCount > 0) {
-      alert(`✅ Upload concluído: ${successCount} imagem(ns) enviada(s) com sucesso${failureCount > 0 ? `, ${failureCount} falhou` : ''} !`);
+      alert(`Upload concluído: ${successCount} imagem(ns) enviada(s) com sucesso${failureCount > 0 ? `, ${failureCount} falhou` : ''} !`);
       if (failureCount === 0) {
         removeAllFiles(); // Clear list only if all uploads succeeded
       }
     } else {
-      alert(`❌ Nenhuma imagem foi enviada.Tente novamente.`);
+      alert(`Nenhuma imagem foi enviada.Tente novamente.`);
     }
   };
 
