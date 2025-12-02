@@ -1,3 +1,4 @@
+// src/pages/ViewImagesPage.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import './ViewImagesPage.css';
 import {
@@ -8,12 +9,12 @@ import {
   FiX,
   FiUploadCloud,
   FiEye,
-  FiAlertTriangle
+  FiAlertTriangle,
+  FiTrash2
 } from 'react-icons/fi';
-import { useAuth } from '../context/AuthContext';
+import { useImages } from '../hooks/useImages';
+import { api } from '../services/api';
 import { showAlert } from '../utils/alert';
-
-const API_BASE_URL = 'http://localhost:8000';
 
 // --- Components ---
 
@@ -84,7 +85,7 @@ const LightboxModal = ({ image, onClose, imageUrl }) => {
   );
 };
 
-const ImageCard = ({ image, token, onClick }) => {
+const ImageCard = ({ image, onClick, onDelete }) => {
   const [imageUrl, setImageUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -93,14 +94,8 @@ const ImageCard = ({ image, token, onClick }) => {
     let isMounted = true;
     const loadImage = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/images/${image.imageId}/download`, {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (!response.ok) throw new Error('Failed to load');
-
-        const blob = await response.blob();
+        // Use api.download helper
+        const blob = await api.download(`/images/${image.imageId}/download`);
         const url = URL.createObjectURL(blob);
 
         if (isMounted) {
@@ -109,19 +104,20 @@ const ImageCard = ({ image, token, onClick }) => {
         }
       } catch (err) {
         if (isMounted) {
+          console.error(`Error loading image ${image.filename}:`, err);
           setError(true);
           setLoading(false);
         }
       }
     };
 
-    if (token && image.imageId) loadImage();
+    if (image.imageId) loadImage();
 
     return () => {
       isMounted = false;
       if (imageUrl) URL.revokeObjectURL(imageUrl);
     };
-  }, [image.imageId, token]);
+  }, [image.imageId]);
 
   return (
     <article
@@ -144,6 +140,13 @@ const ImageCard = ({ image, token, onClick }) => {
             <img src={imageUrl} alt="" className="image-card-img" loading="lazy" />
             <div className="card-overlay">
               <FiEye className="view-icon" />
+              <button
+                className="delete-icon-btn"
+                onClick={(e) => { e.stopPropagation(); onDelete(image); }}
+                title="Excluir Imagem"
+              >
+                <FiTrash2 />
+              </button>
             </div>
           </>
         )}
@@ -163,9 +166,14 @@ const ImageCard = ({ image, token, onClick }) => {
 // --- Main Page Component ---
 
 const ViewImagesPage = () => {
-  const [images, setImages] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // Use Custom Hook
+  const {
+    images,
+    loading,
+    error,
+    fetchImages,
+    deleteImage
+  } = useImages();
 
   // Filter & Sort State
   const [searchQuery, setSearchQuery] = useState('');
@@ -175,45 +183,10 @@ const ViewImagesPage = () => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedImageUrl, setSelectedImageUrl] = useState(null);
 
-  const { token } = useAuth();
-
-  const fetchImages = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      if (!token) throw new Error('Autenticação necessária');
-
-      const response = await fetch(`${API_BASE_URL}/images?page=1&per_page=100`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!response.ok) throw new Error('Falha ao buscar imagens');
-
-      const data = await response.json();
-
-      if (Array.isArray(data)) {
-        const transformed = data.map(img => ({
-          id: img._id,
-          imageId: img._id,
-          filename: img.filename,
-          uploadedDate: img.uploaded_date,
-          fileSize: img.file_size,
-          sourceType: img.source_type
-        }));
-        setImages(transformed);
-      } else {
-        throw new Error('Formato de dados inválido');
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Initial Fetch
   useEffect(() => {
     fetchImages();
-  }, [token]);
+  }, [fetchImages]);
 
   // Filter and Sort Logic
   const filteredImages = useMemo(() => {
@@ -259,7 +232,7 @@ const ViewImagesPage = () => {
   };
 
   const handleUploadClick = () => {
-    alert("Por favor, use o menu lateral para acessar a página de Upload.");
+    showAlert('Upload', "Por favor, use o menu lateral para acessar a página de Upload.", 'info');
   };
 
   return (
@@ -303,7 +276,7 @@ const ViewImagesPage = () => {
 
             <button
               className="refresh-btn"
-              onClick={fetchImages}
+              onClick={() => fetchImages()}
               title="Atualizar lista"
               aria-label="Atualizar lista de imagens"
             >
@@ -322,7 +295,7 @@ const ViewImagesPage = () => {
           <FiRefreshCw className="empty-icon" style={{ color: '#ff6b6b' }} />
           <h3>Erro ao carregar</h3>
           <p>{error}</p>
-          <button className="upload-link-btn" onClick={fetchImages}>
+          <button className="upload-link-btn" onClick={() => fetchImages()}>
             Tentar Novamente
           </button>
         </div>
@@ -334,8 +307,8 @@ const ViewImagesPage = () => {
             <ImageCard
               key={image.id}
               image={image}
-              token={token}
               onClick={openLightbox}
+              onDelete={deleteImage}
             />
           ))}
         </div>

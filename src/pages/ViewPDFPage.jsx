@@ -15,10 +15,9 @@ import {
   FiX,
   FiUploadCloud
 } from 'react-icons/fi';
-import { useAuth } from '../context/AuthContext';
-import { showConfirm, showToast, showAlert } from '../utils/alert';
-
-const API_BASE_URL = 'http://localhost:8000';
+import { useDocuments } from '../hooks/useDocuments';
+import { api } from '../services/api';
+import { showAlert } from '../utils/alert';
 
 // --- Components ---
 
@@ -49,7 +48,7 @@ const EmptyState = ({ isSearch, onUploadClick }) => (
   </div>
 );
 
-const PDFViewerModal = ({ doc, onClose, token }) => {
+const PDFViewerModal = ({ doc, onClose }) => {
   const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -65,24 +64,15 @@ const PDFViewerModal = ({ doc, onClose, token }) => {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
 
-  // Fetch PDF blob with auth header
+  // Fetch PDF blob
   useEffect(() => {
     let isMounted = true;
     const fetchPdf = async () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch(`${API_BASE_URL}/documents/${doc.id}/download`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
 
-        if (!response.ok) {
-          throw new Error('Falha ao carregar o documento.');
-        }
-
-        const blob = await response.blob();
+        const blob = await api.download(`/documents/${doc.id}/download`);
         const url = URL.createObjectURL(blob);
 
         if (isMounted) {
@@ -98,7 +88,7 @@ const PDFViewerModal = ({ doc, onClose, token }) => {
       }
     };
 
-    if (doc && token) {
+    if (doc) {
       fetchPdf();
     }
 
@@ -108,7 +98,7 @@ const PDFViewerModal = ({ doc, onClose, token }) => {
         URL.revokeObjectURL(pdfBlobUrl);
       }
     };
-  }, [doc, token]);
+  }, [doc]);
 
   return (
     <div className="lightbox-overlay" onClick={onClose} role="dialog" aria-modal="true">
@@ -221,9 +211,15 @@ const DocumentListRow = ({ doc, onView, onDownload, onDelete }) => {
 // --- Main Page Component ---
 
 const ViewPDFPage = () => {
-  const [documents, setDocuments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // Use Custom Hook
+  const {
+    documents,
+    loading,
+    error,
+    fetchDocuments,
+    deleteDocument,
+    downloadDocument
+  } = useDocuments();
 
   // UI State
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
@@ -231,57 +227,10 @@ const ViewPDFPage = () => {
   const [sortBy, setSortBy] = useState('newest');
   const [selectedDoc, setSelectedDoc] = useState(null);
 
-  const { token } = useAuth();
-
-  // Fetch documents
-  const fetchDocuments = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      if (!token) throw new Error('Autenticação necessária');
-
-      // Use Core API endpoint
-      const response = await fetch(`${API_BASE_URL}/documents?limit=100&offset=0`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Erro HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (Array.isArray(data)) {
-        const transformedDocs = data.map(doc => ({
-          id: doc._id,
-          filename: doc.filename,
-          uploadedDate: doc.uploaded_date,
-          fileSize: doc.file_size,
-          extractionStatus: doc.extraction_status || 'pending',
-          extractedImageCount: doc.extracted_image_count || 0
-        }));
-        setDocuments(transformedDocs);
-      } else {
-        throw new Error('Formato de resposta inválido da API');
-      }
-
-    } catch (err) {
-      console.error('Error fetching documents:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Initial Fetch
   useEffect(() => {
     fetchDocuments();
-  }, [token]);
+  }, [fetchDocuments]);
 
   // Filter & Sort Logic
   const filteredDocuments = useMemo(() => {
@@ -305,52 +254,6 @@ const ViewPDFPage = () => {
 
     return result;
   }, [documents, searchQuery, sortBy]);
-
-  // Actions
-  const handleDelete = async (doc) => {
-    const confirmed = await showConfirm(
-      'Tem certeza?',
-      `Deseja realmente excluir o documento "${doc.filename}"? Esta ação não pode ser desfeita.`
-    );
-
-    if (!confirmed) return;
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/documents/${doc.id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!response.ok) throw new Error('Falha ao deletar');
-
-      setDocuments(prev => prev.filter(d => d.id !== doc.id));
-      showToast('Documento deletado com sucesso!', 'success');
-    } catch (err) {
-      showAlert('Erro', `Erro ao deletar: ${err.message}`, 'error');
-    }
-  };
-
-  const handleDownload = async (doc) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/documents/${doc.id}/download`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (!response.ok) throw new Error('Falha no download');
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = doc.filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      showToast('Download iniciado!', 'success');
-    } catch (err) {
-      showAlert('Erro', `Erro ao baixar: ${err.message}`, 'error');
-    }
-  };
 
   const handleUploadClick = () => {
     showAlert('Upload', "Use o menu lateral para acessar a página de Upload.", 'info');
@@ -411,7 +314,7 @@ const ViewPDFPage = () => {
               </button>
             </div>
 
-            <button className="refresh-btn" onClick={fetchDocuments} title="Atualizar">
+            <button className="refresh-btn" onClick={() => fetchDocuments()} title="Atualizar">
               <FiRefreshCw />
             </button>
           </div>
@@ -428,7 +331,7 @@ const ViewPDFPage = () => {
           <FiAlertTriangle className="empty-icon" style={{ color: '#ff6b6b' }} />
           <h3>Erro ao carregar</h3>
           <p>{error}</p>
-          <button className="upload-link-btn" onClick={fetchDocuments}>Tentar Novamente</button>
+          <button className="upload-link-btn" onClick={() => fetchDocuments()}>Tentar Novamente</button>
         </div>
       ) : filteredDocuments.length === 0 ? (
         <EmptyState isSearch={!!searchQuery} onUploadClick={handleUploadClick} />
@@ -440,8 +343,8 @@ const ViewPDFPage = () => {
                 key={doc.id}
                 doc={doc}
                 onView={setSelectedDoc}
-                onDownload={handleDownload}
-                onDelete={handleDelete}
+                onDownload={downloadDocument}
+                onDelete={deleteDocument}
               />
             ))
           ) : (
@@ -459,8 +362,8 @@ const ViewPDFPage = () => {
                   key={doc.id}
                   doc={doc}
                   onView={setSelectedDoc}
-                  onDownload={handleDownload}
-                  onDelete={handleDelete}
+                  onDownload={downloadDocument}
+                  onDelete={deleteDocument}
                 />
               ))}
             </div>
@@ -472,7 +375,6 @@ const ViewPDFPage = () => {
       {selectedDoc && (
         <PDFViewerModal
           doc={selectedDoc}
-          token={token}
           onClose={() => setSelectedDoc(null)}
         />
       )}

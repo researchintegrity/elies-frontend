@@ -1,5 +1,4 @@
-
-// src/components/UploadImagePage.jsx
+// src/pages/UploadImagePage.jsx
 import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
@@ -7,13 +6,13 @@ import {
   FiUploadCloud,
   FiPlus,
   FiTrash2,
-  FiCheck
+  FiCheck,
+  FiUpload
 } from 'react-icons/fi';
-import { useAuth } from '../context/AuthContext';
+import { useImages } from '../hooks/useImages';
+import { showAlert, showToast } from '../utils/alert';
 
 import './UploadImagePage.css';
-
-const API_BASE_URL = 'http://localhost:8000';
 
 // --- Funções Auxiliares ---
 
@@ -33,16 +32,15 @@ const UploadImagePage = () => {
   // Estado para guardar os arquivos (que são objetos File)
   const [files, setFiles] = useState([]);
 
-  // Get authentication token from context
-  const { token } = useAuth();
+  // Use Custom Hook
+  const { uploadImage } = useImages();
 
   // Função chamada ao soltar ou selecionar arquivos
   const onDrop = useCallback((acceptedFiles) => {
-
-    // Adiciona os novos arquivos, criando um ID e uma URL de miniatura
+    // Adiciona os novos arquivos, criando um ID e URL de preview
     const newFiles = acceptedFiles.map(file => Object.assign(file, {
-      id: Math.random().toString(36).substring(7),
-      preview: URL.createObjectURL(file) // Cria URL para a miniatura
+      preview: URL.createObjectURL(file),
+      id: Math.random().toString(36).substring(7)
     }));
 
     setFiles(prevFiles => [...prevFiles, ...newFiles]);
@@ -50,37 +48,32 @@ const UploadImagePage = () => {
 
   // Remove um arquivo da lista
   const removeFile = (fileId) => {
-    // Encontra o arquivo para revogar a URL da miniatura
-    const fileToRemove = files.find(file => file.id === fileId);
-    if (fileToRemove) {
-      URL.revokeObjectURL(fileToRemove.preview);
-    }
-    setFiles(prevFiles => prevFiles.filter(file => file.id !== fileId));
+    setFiles(prevFiles => {
+      const updatedFiles = prevFiles.filter(file => file.id !== fileId);
+      // Revoga a URL do objeto para evitar memory leak (opcional aqui, mas boa prática)
+      const removedFile = prevFiles.find(file => file.id === fileId);
+      if (removedFile) URL.revokeObjectURL(removedFile.preview);
+      return updatedFiles;
+    });
   };
 
   // Remove todos os arquivos ("Cancelar")
   const removeAllFiles = () => {
-    // Revoga todas as URLs de miniatura antes de limpar
+    // Limpa previews
     files.forEach(file => URL.revokeObjectURL(file.preview));
     setFiles([]);
   };
 
-  // [IMPORTANTE] Limpeza de Memória
-  // Revoga as URLs de miniatura quando o componente é desmontado
+  // Limpeza de memória ao desmontar o componente
   useEffect(() => {
-    return () => {
-      files.forEach(file => URL.revokeObjectURL(file.preview));
-    };
+    return () => files.forEach(file => URL.revokeObjectURL(file.preview));
   }, [files]);
-
 
   // Configuração do Dropzone
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
-    accept: { // Aceita apenas os principais tipos de imagem
-      'image/png': ['.png'],
-      'image/jpeg': ['.jpg', '.jpeg'],
-      'image/webp': ['.webp'],
+    accept: {
+      'image/*': ['.jpeg', '.png', '.jpg', '.gif', '.webp']
     },
     noClick: false, // Permite clique no dropzone
     noKeyboard: true,
@@ -89,61 +82,41 @@ const UploadImagePage = () => {
   // [IMPORTANTE] Função de envio para a API
   const handleSubmit = async () => {
     if (files.length === 0) {
-      alert('Por favor, selecione pelo menos uma imagem.');
+      showAlert('Atenção', 'Por favor, selecione pelo menos uma imagem.', 'warning');
       return;
     }
 
-    console.log("Iniciando envio das imagens...");
-
-    if (!token) {
-      alert('Você não está autenticado. Por favor, faça login novamente.');
-      return;
-    }
+    console.log("Iniciando envio dos arquivos...");
 
     // Upload each file individually to the backend
     let successCount = 0;
     let failureCount = 0;
 
     for (const file of files) {
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
+      console.log(`Uploading Image: ${file.name} `);
 
-        console.log(`Uploading: ${file.name} `);
+      const result = await uploadImage(file);
 
-        const response = await fetch(`${API_BASE_URL}/images/upload`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token} `
-          },
-          body: formData
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-          console.log(`Success: ${file.name} `, data);
-          successCount++;
-        } else {
-          console.error(`Failed: ${file.name} `, data);
-          failureCount++;
-          alert(`Erro ao upload ${file.name}: ${data.detail || data.message || 'Unknown error'} `);
-        }
-      } catch (error) {
-        console.error(`Error uploading ${file.name}: `, error);
+      if (result.success) {
+        console.log(`Success: ${file.name}`);
+        successCount++;
+      } else {
+        console.error(`Failed: ${file.name}`, result.error);
         failureCount++;
-        alert(`Erro na requisição para ${file.name}: ${error.message} `);
+        showToast(`Erro ao upload ${file.name}: ${result.error}`, 'error');
       }
     }
 
     // Show summary
     if (successCount > 0) {
-      alert(`Upload concluído: ${successCount} imagem(ns) enviada(s) com sucesso${failureCount > 0 ? `, ${failureCount} falhou` : ''} !`);
       if (failureCount === 0) {
-        removeAllFiles(); // Clear list only if all uploads succeeded
+        showAlert('Sucesso!', `Upload concluído: ${successCount} imagem(ns) enviada(s) com sucesso!`, 'success');
+        removeAllFiles();
+      } else {
+        showAlert('Concluído Parcialmente', `Upload concluído: ${successCount} sucesso(s), ${failureCount} falha(s).`, 'warning');
       }
     } else {
-      alert(`Nenhuma imagem foi enviada.Tente novamente.`);
+      showAlert('Falha no Upload', `Nenhuma imagem foi enviada. Tente novamente.`, 'error');
     }
   };
 
@@ -155,20 +128,17 @@ const UploadImagePage = () => {
         {/* --- CABEÇALHO --- */}
         <div className="upload-header">
           <div className="header-icon-wrapper">
-            <FiImage className="icon" />
+            <FiUpload className="icon" />
           </div>
           <h2>Upload de Imagens</h2>
-          <p className="upload-subtitle">Adicione imagens para análise de integridade</p>
+          <p className="upload-subtitle">Adicione imagens para análise e processamento</p>
         </div>
 
         {/* --- ÁREA DE DROPZONE (HERO) --- */}
-        {/* S
-        */}
-
         {!hasFiles ? (
           <div
             {...getRootProps()}
-            className={`dropzone hero - dropzone ${isDragActive ? 'active' : ''} `}
+            className={`dropzone hero-dropzone ${isDragActive ? 'active' : ''} `}
           >
             <input {...getInputProps()} />
             <div className="dropzone-content">
@@ -177,7 +147,7 @@ const UploadImagePage = () => {
               </div>
               <h3>Arraste e solte suas imagens aqui</h3>
               <p>ou clique para selecionar do computador</p>
-              <span className="file-types">Suporta: PNG, JPG, WEBP</span>
+              <span className="file-types">Suporta: JPG, PNG, GIF, WEBP</span>
             </div>
           </div>
         ) : (
@@ -234,11 +204,8 @@ const ImageFileItem = ({ file, onRemove }) => {
     <div className="image-file-item">
       {/* Miniatura */}
       <div className="image-thumbnail">
-        {file.preview ? (
-          <img
-            src={file.preview}
-            alt={file.name}
-          />
+        {file.type.startsWith('image/') ? (
+          <img src={file.preview} alt={file.name} />
         ) : (
           <FiImage className="icon" />
         )}

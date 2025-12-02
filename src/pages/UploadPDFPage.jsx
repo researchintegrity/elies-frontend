@@ -1,5 +1,5 @@
-// src/components/UploadPDFPage.jsx
-import React, { useState, useCallback, useEffect } from 'react';
+// src/pages/UploadPDFPage.jsx
+import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
   FiFileText,
@@ -9,11 +9,10 @@ import {
   FiCheck,
   FiUpload
 } from 'react-icons/fi';
-import { useAuth } from '../context/AuthContext';
+import { useDocuments } from '../hooks/useDocuments';
+import { showAlert, showToast } from '../utils/alert';
 
 import './UploadPDFPage.css';
-
-const API_BASE_URL = 'http://localhost:8000';
 
 // --- Funções Auxiliares ---
 
@@ -33,8 +32,8 @@ const UploadPDFPage = () => {
   // Estado para guardar os arquivos (que são objetos File)
   const [files, setFiles] = useState([]);
 
-  // Get authentication token from context
-  const { token } = useAuth();
+  // Use Custom Hook
+  const { uploadDocument } = useDocuments();
 
   // Função chamada ao soltar ou selecionar arquivos
   const onDrop = useCallback((acceptedFiles) => {
@@ -70,61 +69,41 @@ const UploadPDFPage = () => {
   // [IMPORTANTE] Função de envio para a API
   const handleSubmit = async () => {
     if (files.length === 0) {
-      alert('Por favor, selecione pelo menos um PDF.');
+      showAlert('Atenção', 'Por favor, selecione pelo menos um PDF.', 'warning');
       return;
     }
 
     console.log("Iniciando envio dos arquivos...");
-
-    if (!token) {
-      alert('Você não está autenticado. Por favor, faça login novamente.');
-      return;
-    }
 
     // Upload each file individually to the backend
     let successCount = 0;
     let failureCount = 0;
 
     for (const file of files) {
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
+      console.log(`Uploading PDF: ${file.name} `);
 
-        console.log(`Uploading PDF: ${file.name} `);
+      const result = await uploadDocument(file);
 
-        const response = await fetch(`${API_BASE_URL}/documents/upload`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token} `
-          },
-          body: formData
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-          console.log(`Success: ${file.name} `, data);
-          successCount++;
-        } else {
-          console.error(`Failed: ${file.name} `, data);
-          failureCount++;
-          alert(`Erro ao upload ${file.name}: ${data.detail || data.message || 'Unknown error'} `);
-        }
-      } catch (error) {
-        console.error(`Error uploading ${file.name}: `, error);
+      if (result.success) {
+        console.log(`Success: ${file.name}`);
+        successCount++;
+      } else {
+        console.error(`Failed: ${file.name}`, result.error);
         failureCount++;
-        alert(`Erro na requisição para ${file.name}: ${error.message} `);
+        showToast(`Erro ao upload ${file.name}: ${result.error}`, 'error');
       }
     }
 
     // Show summary
     if (successCount > 0) {
-      alert(`Upload concluído: ${successCount} PDF(s) enviado(s) com sucesso${failureCount > 0 ? `, ${failureCount} falhou` : ''} !`);
       if (failureCount === 0) {
-        removeAllFiles(); // Clear list only if all uploads succeeded
+        showAlert('Sucesso!', `Upload concluído: ${successCount} PDF(s) enviado(s) com sucesso!`, 'success');
+        removeAllFiles();
+      } else {
+        showAlert('Concluído Parcialmente', `Upload concluído: ${successCount} sucesso(s), ${failureCount} falha(s).`, 'warning');
       }
     } else {
-      alert(`Nenhum PDF foi enviado. Tente novamente.`);
+      showAlert('Falha no Upload', `Nenhum PDF foi enviado. Tente novamente.`, 'error');
     }
   };
 
