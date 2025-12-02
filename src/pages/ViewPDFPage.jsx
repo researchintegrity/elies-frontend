@@ -16,6 +16,7 @@ import {
   FiUploadCloud
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
+import { showConfirm, showToast, showAlert } from '../utils/alert';
 
 const API_BASE_URL = 'http://localhost:8000';
 
@@ -307,7 +308,12 @@ const ViewPDFPage = () => {
 
   // Actions
   const handleDelete = async (doc) => {
-    if (!window.confirm(`Tem certeza que deseja deletar "${doc.filename}"?`)) return;
+    const confirmed = await showConfirm(
+      'Tem certeza?',
+      `Deseja realmente excluir o documento "${doc.filename}"? Esta ação não pode ser desfeita.`
+    );
+
+    if (!confirmed) return;
 
     try {
       const response = await fetch(`${API_BASE_URL}/documents/${doc.id}`, {
@@ -318,9 +324,9 @@ const ViewPDFPage = () => {
       if (!response.ok) throw new Error('Falha ao deletar');
 
       setDocuments(prev => prev.filter(d => d.id !== doc.id));
-      // alert('Documento deletado com sucesso!'); // Optional: toast notification better
+      showToast('Documento deletado com sucesso!', 'success');
     } catch (err) {
-      alert(`Erro ao deletar: ${err.message}`);
+      showAlert('Erro', `Erro ao deletar: ${err.message}`, 'error');
     }
   };
 
@@ -340,13 +346,14 @@ const ViewPDFPage = () => {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      showToast('Download iniciado!', 'success');
     } catch (err) {
-      alert(`Erro ao baixar: ${err.message}`);
+      showAlert('Erro', `Erro ao baixar: ${err.message}`, 'error');
     }
   };
 
   const handleUploadClick = () => {
-    alert("Use o menu lateral para acessar a página de Upload.");
+    showAlert('Upload', "Use o menu lateral para acessar a página de Upload.", 'info');
   };
 
   return (

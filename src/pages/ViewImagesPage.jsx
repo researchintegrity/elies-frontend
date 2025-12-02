@@ -11,6 +11,7 @@ import {
   FiAlertTriangle
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
+import { showAlert } from '../utils/alert';
 
 const API_BASE_URL = 'http://localhost:8000';
 
