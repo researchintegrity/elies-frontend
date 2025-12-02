@@ -37,6 +37,11 @@ const handleResponse = async (response) => {
         throw new Error('Sessão expirada ou inválida. Por favor, faça login novamente.');
     }
 
+    // Handle 204 No Content (Success with no body)
+    if (response.status === 204) {
+        return null;
+    }
+
     const contentType = response.headers.get('content-type');
     let data;
 
