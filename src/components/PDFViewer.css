@@ -1,0 +1,140 @@
+/* src/components/PDFViewer.css */
+
+.pdf-viewer-root {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    background-color: #525659;
+    /* Standard PDF viewer dark gray */
+    color: white;
+    overflow: hidden;
+    border-radius: 8px;
+}
+
+/* Toolbar */
+.pdf-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background-color: #323639;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+    gap: 1rem;
+}
+
+.pdf-toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pdf-toolbar-btn {
+    background: transparent;
+    border: none;
+    color: #f1f1f1;
+    padding: 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
+}
+
+.pdf-toolbar-btn:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.pdf-toolbar-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pdf-page-info {
+    font-size: 0.9rem;
+    color: #e0e0e0;
+    white-space: nowrap;
+}
+
+.pdf-zoom-level {
+    min-width: 3rem;
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+/* Document Container */
+.pdf-document-container {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    justify-content: center;
+    padding: 2rem;
+    position: relative;
+}
+
+.pdf-document-wrapper {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease-out;
+}
+
+/* React-PDF Page Overrides */
+.react-pdf__Page {
+    background-color: white;
+}
+
+.react-pdf__Page__canvas {
+    display: block;
+    user-select: none;
+}
+
+.react-pdf__Page__textContent {
+    user-select: text;
+}
+
+/* Loading & Error States */
+.pdf-loading,
+.pdf-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    color: #e0e0e0;
+    gap: 1rem;
+}
+
+.pdf-loading-spinner {
+    font-size: 2.5rem;
+    animation: spin 1s linear infinite;
+    color: #3498db;
+}
+
+.pdf-error-icon {
+    font-size: 3rem;
+    color: #e74c3c;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .pdf-toolbar {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .pdf-toolbar-group {
+        margin-bottom: 0.5rem;
+    }
+}

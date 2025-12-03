@@ -18,6 +18,7 @@ import {
 import { useDocuments } from '../hooks/useDocuments';
 import { api } from '../services/api';
 import { showAlert } from '../utils/alert';
+import PDFViewer from '../components/PDFViewer';
 
 // --- Components ---
 
@@ -123,12 +124,7 @@ const PDFViewerModal = ({ doc, onClose }) => {
               <p>{error}</p>
             </div>
           ) : (
-            <iframe
-              src={pdfBlobUrl}
-              title={doc.filename}
-              className="pdf-iframe"
-              type="application/pdf"
-            />
+            <PDFViewer url={pdfBlobUrl} filename={doc.filename} />
           )}
         </div>
 
