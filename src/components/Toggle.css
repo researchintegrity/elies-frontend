@@ -2,8 +2,9 @@
 .toggle-switch {
   position: relative;
   display: inline-block;
-  width: 50px; /* Largura do toggle */
-  height: 28px; /* Altura do toggle */
+  width: 54px;
+  /* Aumentado levemente para caber os ícones */
+  height: 28px;
 }
 
 .toggle-switch input {
@@ -19,27 +20,57 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: var(--color-bg-card); /* Cor quando desligado */
+  background-color: #cbd5e1;
+  /* Cinza claro para modo light */
   transition: 0.4s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 5px;
+  overflow: hidden;
 }
 
 .slider:before {
   position: absolute;
   content: "";
-  height: 20px; /* Tamanho da bolinha */
-  width: 20px;  /* Tamanho da bolinha */
+  height: 20px;
+  width: 20px;
   left: 4px;
   bottom: 4px;
   background-color: white;
   transition: 0.4s;
+  z-index: 2;
+  /* Garante que a bolinha fique acima dos ícones */
 }
 
-input:checked + .slider {
-  background-color: var(--color-toggle-accent); /* Cor roxa do seu design */
+input:checked+.slider {
+  background-color: var(--color-toggle-accent);
 }
 
-input:checked + .slider:before {
-  transform: translateX(22px); /* Distância que a bolinha se move */
+input:checked+.slider:before {
+  transform: translateX(26px);
+}
+
+/* Ícones dentro do toggle */
+.icon-sun,
+.icon-moon {
+  color: white;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  transition: opacity 0.3s;
+}
+
+.icon-sun {
+  color: #f59e0b;
+  /* Amarelo sol */
+}
+
+.icon-moon {
+  color: #f1f5f9;
+  /* Branco lua */
 }
 
 /* Formato redondo */
@@ -49,4 +80,5 @@ input:checked + .slider:before {
 
 .slider.round:before {
   border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }

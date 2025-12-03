@@ -18,7 +18,7 @@ export const AuthProvider = ({ children }) => {
       // check localstorage to see if we're already logged in
       const storedToken = localStorage.getItem('authToken');
       const storedUser = localStorage.getItem('user');
-      
+
       if (storedToken && storedUser) {
         setToken(storedToken);
         setUser(JSON.parse(storedUser));
@@ -37,7 +37,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (usernameOrEmail, password) => {
     setLoading(true);
     setError(null);
-    
+
     // client-side check. just to be safe.
     if (!usernameOrEmail || !password) {
       setError("username and password are required.");
@@ -87,7 +87,7 @@ export const AuthProvider = ({ children }) => {
       // nice, it worked.
       setToken(data.access_token);
       setUser(data.user);
-      
+
       // save token and user to localstorage so we stay logged in
       localStorage.setItem('authToken', data.access_token);
       localStorage.setItem('user', JSON.stringify(data.user));
@@ -144,7 +144,7 @@ export const AuthProvider = ({ children }) => {
       // sweet, register worked. api gave us the token and user
       setToken(data.access_token);
       setUser(data.user);
-      
+
       // save to localstorage too
       localStorage.setItem('authToken', data.access_token);
       localStorage.setItem('user', JSON.stringify(data.user));

@@ -1,0 +1,77 @@
+import { useState, useCallback } from 'react';
+import { api } from '../services/api';
+import { showAlert, showToast, showConfirm } from '../utils/alert';
+
+export const useImages = () => {
+    const [images, setImages] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+
+    const fetchImages = useCallback(async (params = { page: 1, per_page: 100 }) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await api.get('/images', params);
+
+            if (Array.isArray(data)) {
+                const transformed = data.map(img => ({
+                    id: img._id,
+                    imageId: img._id,
+                    filename: img.filename,
+                    uploadedDate: img.uploaded_date,
+                    fileSize: img.file_size,
+                    sourceType: img.source_type
+                }));
+                setImages(transformed);
+            } else {
+                throw new Error('Formato de dados inválido');
+            }
+        } catch (err) {
+            console.error('Error fetching images:', err);
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const uploadImage = useCallback(async (file) => {
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            await api.post('/images/upload', formData, true);
+            return { success: true };
+        } catch (err) {
+            console.error(`Error uploading ${file.name}:`, err);
+            return { success: false, error: err.message };
+        }
+    }, []);
+
+    const deleteImage = useCallback(async (image) => {
+        const confirmed = await showConfirm(
+            'Tem certeza?',
+            `Deseja realmente excluir a imagem "${image.filename}"?`
+        );
+
+        if (!confirmed) return false;
+
+        try {
+            await api.delete(`/images/${image.id}`);
+            setImages(prev => prev.filter(img => img.id !== image.id));
+            showToast('Imagem deletada com sucesso!', 'success');
+            return true;
+        } catch (err) {
+            showAlert('Erro', `Erro ao deletar: ${err.message}`, 'error');
+            return false;
+        }
+    }, []);
+
+    return {
+        images,
+        loading,
+        error,
+        fetchImages,
+        uploadImage,
+        deleteImage
+    };
+};

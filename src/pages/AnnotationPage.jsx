@@ -1,9 +1,9 @@
 // src/pages/AnnotationPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import AnnotationModal from './AnnotationModal'; 
+import AnnotationModal from './AnnotationModal';
 import { API_BASE_URL } from '../config/api';
-import { FiLoader, FiAlertTriangle } from 'react-icons/fi'; 
+import { FiLoader, FiAlertTriangle } from 'react-icons/fi';
 
 // ############ DADOS MOCKADOS (Substitua pela sua API) ############
 // Sua API real deve retornar algo parecido com isso:
@@ -30,36 +30,36 @@ const AnnotationPage = () => {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // Estado para controlar o modal
   const [selectedImage, setSelectedImage] = useState(null);
-  
+
   const { token } = useAuth();
 
   useEffect(() => {
     const fetchImages = async () => {
       setLoading(true);
       setError(null);
-      
+
       try {
         // Fetch all images (both extracted and uploaded) for annotation
         const response = await fetch(`${API_BASE_URL}/images`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
-        
+
         if (!response.ok) {
           throw new Error(`Failed to fetch images: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
         console.log('Fetched images:', data);
-        
+
         if (!data || data.length === 0) {
           setImages([]);
           setLoading(false);
           return;
         }
-        
+
         // Transform the image data to include image blob URLs
         const imagesWithBlobs = await Promise.all(
           data.map(async (image) => {
@@ -68,7 +68,7 @@ const AnnotationPage = () => {
               const imageResponse = await fetch(`${API_BASE_URL}/images/${image._id}/download`, {
                 headers: { 'Authorization': `Bearer ${token}` },
               });
-              
+
               if (imageResponse.ok) {
                 const blob = await imageResponse.blob();
                 const blobUrl = URL.createObjectURL(blob);
@@ -85,7 +85,7 @@ const AnnotationPage = () => {
             } catch (err) {
               console.error(`Error loading image ${image._id}:`, err);
             }
-            
+
             return {
               ...image,
               id: image._id,
@@ -94,7 +94,7 @@ const AnnotationPage = () => {
             };
           })
         );
-        
+
         setImages(imagesWithBlobs);
       } catch (err) {
         setError(err.message);
@@ -141,7 +141,7 @@ const AnnotationPage = () => {
     <div className="view-images-container"> {/* Reutilizando classe CSS */}
       <h2>Anotação de Imagens</h2>
       <p>Selecione uma imagem para adicionar ou revisar anotações (funciona com imagens extraídas e enviadas).</p>
-      
+
       {images.length === 0 ? (
         <div className="page-status-container">
           <p>Nenhuma imagem para anotar encontrada. Carregue imagens extraídas ou enviadas.</p>
@@ -149,9 +149,9 @@ const AnnotationPage = () => {
       ) : (
         <div className="image-grid"> {/* Reutilizando classe CSS */}
           {images.map((image) => (
-            <div 
-              key={image.id} 
-              className="image-card" 
+            <div
+              key={image.id}
+              className="image-card"
               onClick={() => handleImageClick(image)} // Abre o modal
             >
               <img src={image.url} alt={image.title} className="image-card-img" />
@@ -165,9 +165,9 @@ const AnnotationPage = () => {
 
       {/* O Modal de Anotação (Renderiza fora do fluxo) */}
       {selectedImage && (
-        <AnnotationModal 
-          image={selectedImage} 
-          onClose={handleCloseModal} 
+        <AnnotationModal
+          image={selectedImage}
+          onClose={handleCloseModal}
         />
       )}
     </div>

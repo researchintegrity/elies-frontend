@@ -1,253 +1,382 @@
 // src/pages/ViewPDFPage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './ViewPDFPage.css';
-import { FiLoader, FiAlertTriangle, FiRefreshCw, FiDownload, FiTrash2 } from 'react-icons/fi';
-import { useAuth } from '../context/AuthContext';
+import {
+  FiLoader,
+  FiAlertTriangle,
+  FiRefreshCw,
+  FiDownload,
+  FiTrash2,
+  FiSearch,
+  FiGrid,
+  FiList,
+  FiFileText,
+  FiEye,
+  FiX,
+  FiUploadCloud
+} from 'react-icons/fi';
+import { useDocuments } from '../hooks/useDocuments';
+import { api } from '../services/api';
+import { showAlert } from '../utils/alert';
 
-const API_BASE_URL = 'http://localhost:8000';
+// --- Components ---
 
-const ViewPDFPage = () => {
-  const [documents, setDocuments] = useState([]);
+const SkeletonCard = () => (
+  <div className="skeleton-card">
+    <div className="skeleton skeleton-preview"></div>
+    <div className="skeleton-content">
+      <div className="skeleton skeleton-text"></div>
+      <div className="skeleton skeleton-text short"></div>
+    </div>
+  </div>
+);
+
+const EmptyState = ({ isSearch, onUploadClick }) => (
+  <div className="empty-state">
+    <FiFileText className="empty-icon" />
+    <h3>{isSearch ? 'Nenhum documento encontrado' : 'Nenhum PDF enviado'}</h3>
+    <p>
+      {isSearch
+        ? 'Tente buscar com outros termos ou limpe os filtros.'
+        : 'Você ainda não enviou nenhum documento PDF para a plataforma.'}
+    </p>
+    {!isSearch && (
+      <button className="upload-link-btn" onClick={onUploadClick}>
+        <FiUploadCloud /> Fazer Upload Agora
+      </button>
+    )}
+  </div>
+);
+
+const PDFViewerModal = ({ doc, onClose }) => {
+  const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  // Get authentication token from context
-  const { token } = useAuth();
 
-  // Fetch documents from the API
-  const fetchDocuments = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      if (!token) {
-        throw new Error('Você não está autenticado. Por favor, faça login novamente.');
-      }
+  if (!doc) return null;
 
-      console.log('Fetching documents with token:', token ? '✅ Present' : '❌ Missing');
+  // Close on ESC key
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
 
-      const response = await fetch(`${API_BASE_URL}/api/documents?page=1&per_page=100`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+  // Fetch PDF blob
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPdf = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const blob = await api.download(`/documents/${doc.id}/download`);
+        const url = URL.createObjectURL(blob);
+
+        if (isMounted) {
+          setPdfBlobUrl(url);
+          setLoading(false);
         }
-      });
-
-      console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: Não foi possível buscar os documentos.`;
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.data) {
-        // Transform API data to match the component's expected format
-        const transformedDocs = data.data.map(doc => ({
-          id: doc._id,
-          filename: doc.filename,
-          uploadedDate: doc.uploaded_date,
-          fileSize: doc.file_size,
-          extractionStatus: doc.extraction_status || 'pending',
-          extractedImageCount: doc.extracted_image_count || 0
-        }));
-        
-        setDocuments(transformedDocs);
-      } else {
-        throw new Error('Formato de resposta inválido da API');
-      }
-
-    } catch (err) {
-      console.error('Error fetching documents:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Delete document
-  const deleteDocument = async (docId) => {
-    if (!window.confirm('Tem certeza que deseja deletar este documento?')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/documents/${docId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
+      } catch (err) {
+        if (isMounted) {
+          console.error('Error loading PDF:', err);
+          setError('Não foi possível carregar o visualizador.');
+          setLoading(false);
         }
-      });
-
-      if (!response.ok) {
-        throw new Error('Não foi possível deletar o documento.');
       }
+    };
 
-      // Remove from list
-      setDocuments(prevDocs => prevDocs.filter(doc => doc.id !== docId));
-      alert('✅ Documento deletado com sucesso!');
-    } catch (err) {
-      console.error('Error deleting document:', err);
-      alert(`❌ Erro ao deletar: ${err.message}`);
+    if (doc) {
+      fetchPdf();
     }
-  };
 
-  // Download document
-  const downloadDocument = async (docId, filename) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/documents/${docId}/download`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to download document: ${response.statusText}`);
+    return () => {
+      isMounted = false;
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl);
       }
+    };
+  }, [doc]);
 
-      // Get the blob from response
-      const blob = await response.blob();
+  return (
+    <div className="lightbox-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="lightbox-content pdf-modal-content" onClick={e => e.stopPropagation()}>
+        <button
+          className="lightbox-close"
+          onClick={onClose}
+          aria-label="Fechar visualização"
+        >
+          <FiX />
+        </button>
 
-      // Create a temporary download link
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename || 'document.pdf';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Error downloading document:', err);
-      alert(`❌ Erro ao baixar: ${err.message}`);
-    }
-  };
+        <div className="pdf-viewer-container">
+          {loading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'white' }}>
+              <FiLoader className="loading-spinner" style={{ fontSize: '3rem', marginBottom: '1rem' }} />
+              <p>Carregando documento...</p>
+            </div>
+          ) : error ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#ff6b6b' }}>
+              <FiAlertTriangle style={{ fontSize: '3rem', marginBottom: '1rem' }} />
+              <p>{error}</p>
+            </div>
+          ) : (
+            <iframe
+              src={pdfBlobUrl}
+              title={doc.filename}
+              className="pdf-iframe"
+              type="application/pdf"
+            />
+          )}
+        </div>
 
-  // Fetch documents when component mounts
+        <div className="lightbox-caption">
+          <div className="lightbox-title">{doc.filename}</div>
+          <div className="lightbox-details">
+            {new Date(doc.uploadedDate).toLocaleDateString()} • {(doc.fileSize / 1024 / 1024).toFixed(2)} MB
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DocumentCard = ({ doc, onView, onDownload, onDelete }) => {
+  return (
+    <div className="document-card">
+      <div className="card-preview-wrapper" onClick={() => onView(doc)}>
+        <FiFileText className="card-preview-icon" />
+        <div className="card-overlay">
+          <button className="action-btn view-btn" onClick={(e) => { e.stopPropagation(); onView(doc); }} title="Visualizar">
+            <FiEye />
+          </button>
+          <button className="action-btn download-btn" onClick={(e) => { e.stopPropagation(); onDownload(doc); }} title="Baixar">
+            <FiDownload />
+          </button>
+          <button className="action-btn delete-btn" onClick={(e) => { e.stopPropagation(); onDelete(doc); }} title="Excluir">
+            <FiTrash2 />
+          </button>
+        </div>
+      </div>
+      <div className="document-info">
+        <h4 className="document-title" title={doc.filename}>{doc.filename}</h4>
+        <div className="document-meta">
+          <span>{new Date(doc.uploadedDate).toLocaleDateString()}</span>
+          <span>{(doc.fileSize / 1024 / 1024).toFixed(2)} MB</span>
+        </div>
+        <div className="document-status">
+          <span className={`status-badge status-${doc.extractionStatus}`}>
+            {doc.extractionStatus === 'completed' ? 'Completo' :
+              doc.extractionStatus === 'processing' ? 'Processando' :
+                'Aguardando'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DocumentListRow = ({ doc, onView, onDownload, onDelete }) => {
+  return (
+    <div className="document-list-row">
+      <div className="list-col-icon" onClick={() => onView(doc)}>
+        <FiFileText />
+      </div>
+      <div className="list-col-name" onClick={() => onView(doc)}>
+        <span className="list-filename" title={doc.filename}>{doc.filename}</span>
+      </div>
+      <div className="list-col-date">
+        {new Date(doc.uploadedDate).toLocaleDateString()}
+      </div>
+      <div className="list-col-size">
+        {(doc.fileSize / 1024 / 1024).toFixed(2)} MB
+      </div>
+      <div className="list-col-status">
+        <span className={`status-badge status-${doc.extractionStatus}`}>
+          {doc.extractionStatus === 'completed' ? 'Completo' :
+            doc.extractionStatus === 'processing' ? 'Processando' : 'Aguardando'}
+        </span>
+      </div>
+      <div className="list-col-actions">
+        <button className="list-action-btn" onClick={() => onView(doc)} title="Visualizar"><FiEye /></button>
+        <button className="list-action-btn" onClick={() => onDownload(doc)} title="Baixar"><FiDownload /></button>
+        <button className="list-action-btn delete" onClick={() => onDelete(doc)} title="Excluir"><FiTrash2 /></button>
+      </div>
+    </div>
+  );
+};
+
+// --- Main Page Component ---
+
+const ViewPDFPage = () => {
+  // Use Custom Hook
+  const {
+    documents,
+    loading,
+    error,
+    fetchDocuments,
+    deleteDocument,
+    downloadDocument
+  } = useDocuments();
+
+  // UI State
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
+  const [selectedDoc, setSelectedDoc] = useState(null);
+
+  // Initial Fetch
   useEffect(() => {
     fetchDocuments();
-  }, [token]);
+  }, [fetchDocuments]);
 
-  // --- Renderização de Loading, Erro e Sucesso ---
+  // Filter & Sort Logic
+  const filteredDocuments = useMemo(() => {
+    let result = [...documents];
 
-  if (loading) {
-    return (
-      <div className="page-status-container">
-        <FiLoader className="loading-spinner" />
-        <p>Carregando documentos...</p>
-      </div>
-    );
-  }
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(doc => doc.filename.toLowerCase().includes(query));
+    }
 
-  if (error) {
-    return (
-      <div className="page-status-container error">
-        <FiAlertTriangle size={40} />
-        <h3>Erro ao carregar</h3>
-        <p>{error}</p>
-        <button 
-          className="retry-button"
-          onClick={fetchDocuments}
-          style={{
-            marginTop: '1rem',
-            padding: '0.75rem 1.5rem',
-            backgroundColor: 'var(--color-toggle-accent)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <FiRefreshCw /> Tentar novamente
-        </button>
-      </div>
-    );
-  }
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'newest': return new Date(b.uploadedDate) - new Date(a.uploadedDate);
+        case 'oldest': return new Date(a.uploadedDate) - new Date(b.uploadedDate);
+        case 'name_asc': return a.filename.localeCompare(b.filename);
+        case 'name_desc': return b.filename.localeCompare(a.filename);
+        case 'size_desc': return b.fileSize - a.fileSize;
+        default: return 0;
+      }
+    });
+
+    return result;
+  }, [documents, searchQuery, sortBy]);
+
+  const handleUploadClick = () => {
+    showAlert('Upload', "Use o menu lateral para acessar a página de Upload.", 'info');
+  };
 
   return (
     <div className="view-pdf-container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <div>
-          <h2>Documentos PDF</h2>
-          <p>Total: {documents.length} documento(s)</p>
+      {/* Header & Toolbar */}
+      <header className="gallery-header">
+        <div className="gallery-title-section">
+          <div>
+            <h2>Meus Documentos</h2>
+            <span className="gallery-stats">
+              {loading ? 'Carregando...' : `${filteredDocuments.length} documentos encontrados`}
+            </span>
+          </div>
         </div>
-        <button 
-          onClick={fetchDocuments}
-          style={{
-            padding: '0.75rem 1.5rem',
-            backgroundColor: 'var(--color-primary-accent)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <FiRefreshCw /> Atualizar
-        </button>
-      </div>
-      
-      {documents.length === 0 ? (
-        <div className="page-status-container">
-          <p>Nenhum documento encontrado. Envie um PDF primeiro!</p>
-        </div>
-      ) : (
-        <div className="documents-grid">
-          {documents.map((doc) => (
-            <div 
-              key={doc.id} 
-              className="document-card"
+
+        <div className="gallery-toolbar">
+          <div className="search-box">
+            <FiSearch className="search-icon" />
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Buscar documentos..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="filter-group">
+            <select
+              className="sort-select"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
             >
-              <div className="document-icon">📄</div>
-              <div className="document-info">
-                <h4 className="document-title">{doc.filename}</h4>
-                <p className="document-date">
-                  {new Date(doc.uploadedDate).toLocaleDateString('pt-BR')}
-                </p>
-                <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-                  {(doc.fileSize / 1024 / 1024).toFixed(2)} MB
-                </p>
-                <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
-                  <span className={`status-badge status-${doc.extractionStatus}`}>
-                    {doc.extractionStatus === 'completed' ? '✅ Completo' : 
-                     doc.extractionStatus === 'processing' ? '⏳ Processando' : 
-                     '⏸️ Aguardando'}
-                  </span>
-                  {doc.extractedImageCount > 0 && (
-                    <span style={{ marginLeft: '0.5rem' }}>
-                      {doc.extractedImageCount} imagem(ns)
-                    </span>
-                  )}
-                </p>
-              </div>
-              <div className="document-actions">
-                <button 
-                  className="action-button download-btn"
-                  onClick={() => downloadDocument(doc.id, doc.filename)}
-                  title="Download"
-                >
-                  <FiDownload />
-                </button>
-                <button 
-                  className="action-button delete-btn"
-                  onClick={() => deleteDocument(doc.id)}
-                  title="Deletar"
-                >
-                  <FiTrash2 />
-                </button>
-              </div>
+              <option value="newest">Mais recentes</option>
+              <option value="oldest">Mais antigos</option>
+              <option value="name_asc">Nome (A-Z)</option>
+              <option value="name_desc">Nome (Z-A)</option>
+              <option value="size_desc">Tamanho (Maior)</option>
+            </select>
+
+            <div className="view-toggle">
+              <button
+                className={`toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                onClick={() => setViewMode('grid')}
+                title="Visualização em Grade"
+              >
+                <FiGrid />
+              </button>
+              <button
+                className={`toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
+                onClick={() => setViewMode('list')}
+                title="Visualização em Lista"
+              >
+                <FiList />
+              </button>
             </div>
-          ))}
+
+            <button className="refresh-btn" onClick={() => fetchDocuments()} title="Atualizar">
+              <FiRefreshCw />
+            </button>
+          </div>
         </div>
+      </header>
+
+      {/* Content Area */}
+      {loading ? (
+        <div className={viewMode === 'grid' ? 'documents-grid' : 'documents-list'}>
+          {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+      ) : error ? (
+        <div className="empty-state">
+          <FiAlertTriangle className="empty-icon" style={{ color: '#ff6b6b' }} />
+          <h3>Erro ao carregar</h3>
+          <p>{error}</p>
+          <button className="upload-link-btn" onClick={() => fetchDocuments()}>Tentar Novamente</button>
+        </div>
+      ) : filteredDocuments.length === 0 ? (
+        <EmptyState isSearch={!!searchQuery} onUploadClick={handleUploadClick} />
+      ) : (
+        <div className={viewMode === 'grid' ? 'documents-grid' : 'documents-list'}>
+          {viewMode === 'grid' ? (
+            filteredDocuments.map(doc => (
+              <DocumentCard
+                key={doc.id}
+                doc={doc}
+                onView={setSelectedDoc}
+                onDownload={downloadDocument}
+                onDelete={deleteDocument}
+              />
+            ))
+          ) : (
+            <div className="list-container">
+              <div className="list-header-row">
+                <div className="list-col-icon">Tipo</div>
+                <div className="list-col-name">Nome</div>
+                <div className="list-col-date">Data</div>
+                <div className="list-col-size">Tamanho</div>
+                <div className="list-col-status">Status</div>
+                <div className="list-col-actions">Ações</div>
+              </div>
+              {filteredDocuments.map(doc => (
+                <DocumentListRow
+                  key={doc.id}
+                  doc={doc}
+                  onView={setSelectedDoc}
+                  onDownload={downloadDocument}
+                  onDelete={deleteDocument}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* PDF Viewer Modal */}
+      {selectedDoc && (
+        <PDFViewerModal
+          doc={selectedDoc}
+          onClose={() => setSelectedDoc(null)}
+        />
       )}
     </div>
   );

@@ -1,44 +1,57 @@
-// src/components/UploadPDFPage.jsx
+// src/pages/UploadPDFPage.jsx
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { 
-  FiUploadCloud, 
-  FiFileText, 
-  FiTrash2, 
-  FiCheckSquare, 
+import {
+  FiFileText,
+  FiUploadCloud,
   FiPlus,
+  FiTrash2,
+  FiCheck,
   FiUpload
 } from 'react-icons/fi';
-import { useAuth } from '../context/AuthContext';
+import { useDocuments } from '../hooks/useDocuments';
+import { showAlert, showToast } from '../utils/alert';
 
 import './UploadPDFPage.css';
 
-const API_BASE_URL = 'http://localhost:8000';
+// --- Funções Auxiliares ---
+
+// Formata bytes para KB, MB, GB
+function formatBytes(bytes, decimals = 2) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+// --- Componente Principal ---
 
 const UploadPDFPage = () => {
-  // Estado para guardar os arquivos selecionados
+  // Estado para guardar os arquivos (que são objetos File)
   const [files, setFiles] = useState([]);
-  
-  // Get authentication token from context
-  const { token } = useAuth();
 
-  // Função chamada quando os arquivos são soltos ou selecionados
+  // Use Custom Hook
+  const { uploadDocument } = useDocuments();
+
+  // Função chamada ao soltar ou selecionar arquivos
   const onDrop = useCallback((acceptedFiles) => {
-    // Adiciona os novos arquivos à lista existente
-    // Adicionamos um 'id' simples (no mundo real, usaria 'uuid')
+    // Adiciona os novos arquivos, criando um ID
     const newFiles = acceptedFiles.map(file => Object.assign(file, {
       id: Math.random().toString(36).substring(7),
-      progress: 100, // Simular upload completo por enquanto
+      // PDFs não precisam de preview de imagem imediato, mas mantemos a estrutura
     }));
+
     setFiles(prevFiles => [...prevFiles, ...newFiles]);
   }, []);
 
-  // Função para remover um arquivo da lista
+  // Remove um arquivo da lista
   const removeFile = (fileId) => {
     setFiles(prevFiles => prevFiles.filter(file => file.id !== fileId));
   };
-  
-  // Função para remover todos os arquivos
+
+  // Remove todos os arquivos ("Cancelar")
   const removeAllFiles = () => {
     setFiles([]);
   };
@@ -49,161 +62,155 @@ const UploadPDFPage = () => {
     accept: {
       'application/pdf': ['.pdf'], // Aceita apenas PDFs
     },
-    noClick: true, // Desativa o clique, pois faremos um botão "Adicionar"
+    noClick: false, // Permite clique no dropzone
     noKeyboard: true,
   });
-  
-  // Função que será chamada pela API (simulação)
-  const handleUpload = async () => {
+
+  // [IMPORTANTE] Função de envio para a API
+  const handleSubmit = async () => {
     if (files.length === 0) {
-      alert('Por favor, selecione pelo menos um PDF.');
+      showAlert('Atenção', 'Por favor, selecione pelo menos um PDF.', 'warning');
       return;
     }
 
-    console.log("Iniciando upload dos arquivos:", files);
-    
-    if (!token) {
-      alert('Você não está autenticado. Por favor, faça login novamente.');
-      return;
-    }
+    console.log("Iniciando envio dos arquivos...");
 
     // Upload each file individually to the backend
     let successCount = 0;
     let failureCount = 0;
 
     for (const file of files) {
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
+      console.log(`Uploading PDF: ${file.name} `);
 
-        console.log(`Uploading PDF: ${file.name}`);
+      const result = await uploadDocument(file);
 
-        const response = await fetch(`${API_BASE_URL}/documents/upload`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
-          body: formData
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-          console.log(`✅ Success: ${file.name}`, data);
-          successCount++;
-        } else {
-          console.error(`❌ Failed: ${file.name}`, data);
-          failureCount++;
-          alert(`Erro ao upload ${file.name}: ${data.detail || data.message || 'Unknown error'}`);
-        }
-      } catch (error) {
-        console.error(`Error uploading ${file.name}:`, error);
+      if (result.success) {
+        console.log(`Success: ${file.name}`);
+        successCount++;
+      } else {
+        console.error(`Failed: ${file.name}`, result.error);
         failureCount++;
-        alert(`Erro na requisição para ${file.name}: ${error.message}`);
+        showToast(`Erro ao upload ${file.name}: ${result.error}`, 'error');
       }
     }
 
     // Show summary
     if (successCount > 0) {
-      alert(`✅ Upload concluído: ${successCount} PDF(s) enviado(s) com sucesso${failureCount > 0 ? `, ${failureCount} falhou` : ''}!`);
       if (failureCount === 0) {
-        removeAllFiles(); // Clear list only if all uploads succeeded
+        showAlert('Sucesso!', `Upload concluído: ${successCount} PDF(s) enviado(s) com sucesso!`, 'success');
+        removeAllFiles();
+      } else {
+        showAlert('Concluído Parcialmente', `Upload concluído: ${successCount} sucesso(s), ${failureCount} falha(s).`, 'warning');
       }
     } else {
-      alert(`❌ Nenhum PDF foi enviado. Tente novamente.`);
+      showAlert('Falha no Upload', `Nenhum PDF foi enviado. Tente novamente.`, 'error');
     }
   };
 
+  const hasFiles = files.length > 0;
+
   return (
-    <div className="upload-container">
-      {/* --- CABEÇALHO --- */}
-      <div className="upload-header">
-        <FiUpload className="icon" />
-        <h2>Upload de PDF</h2>
-      </div>
+    <div className="upload-modal">
+      <div className="upload-pdf-container">
+        {/* --- CABEÇALHO --- */}
+        <div className="upload-header">
+          <div className="header-icon-wrapper">
+            <FiUpload className="icon" />
+          </div>
+          <h2>Upload de PDF</h2>
+          <p className="upload-subtitle">Adicione documentos PDF para extração e análise</p>
+        </div>
 
-      {/* --- ÁREA DE DROPZONE --- */}
-      <div 
-        {...getRootProps()} 
-        className={`dropzone ${isDragActive ? 'active' : ''}`}
-      >
-        <input {...getInputProps()} />
-        <FiUploadCloud className="drop-icon" />
-        {isDragActive ? (
-          <p>Solte os PDFs aqui ...</p>
+        {/* --- ÁREA DE DROPZONE (HERO) --- */}
+        {!hasFiles ? (
+          <div
+            {...getRootProps()}
+            className={`dropzone hero-dropzone ${isDragActive ? 'active' : ''} `}
+          >
+            <input {...getInputProps()} />
+            <div className="dropzone-content">
+              <div className="icon-circle">
+                <FiUploadCloud className="drop-icon" />
+              </div>
+              <h3>Arraste e solte seus PDFs aqui</h3>
+              <p>ou clique para selecionar do computador</p>
+              <span className="file-types">Suporta: PDF</span>
+            </div>
+          </div>
         ) : (
-          <p>Solte aqui os PDFs que deseja analisar</p>
-        )}
-      </div>
-      
-      {/* --- CABEÇALHO DA LISTA DE ARQUIVOS (com botão Adicionar) --- */}
-      <div className="file-list-header">
-        <h3>PDFs</h3>
-        {/* O botão 'open' vem do react-dropzone e abre a janela de seleção */}
-        <button className="add-button" onClick={open}>
-          <FiPlus />
-          ADICIONAR PDF
-        </button>
-      </div>
+          <>
+            {/* --- LISTA DE ARQUIVOS --- */}
+            <div className="file-list-container">
+              <div className="file-list-header">
+                <h3>Arquivos Selecionados ({files.length})</h3>
+                <button className="add-more-button" onClick={open}>
+                  <FiPlus /> Adicionar mais
+                </button>
+              </div>
 
-      {/* --- LISTA DE ARQUIVOS --- */}
-      <div className="file-list">
-        {files.length === 0 && (
-          <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-            Nenhum arquivo adicionado ainda.
-          </p>
+              <div className="file-list">
+                {files.map((file) => (
+                  <PDFFileItem
+                    key={file.id}
+                    file={file}
+                    onRemove={removeFile}
+                  />
+                ))}
+              </div>
+            </div>
+          </>
         )}
-        
-        {files.map((file, index) => (
-          <FileItem 
-            key={file.id} 
-            file={file} 
-            index={index + 1} 
-            onRemove={removeFile} 
-          />
-        ))}
-      </div>
 
-      {/* --- RODAPÉ COM BOTÕES --- */}
-      <div className="upload-footer">
-        <button 
-          className="footer-button cancel-button" 
-          onClick={removeAllFiles}
-        >
-          Cancelar
-        </button>
-        <button 
-          className="footer-button submit-button"
-          onClick={handleUpload}
-        >
-          Fazer Upload
-        </button>
+        {/* --- RODAPÉ COM BOTÕES --- */}
+        <div className="upload-footer">
+          <button
+            className="footer-button cancel-button"
+            onClick={removeAllFiles}
+            disabled={!hasFiles}
+          >
+            Cancelar
+          </button>
+          <button
+            className="footer-button submit-button"
+            onClick={handleSubmit}
+            disabled={!hasFiles}
+          >
+            <FiCheck /> Concluir Upload
+          </button>
+        </div>
       </div>
     </div>
   );
 };
 
+
 // --- Componente de Item de Arquivo (separado) ---
 
-const FileItem = ({ file, index, onRemove }) => {
+const PDFFileItem = ({ file, onRemove }) => {
   return (
-    <div className="file-item">
-      {/* Ícone com a inicial (P de PDF) */}
-      <div className="file-icon">P</div>
-      
-      {/* Detalhes do arquivo e barra de progresso */}
-      <div className="file-details">
-        <p>PDF {index.toString().padStart(2, '0')}</p>
-        <div className="progress-bar">
-          <div style={{ width: `${file.progress}%` }}></div>
+    <div className="image-file-item">
+      {/* Ícone de PDF (no lugar da miniatura) */}
+      <div className="image-thumbnail" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255, 0, 0, 0.1)' }}>
+        <FiFileText className="icon" style={{ fontSize: '1.5rem', color: '#ff4d4d' }} />
+      </div>
+
+      {/* Detalhes (nome, tamanho) */}
+      <div className="image-details">
+        <div className="file-info">
+          <p className="filename">{file.name}</p>
+          <span className="filesize">{formatBytes(file.size)}</span>
+        </div>
+        {/* Barra de progresso visual (mock) */}
+        <div className="progress-bar-container">
+          <div className="progress-bar" style={{ width: '100%' }}></div>
         </div>
       </div>
 
-      {/* Ações do item (Remover, Check) */}
-      <div className="file-actions">
-        {/* Usamos o 'name' do arquivo para o checkbox, mas no seu design parece fixo */}
-        <FiCheckSquare className="icon-button" style={{ color: 'var(--color-toggle-accent)'}} />
-        <FiTrash2 className="icon-button" onClick={() => onRemove(file.id)} />
+      {/* Ações (lixeira) */}
+      <div className="image-actions">
+        <button className="action-icon-button delete" onClick={() => onRemove(file.id)}>
+          <FiTrash2 />
+        </button>
       </div>
     </div>
   );
