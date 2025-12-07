@@ -23,12 +23,17 @@ export const useProfile = () => {
 
         try {
             const response = await api.get('/users/me');
+            console.log('Profile API Response:', response); // Debug
 
-            // Lidar com resposta corretamente
-            if (response && response.data) {
-                setUser(response.data);
+            // A resposta pode vir direto ou em response.data
+            const userData = response.data || response;
+            console.log('User Data:', userData); // Debug
+
+            if (userData && (userData._id || userData.username)) {
+                setUser(userData);
             } else {
-                throw new Error('Resposta inválida do servidor');
+                console.error('Invalid user data structure:', userData);
+                throw new Error('Dados do usuário inválidos');
             }
         } catch (err) {
             console.error('Erro ao carregar perfil:', err);
