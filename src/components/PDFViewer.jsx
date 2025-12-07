@@ -10,7 +10,6 @@ import {
     FiLoader,
     FiAlertTriangle
 } from 'react-icons/fi';
-import './PDFViewer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -61,23 +60,25 @@ const PDFViewer = ({ url, filename }) => {
     };
 
     return (
-        <div className="pdf-viewer-root">
+        <div className="flex flex-col h-full w-full bg-[#525659] text-white overflow-hidden rounded-lg">
             {/* Toolbar */}
-            <div className="pdf-toolbar">
-                <div className="pdf-toolbar-group">
+            <div className="flex items-center justify-between px-4 py-3 bg-[#323639] shadow-[0_2px_4px_rgba(0,0,0,0.2)] z-10 gap-4">
+                <div className="flex items-center gap-2">
                     <button
-                        className="pdf-toolbar-btn"
+                        className="bg-transparent border-none text-[#f1f1f1] p-2 rounded cursor-pointer flex items-center justify-center transition-colors
+                          hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                         onClick={() => changePage(-1)}
                         disabled={pageNumber <= 1 || loading}
                         title="Página Anterior"
                     >
                         <FiChevronLeft />
                     </button>
-                    <span className="pdf-page-info">
+                    <span className="text-sm text-[#e0e0e0] whitespace-nowrap">
                         {loading ? '...' : `${pageNumber} / ${numPages || '--'}`}
                     </span>
                     <button
-                        className="pdf-toolbar-btn"
+                        className="bg-transparent border-none text-[#f1f1f1] p-2 rounded cursor-pointer flex items-center justify-center transition-colors
+                          hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                         onClick={() => changePage(1)}
                         disabled={pageNumber >= (numPages || 1) || loading}
                         title="Próxima Página"
@@ -86,50 +87,66 @@ const PDFViewer = ({ url, filename }) => {
                     </button>
                 </div>
 
-                <div className="pdf-toolbar-group">
-                    <button className="pdf-toolbar-btn" onClick={zoomOut} title="Diminuir Zoom">
+                <div className="flex items-center gap-2">
+                    <button
+                        className="bg-transparent border-none text-[#f1f1f1] p-2 rounded cursor-pointer flex items-center justify-center transition-colors hover:bg-white/10"
+                        onClick={zoomOut}
+                        title="Diminuir Zoom"
+                    >
                         <FiZoomOut />
                     </button>
-                    <span className="pdf-page-info pdf-zoom-level">
+                    <span className="text-sm text-[#e0e0e0] whitespace-nowrap min-w-[3rem] text-center">
                         {Math.round(scale * 100)}%
                     </span>
-                    <button className="pdf-toolbar-btn" onClick={zoomIn} title="Aumentar Zoom">
+                    <button
+                        className="bg-transparent border-none text-[#f1f1f1] p-2 rounded cursor-pointer flex items-center justify-center transition-colors hover:bg-white/10"
+                        onClick={zoomIn}
+                        title="Aumentar Zoom"
+                    >
                         <FiZoomIn />
                     </button>
                 </div>
 
-                <div className="pdf-toolbar-group">
-                    <button className="pdf-toolbar-btn" onClick={rotate} title="Girar">
+                <div className="flex items-center gap-2">
+                    <button
+                        className="bg-transparent border-none text-[#f1f1f1] p-2 rounded cursor-pointer flex items-center justify-center transition-colors hover:bg-white/10"
+                        onClick={rotate}
+                        title="Girar"
+                    >
                         <FiRotateCw />
                     </button>
-                    <button className="pdf-toolbar-btn" onClick={handleDownload} title="Baixar PDF">
+                    <button
+                        className="bg-transparent border-none text-[#f1f1f1] p-2 rounded cursor-pointer flex items-center justify-center transition-colors hover:bg-white/10"
+                        onClick={handleDownload}
+                        title="Baixar PDF"
+                    >
                         <FiDownload />
                     </button>
                 </div>
             </div>
 
             {/* Content */}
-            <div className="pdf-document-container">
+            <div className="flex-1 overflow-auto flex justify-center p-8 relative">
                 {error ? (
-                    <div className="pdf-error">
-                        <FiAlertTriangle className="pdf-error-icon" />
+                    <div className="flex flex-col items-center justify-center h-full w-full text-[#e0e0e0] gap-4">
+                        <FiAlertTriangle className="text-5xl text-[#e74c3c]" />
                         <p>{error}</p>
                     </div>
                 ) : (
-                    <div className="pdf-document-wrapper">
+                    <div className="shadow-[0_4px_15px_rgba(0,0,0,0.3)] transition-transform duration-200 ease-out">
                         <Document
                             file={url}
                             onLoadSuccess={onDocumentLoadSuccess}
                             onLoadError={onDocumentLoadError}
                             loading={
-                                <div className="pdf-loading">
-                                    <FiLoader className="pdf-loading-spinner" />
+                                <div className="flex flex-col items-center justify-center h-full w-full text-[#e0e0e0] gap-4">
+                                    <FiLoader className="text-[2.5rem] animate-spin text-[#3498db]" />
                                     <p>Carregando PDF...</p>
                                 </div>
                             }
                             error={
-                                <div className="pdf-error">
-                                    <FiAlertTriangle className="pdf-error-icon" />
+                                <div className="flex flex-col items-center justify-center h-full w-full text-[#e0e0e0] gap-4">
+                                    <FiAlertTriangle className="text-5xl text-[#e74c3c]" />
                                     <p>Erro ao renderizar PDF.</p>
                                 </div>
                             }
@@ -141,6 +158,7 @@ const PDFViewer = ({ url, filename }) => {
                                     rotate={rotation}
                                     renderTextLayer={true}
                                     renderAnnotationLayer={true}
+                                    className="bg-white"
                                 />
                             )}
                         </Document>
