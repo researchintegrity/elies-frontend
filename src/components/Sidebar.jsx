@@ -9,7 +9,8 @@ import {
   FiTag,
   FiSettings,
   FiGrid,
-  FiEdit
+  FiEdit,
+  FiUser
 } from 'react-icons/fi';
 
 const Sidebar = ({ activePage, onNavigate, pages }) => {
@@ -126,10 +127,13 @@ const Sidebar = ({ activePage, onNavigate, pages }) => {
             <FiSettings className="text-xl" />
             <span>Geral</span>
           </a>
-          <a href="#" className="flex items-center gap-4 px-4 py-3.5 rounded-lg transition-all duration-200 ease-out cursor-pointer text-sidebar-text-secondary hover:bg-sidebar-hover-light dark:hover:bg-sidebar-hover-dark hover:text-text-primary dark:hover:text-white font-medium text-[0.95rem]">
-            <FiSettings className="text-xl" />
+          <button
+            className={getItemClass(pages.PROFILE)}
+            onClick={() => onNavigate(pages.PROFILE)}
+          >
+            <FiUser className="text-xl" />
             <span>Perfil</span>
-          </a>
+          </button>
         </div>
       </div>
     </nav>

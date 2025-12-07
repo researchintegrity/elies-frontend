@@ -9,14 +9,16 @@ import UploadImagePage from './pages/UploadImagePage';
 import ViewImagesPage from './pages/ViewImagesPage';
 import ViewPDFPage from './pages/ViewPDFPage';
 import AnnotationPage from './pages/AnnotationPage';
+import ProfilePage from './pages/ProfilePage';
 
 // Define as chaves para todas as páginas
 const PAGES = {
   UPLOAD_IMAGE: 'uploadImage',
   VIEW_IMAGES: 'viewImages',
-  ANNOTATION: 'annotation', // 2. ADICIONE A CHAVE DA NOVA PÁGINA
+  ANNOTATION: 'annotation',
   UPLOAD_PDF: 'uploadPDF',
   VIEW_PDFS: 'viewPDFs',
+  PROFILE: 'profile',
   SEARCH: 'search',
 };
 
@@ -37,6 +39,8 @@ function AppLayout() {
         return <UploadPDFPage />;
       case PAGES.VIEW_PDFS:
         return <ViewPDFPage />;
+      case PAGES.PROFILE:
+        return <ProfilePage />;
       case PAGES.SEARCH:
         return <div>Página "Search" (Em breve)</div>;
       default:
