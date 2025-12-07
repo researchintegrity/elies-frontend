@@ -6,6 +6,7 @@ import {
   FiUploadCloud, FiColumns, FiDroplet, FiCheck
 } from 'react-icons/fi';
 import { useDocuments } from '../hooks/useDocuments';
+import { useWatermarkRemoval } from '../hooks/useWatermarkRemoval';
 import { api } from '../services/api';
 import { showAlert } from '../utils/alert';
 import PDFViewer from '../components/PDFViewer';
@@ -345,11 +346,14 @@ const ViewPDFPage = () => {
   const [sortBy, setSortBy] = useState('newest');
   const [selectedDoc, setSelectedDoc] = useState(null);
 
-  useEffect(() => { fetchDocuments(); }, [fetchDocuments]);
+  // Hook de remoção de watermark com callback de sucesso
+  const { removeWatermark, isRemoving } = useWatermarkRemoval((doc, level) => {
+    console.log(`Watermark removal completed for ${doc.filename} at level ${level}`);
+    // Opcional: atualizar status do documento ou recarregar lista
+    // fetchDocuments();
+  });
 
-  const handleRemoveWatermark = async (doc, aggressivenessMode) => {
-    showAlert('Funcionalidade em Breve', `Remoção de nível ${aggressivenessMode} solicitada para: ${doc.filename}`, 'info');
-  };
+  useEffect(() => { fetchDocuments(); }, [fetchDocuments]);
 
   const filteredDocuments = useMemo(() => {
     let result = [...documents];
@@ -458,7 +462,7 @@ const ViewPDFPage = () => {
             <div className={viewMode === 'grid' && !isSplitView ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-10' : 'w-full pb-10'}>
               {viewMode === 'grid' && !isSplitView ? (
                 filteredDocuments.map(doc => (
-                  <DocumentCard key={doc.id} doc={doc} onView={handleDocumentClick} onDownload={downloadDocument} onDelete={deleteDocument} onRemoveWatermark={handleRemoveWatermark} />
+                  <DocumentCard key={doc.id} doc={doc} onView={handleDocumentClick} onDownload={downloadDocument} onDelete={deleteDocument} onRemoveWatermark={removeWatermark} />
                 ))
               ) : (
 
@@ -485,7 +489,7 @@ const ViewPDFPage = () => {
                       onView={handleDocumentClick}
                       onDownload={downloadDocument}
                       onDelete={deleteDocument}
-                      onRemoveWatermark={handleRemoveWatermark}
+                      onRemoveWatermark={removeWatermark}
                     />
                   ))}
                 </div>
