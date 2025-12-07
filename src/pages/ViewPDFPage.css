@@ -633,6 +633,32 @@
   font-weight: 700;
 }
 
+.list-header-row .list-col-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+}
+
+.list-header-row .list-col-name {
+  display: flex;
+  align-items: center;
+  padding-right: 1rem;
+}
+
+.list-header-row .list-col-date,
+.list-header-row .list-col-size,
+.list-header-row .list-col-status {
+  display: flex;
+  align-items: center;
+}
+
+.list-header-row .list-col-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
 .document-list-row {
   display: grid;
   grid-template-columns: 48px 2fr 140px 110px 130px 160px;
