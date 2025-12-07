@@ -1,15 +1,17 @@
 // src/AppLayout.jsx
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
+import LoadingFallback from './components/LoadingFallback';
 
-// Importa todas as páginas
-import UploadPDFPage from './pages/UploadPDFPage';
-import UploadImagePage from './pages/UploadImagePage';
-import ViewImagesPage from './pages/ViewImagesPage';
-import ViewPDFPage from './pages/ViewPDFPage';
-import AnnotationPage from './pages/AnnotationPage';
-import ProfilePage from './pages/ProfilePage';
+// ✅ CODE SPLITTING: Lazy load todas as páginas
+// Cada página agora é carregada apenas quando necessária
+const UploadPDFPage = lazy(() => import('./pages/UploadPDFPage'));
+const UploadImagePage = lazy(() => import('./pages/UploadImagePage'));
+const ViewImagesPage = lazy(() => import('./pages/ViewImagesPage'));
+const ViewPDFPage = lazy(() => import('./pages/ViewPDFPage'));
+const AnnotationPage = lazy(() => import('./pages/AnnotationPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 
 // Define as chaves para todas as páginas
 const PAGES = {
@@ -58,8 +60,10 @@ function AppLayout() {
       />
       <main className="flex flex-col bg-deep-dark dark:bg-dark-deep p-8">
         <Topbar />
-        {/* Renderiza a página selecionada */}
-        {renderActivePage()}
+        {/* ✅ Suspense: Mostra LoadingFallback enquanto página carrega */}
+        <Suspense fallback={<LoadingFallback />}>
+          {renderActivePage()}
+        </Suspense>
       </main>
     </div>
   );
