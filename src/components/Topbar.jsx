@@ -9,7 +9,7 @@ const Topbar = () => {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <header className="bg-bg-dark dark:bg-dark-bg border-b border-gray-200 dark:border-gray-800 px-8 py-4 flex items-center justify-between transition-colors duration-300">
+    <header className="border-b border-gray-200 dark:border-gray-800 px-8 py-4 flex items-center justify-between transition-colors duration-300">
       <div>
         <h2 className="text-xl font-semibold text-text-primary dark:text-white">
           ELIS - Scientific Integrity Toolkit
