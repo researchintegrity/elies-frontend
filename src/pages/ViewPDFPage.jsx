@@ -378,7 +378,7 @@ const ViewPDFPage = () => {
   const handleCloseModal = () => setSelectedDoc(null);
 
   return (
-    <div className="w-full h-full flex flex-col p-6 md:p-8 overflow-hidden relative bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+    <div className="w-full h-full flex flex-col p-6 md:p-8 overflow-hidden relative text-gray-900 dark:text-gray-100 transition-colors duration-300">
 
       {/* Header & Toolbar */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6 pb-6 border-b border-gray-200 dark:border-gray-800">

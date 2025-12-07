@@ -71,7 +71,7 @@ const ProfilePage = () => {
     }
 
     return (
-        <div className="w-full h-full p-6 md:p-8 overflow-y-auto bg-gray-50 dark:bg-gray-900">
+        <div className="w-full h-full p-6 md:p-8 overflow-y-auto">
             <div className="max-w-4xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
@@ -184,8 +184,8 @@ const ProfilePage = () => {
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
                             <div
                                 className={`h-full rounded-full transition-all duration-500 ${storagePercentage > 90 ? 'bg-red-500' :
-                                        storagePercentage > 70 ? 'bg-amber-500' :
-                                            'bg-gray-600 dark:bg-gray-400'
+                                    storagePercentage > 70 ? 'bg-amber-500' :
+                                        'bg-gray-600 dark:bg-gray-400'
                                     }`}
                                 style={{ width: `${Math.min(storagePercentage, 100)}%` }}
                             />
