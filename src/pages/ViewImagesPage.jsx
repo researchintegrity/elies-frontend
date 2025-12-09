@@ -242,26 +242,21 @@ const ViewImagesPage = () => {
 
   return (
     <div className="w-full pb-8 animate-[fadeIn_0.5s_ease-in-out]">
-      <header className="mb-8">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h2 className="text-[1.75rem] text-text-primary dark:text-white m-0">Galeria de Imagens</h2>
-            <span className="text-text-secondary text-[0.95rem]">
-              {loading ? 'Carregando...' : `${filteredImages.length} imagens encontradas`}
-            </span>
-          </div>
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6 pb-6 border-b border-gray-200 dark:border-gray-800">
+        <div>
+          <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-1">Galeria de Imagens</h2>
+          <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+            {loading ? 'Carregando...' : `${filteredImages.length} imagens encontradas`}
+          </span>
         </div>
 
-        <div className="flex gap-4 bg-modal-bg-light dark:bg-modal-bg-dark backdrop-blur-[12px] px-4 py-4 rounded-xl 
-          shadow-[0_4px_6px_rgba(0,0,0,0.05)] flex-wrap items-center border border-modal-light dark:border-modal-dark">
-
-          <div className="flex-1 min-w-[250px] relative">
-            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+          {/* Search */}
+          <div className="relative flex-1 md:w-72 group">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
             <input
               type="text"
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg 
-                bg-surface dark:bg-surface-dark text-text-primary dark:text-white text-sm
-                transition-all focus:outline-none focus:border-primary-accent focus:ring-2 focus:ring-primary-accent/20"
+              className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg pl-10 pr-4 py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-gray-400"
               placeholder="Buscar por nome do arquivo..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -269,12 +264,9 @@ const ViewImagesPage = () => {
             />
           </div>
 
-          <div className="flex gap-3 items-center">
+          <div className="flex gap-2">
             <select
-              className="px-4 py-3 pr-10 border border-gray-300 dark:border-gray-700 rounded-lg 
-                bg-surface dark:bg-surface-dark text-text-primary dark:text-white cursor-pointer appearance-none
-                bg-[url('data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'16\\' height=\\'16\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' stroke=\\'%23888\\' stroke-width=\\'2\\' stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\'%3E%3Cpath d=\\'M6 9l6 6 6-6\\'/%3E%3C/svg%3E')]
-                bg-no-repeat bg-[right_0.7rem_center]"
+              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-4 py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               aria-label="Ordenar imagens"
@@ -287,9 +279,7 @@ const ViewImagesPage = () => {
             </select>
 
             <button
-              className="p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-surface dark:bg-surface-dark 
-                text-text-secondary cursor-pointer transition-all flex items-center justify-center
-                hover:bg-hover-light dark:hover:bg-hover-dark hover:text-toggle-accent hover:border-toggle-accent"
+              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-500 hover:text-indigo-600 hover:border-indigo-500 px-3 py-2.5 rounded-lg transition-all"
               onClick={() => fetchImages()}
               title="Atualizar lista"
               aria-label="Atualizar lista de imagens"

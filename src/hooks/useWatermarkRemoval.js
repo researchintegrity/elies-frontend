@@ -34,12 +34,12 @@ export const useWatermarkRemoval = (onSuccess) => {
         setError(null);
 
         try {
-            // Chamada à API (descomente quando o endpoint estiver pronto)
-            /*
+
+
             await api.post(`/documents/${document.id}/remove-watermark`, {
-              aggressiveness_mode: aggressivenessLevel
+                aggressiveness_mode: aggressivenessLevel
             });
-            */
+
 
             // MOCK temporário - simula delay de API
             await new Promise(resolve => setTimeout(resolve, 1000));

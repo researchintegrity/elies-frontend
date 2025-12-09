@@ -36,7 +36,7 @@ const AuthPage = () => {
     <div className="flex items-center justify-center min-h-screen bg-cover bg-center bg-no-repeat bg-deep-dark dark:bg-dark-deep"
       style={{ backgroundImage: "url('/seu-wallpaper.jpg')" }}>
 
-      <div className="w-full max-w-[480px] px-12 py-12 text-center rounded-[18px] border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.2)] backdrop-blur-[10px] bg-[rgba(60,60,70,0.7)] dark:bg-[rgba(30,30,46,0.8)]">
+      <div className="w-full max-w-[480px] px-12 py-12 text-center rounded-[18px] border border-black/10 dark:border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.2)] backdrop-blur-[10px] bg-white/95 dark:bg-[rgba(30,30,46,0.8)]">
 
         <h2 className="text-[2.2rem] font-bold mb-3 text-text-primary dark:text-white">
           {isLogin ? 'Bem-vindo de volta!' : 'Crie sua conta'}
@@ -63,7 +63,7 @@ const AuthPage = () => {
                   required
                   autoComplete="username"
                   placeholder="Seu nome de usuário único"
-                  className="w-full px-5 py-4 rounded-[10px] border border-primary-accent bg-deep-dark dark:bg-dark-deep text-text-primary dark:text-white text-lg transition-all duration-300 
+                  className="w-full px-5 py-4 rounded-[10px] border border-primary-accent bg-white dark:bg-dark-deep text-text-primary dark:text-white text-lg transition-all duration-300 
                     placeholder:text-text-secondary placeholder:opacity-70
                     focus:outline-none focus:border-toggle-accent focus:shadow-[0_0_0_3px_rgba(138,99,210,0.3)]"
                 />
@@ -81,7 +81,7 @@ const AuthPage = () => {
                   required
                   autoComplete="name"
                   placeholder="Seu nome"
-                  className="w-full px-5 py-4 rounded-[10px] border border-primary-accent bg-deep-dark dark:bg-dark-deep text-text-primary dark:text-white text-lg transition-all duration-300 
+                  className="w-full px-5 py-4 rounded-[10px] border border-primary-accent bg-white dark:bg-dark-deep text-text-primary dark:text-white text-lg transition-all duration-300 
                     placeholder:text-text-secondary placeholder:opacity-70
                     focus:outline-none focus:border-toggle-accent focus:shadow-[0_0_0_3px_rgba(138,99,210,0.3)]"
                 />
