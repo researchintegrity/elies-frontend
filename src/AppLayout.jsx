@@ -26,7 +26,7 @@ const PAGES = {
 
 function AppLayout() {
   // 3. Mudei o estado inicial para 'ANNOTATION' para você ver a nova página
-  const [activePage, setActivePage] = useState(PAGES.ANNOTATION);
+  const [activePage, setActivePage] = useState(PAGES.VIEW_IMAGES);
 
   // Renderiza o componente da página ativa
   const renderActivePage = () => {
@@ -46,7 +46,7 @@ function AppLayout() {
       case PAGES.SEARCH:
         return <div>Página "Search" (Em breve)</div>;
       default:
-        return <AnnotationPage />;
+        return <ViewImagesPage />;
     }
   };
 
