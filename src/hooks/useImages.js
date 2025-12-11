@@ -20,7 +20,8 @@ export const useImages = () => {
                     filename: img.filename,
                     uploadedDate: img.uploaded_date,
                     fileSize: img.file_size,
-                    sourceType: img.source_type
+                    sourceType: img.source_type,
+                    imageType: img.image_type || []
                 }));
                 setImages(transformed);
             } else {
@@ -66,12 +67,42 @@ export const useImages = () => {
         }
     }, []);
 
+    const addImageTypes = useCallback(async (image, types) => {
+        try {
+            const updatedImage = await api.addImageTypes(image.id, types);
+            setImages(prev => prev.map(img =>
+                img.id === image.id ? { ...img, imageType: updatedImage.image_type } : img
+            ));
+            showToast('Tags adicionadas com sucesso!', 'success');
+            return true;
+        } catch (err) {
+            showAlert('Erro', `Erro ao adicionar tags: ${err.message}`, 'error');
+            return false;
+        }
+    }, []);
+
+    const removeImageType = useCallback(async (image, typeName) => {
+        try {
+            const updatedImage = await api.removeImageType(image.id, typeName);
+            setImages(prev => prev.map(img =>
+                img.id === image.id ? { ...img, imageType: updatedImage.image_type } : img
+            ));
+            showToast('Tag removida com sucesso.', 'success');
+            return true;
+        } catch (err) {
+            showAlert('Erro', `Erro ao remover tag: ${err.message}`, 'error');
+            return false;
+        }
+    }, []);
+
     return {
         images,
         loading,
         error,
         fetchImages,
         uploadImage,
-        deleteImage
+        deleteImage,
+        addImageTypes,
+        removeImageType
     };
 };
