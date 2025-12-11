@@ -20,6 +20,7 @@ import { showAlert, showToast } from '../utils/alert';
 import SelectionToolbar from '../components/SelectionToolbar';
 import ImageFilters from '../components/ImageFilters';
 import TagInput from '../components/TagInput';
+import BatchTagModal from '../components/BatchTagModal';
 
 // --- Components ---
 
@@ -290,6 +291,7 @@ const ViewImagesPage = () => {
 
   // Selection
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [isBatchTagModalOpen, setIsBatchTagModalOpen] = useState(false);
 
   // Lightbox
   const [lightboxImage, setLightboxImage] = useState(null);
@@ -392,18 +394,25 @@ const ViewImagesPage = () => {
     }
   };
 
-  const handleTagSelected = async () => {
-    // Placeholder para funcionalidade de Batch Tagging
-    // Abrir um modal simples pedindo a tag e aplicar a todas, por exemplo.
-    const tag = prompt("Digite a tag para adicionar aos itens selecionados:");
-    if (!tag) return;
+  const handleTagSelected = () => {
+    setIsBatchTagModalOpen(true);
+  };
+
+  const handleBatchTagConfirm = async (newTags) => {
+    if (newTags.length === 0) return;
 
     const idsArray = Array.from(selectedIds);
+    let successCount = 0;
+
     for (const id of idsArray) {
       const img = images.find(i => i.id === id);
-      if (img) await addImageTypes(img, [tag.toLowerCase()]);
+      if (img) {
+        await addImageTypes(img, newTags);
+        successCount++;
+      }
     }
-    showToast(`Tag #${tag} adicionada a ${idsArray.length} imagens.`);
+    showToast(`${newTags.length} tags adicionadas a ${successCount} imagens.`);
+    handleClearSelection();
   };
 
   const handleAnalyzeSelected = () => {
@@ -420,6 +429,14 @@ const ViewImagesPage = () => {
 
   return (
     <div className="w-full h-full flex flex-col relative overflow-hidden">
+
+      {/* Batch Tag Modal */}
+      <BatchTagModal
+        isOpen={isBatchTagModalOpen}
+        onClose={() => setIsBatchTagModalOpen(false)}
+        onConfirm={handleBatchTagConfirm}
+        count={selectedIds.size}
+      />
 
       {/* Selection Toolbar */}
       <SelectionToolbar
