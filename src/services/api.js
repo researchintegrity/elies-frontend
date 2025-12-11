@@ -116,5 +116,15 @@ export const api = {
         }
 
         return response.blob();
+    },
+
+    // --- Image Type Management ---
+
+    addImageTypes: async (imageId, types) => {
+        return api.post(`/images/${imageId}/types`, { types });
+    },
+
+    removeImageType: async (imageId, typeName) => {
+        return api.delete(`/images/${imageId}/types/${typeName}`);
     }
 };

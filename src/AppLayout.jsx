@@ -1,30 +1,32 @@
 // src/AppLayout.jsx
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
+import LoadingFallback from './components/LoadingFallback';
 
-// Importa todas as páginas
-import UploadPDFPage from './pages/UploadPDFPage'; 
-import UploadImagePage from './pages/UploadImagePage';
-import ViewImagesPage from './pages/ViewImagesPage';
-import ViewPDFPage from './pages/ViewPDFPage';
-import AnnotationPage from './pages/AnnotationPage';
-
-import './App.css'; 
+// ✅ CODE SPLITTING: Lazy load todas as páginas
+// Cada página agora é carregada apenas quando necessária
+const UploadPDFPage = lazy(() => import('./pages/UploadPDFPage'));
+const UploadImagePage = lazy(() => import('./pages/UploadImagePage'));
+const ViewImagesPage = lazy(() => import('./pages/ViewImagesPage'));
+const ViewPDFPage = lazy(() => import('./pages/ViewPDFPage'));
+const AnnotationPage = lazy(() => import('./pages/AnnotationPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 
 // Define as chaves para todas as páginas
 const PAGES = {
   UPLOAD_IMAGE: 'uploadImage',
   VIEW_IMAGES: 'viewImages',
-  ANNOTATION: 'annotation', // 2. ADICIONE A CHAVE DA NOVA PÁGINA
+  ANNOTATION: 'annotation',
   UPLOAD_PDF: 'uploadPDF',
   VIEW_PDFS: 'viewPDFs',
+  PROFILE: 'profile',
   SEARCH: 'search',
 };
 
 function AppLayout() {
   // 3. Mudei o estado inicial para 'ANNOTATION' para você ver a nova página
-  const [activePage, setActivePage] = useState(PAGES.ANNOTATION);
+  const [activePage, setActivePage] = useState(PAGES.VIEW_IMAGES);
 
   // Renderiza o componente da página ativa
   const renderActivePage = () => {
@@ -39,25 +41,29 @@ function AppLayout() {
         return <UploadPDFPage />;
       case PAGES.VIEW_PDFS:
         return <ViewPDFPage />;
+      case PAGES.PROFILE:
+        return <ProfilePage />;
       case PAGES.SEARCH:
         return <div>Página "Search" (Em breve)</div>;
       default:
-        return <AnnotationPage />;
+        return <ViewImagesPage />;
     }
   };
 
   return (
-    <div className="app-container">
+    <div className="grid grid-cols-[260px_1fr] min-h-screen">
       {/* Passe os props para a Sidebar (agora incluindo a chave 'pages') */}
-      <Sidebar 
-        activePage={activePage} 
-        onNavigate={setActivePage} 
+      <Sidebar
+        activePage={activePage}
+        onNavigate={setActivePage}
         pages={PAGES}
       />
-      <main className="main-content">
-        <Topbar /> 
-        {/* Renderiza a página selecionada */}
-        {renderActivePage()}
+      <main className="flex flex-col bg-deep-dark dark:bg-dark-deep p-8">
+        <Topbar />
+        {/* ✅ Suspense: Mostra LoadingFallback enquanto página carrega */}
+        <Suspense fallback={<LoadingFallback />}>
+          {renderActivePage()}
+        </Suspense>
       </main>
     </div>
   );

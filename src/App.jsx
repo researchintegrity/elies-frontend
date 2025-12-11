@@ -3,7 +3,6 @@ import React from 'react';
 import { useAuth } from './context/AuthContext';
 import AuthPage from './pages/AuthPage';
 import AppLayout from './AppLayout';
-import './App.css';
 
 function App() {
   // Pega o estado de autenticação do nosso Contexto
