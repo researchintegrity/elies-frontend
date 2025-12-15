@@ -419,14 +419,33 @@ const ViewImagesPage = () => {
   const [similarityLoading, setSimilarityLoading] = useState(false);
   const [similarityTopK, setSimilarityTopK] = useState(20);
   const [similarityThreshold, setSimilarityThreshold] = useState(0.5);
+  const [similarityLabelFilter, setSimilarityLabelFilter] = useState('all');
+
+  // Extract available categories from all images for similarity filter
+  const availableCategoriesForSimilarity = useMemo(() => {
+    const categories = new Set();
+    images.forEach(img => {
+      (img.imageType || []).forEach(type => categories.add(type));
+    });
+    return Array.from(categories).sort();
+  }, [images]);
 
   useEffect(() => {
     fetchImages();
   }, [fetchImages]);
 
   // CBIR Search Handler
-  const handleSimilaritySearch = useCallback(async (queryImage) => {
+  const handleSimilaritySearch = useCallback(async (queryImage, labelFilterOverride) => {
     if (!queryImage) return;
+    
+    // Auto-set label filter based on query image's labels (only on initial search)
+    const effectiveLabelFilter = labelFilterOverride !== undefined 
+      ? labelFilterOverride 
+      : (queryImage.imageType?.length > 0 ? queryImage.imageType[0] : 'all');
+    
+    if (labelFilterOverride === undefined) {
+      setSimilarityLabelFilter(effectiveLabelFilter);
+    }
     
     setSimilarityMode(true);
     setSimilarityQueryImage(queryImage);
@@ -438,7 +457,7 @@ const ViewImagesPage = () => {
       const payload = {
         image_id: queryImage.id,
         top_k: similarityTopK + 1, // +1 to account for query image being returned
-        labels: null
+        labels: effectiveLabelFilter !== 'all' ? [effectiveLabelFilter] : null
       };
 
       const response = await api.post('/cbir/search/sync', payload);
@@ -468,9 +487,9 @@ const ViewImagesPage = () => {
   // Re-run search when parameters change (while in similarity mode)
   const handleUpdateSimilarityParams = useCallback(async () => {
     if (similarityMode && similarityQueryImage) {
-      await handleSimilaritySearch(similarityQueryImage);
+      await handleSimilaritySearch(similarityQueryImage, similarityLabelFilter);
     }
-  }, [similarityMode, similarityQueryImage, handleSimilaritySearch]);
+  }, [similarityMode, similarityQueryImage, handleSimilaritySearch, similarityLabelFilter]);
 
   // Exit similarity mode
   const handleExitSimilarityMode = useCallback(() => {
@@ -478,6 +497,7 @@ const ViewImagesPage = () => {
     setSimilarityQueryImage(null);
     setSimilarityResults([]);
     setSelectedIds(new Set());
+    setSimilarityLabelFilter('all'); // Reset label filter
   }, []);
 
   // Derived State: Filtered Images (or similarity results)
@@ -730,6 +750,21 @@ const ViewImagesPage = () => {
                   className="w-24 accent-amber-500"
                 />
                 <span className="text-sm font-semibold text-gray-900 dark:text-white w-12">{(similarityThreshold * 100).toFixed(0)}%</span>
+              </div>
+
+              {/* Label Filter Dropdown */}
+              <div className="flex items-center gap-3 bg-white dark:bg-gray-800 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                <label className="text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">Categoria:</label>
+                <select
+                  value={similarityLabelFilter}
+                  onChange={(e) => setSimilarityLabelFilter(e.target.value)}
+                  className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-amber-500/50 cursor-pointer min-w-[100px]"
+                >
+                  <option value="all" className="bg-white dark:bg-gray-700 text-gray-900 dark:text-white">Todas</option>
+                  {availableCategoriesForSimilarity.map(cat => (
+                    <option key={cat} value={cat} className="bg-white dark:bg-gray-700 text-gray-900 dark:text-white">{cat}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Search Button */}
