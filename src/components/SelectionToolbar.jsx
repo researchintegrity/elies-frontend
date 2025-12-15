@@ -1,7 +1,7 @@
 import React from 'react';
-import { FiX, FiTrash2, FiTag, FiBarChart2 } from 'react-icons/fi';
+import { FiX, FiTrash2, FiTag, FiBarChart2, FiTarget } from 'react-icons/fi';
 
-const SelectionToolbar = ({ selectedCount, onClearSelection, onDelete, onTag, onAnalyze }) => {
+const SelectionToolbar = ({ selectedCount, onClearSelection, onDelete, onTag, onAnalyze, onFindSimilar }) => {
     if (selectedCount === 0) return null;
 
     return (
@@ -20,6 +20,18 @@ const SelectionToolbar = ({ selectedCount, onClearSelection, onDelete, onTag, on
             </div>
 
             <div className="flex items-center gap-2">
+                {/* Find Similar - Only shown when exactly 1 image is selected */}
+                {selectedCount === 1 && onFindSimilar && (
+                    <button
+                        onClick={onFindSimilar}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-medium transition-colors"
+                        title="Buscar imagens similares"
+                    >
+                        <FiTarget className="text-lg" />
+                        <span>Buscar Similares</span>
+                    </button>
+                )}
+
                 <button
                     onClick={onTag}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-medium transition-colors"
