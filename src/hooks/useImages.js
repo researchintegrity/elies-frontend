@@ -48,21 +48,41 @@ export const useImages = () => {
         }
     }, []);
 
-    const deleteImage = useCallback(async (image) => {
-        const confirmed = await showConfirm(
-            'Tem certeza?',
-            `Deseja realmente excluir a imagem "${image.filename}"?`
-        );
+    const deleteImage = useCallback(async (image, options = {}) => {
+        if (image.sourceType === 'extracted') {
+            showAlert(
+                'Ação Bloqueada',
+                'Imagens extraídas não podem ser excluídas individualmente. Para remover esta imagem, você deve excluir o PDF original na aba "Documentos".',
+                'warning'
+            );
+            return false;
+        }
 
-        if (!confirmed) return false;
+        const { skipConfirm = false } = options;
+
+        if (!skipConfirm) {
+            const confirmed = await showConfirm(
+                'Tem certeza?',
+                `Deseja realmente excluir a imagem "${image.filename}"?`
+            );
+            if (!confirmed) return false;
+        }
 
         try {
             await api.delete(`/images/${image.id}`);
+            // Optimistic update
             setImages(prev => prev.filter(img => img.id !== image.id));
-            showToast('Imagem deletada com sucesso!', 'success');
+
+            // Only show toast if individual action (otherwise batch handler manages toast)
+            if (!skipConfirm) {
+                showToast('Imagem deletada com sucesso!', 'success');
+            }
             return true;
         } catch (err) {
-            showAlert('Erro', `Erro ao deletar: ${err.message}`, 'error');
+            // Only show alert if individual action
+            if (!skipConfirm) {
+                showAlert('Erro', `Erro ao deletar: ${err.message}`, 'error');
+            }
             return false;
         }
     }, []);

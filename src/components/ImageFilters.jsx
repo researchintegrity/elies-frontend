@@ -34,8 +34,8 @@ const ImageFilters = ({ isOpen, onClose, filters, onFilterChange }) => {
                         ].map((option) => (
                             <label key={option.id} className="flex items-center gap-3 cursor-pointer group">
                                 <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${filters.sourceType === option.id
-                                        ? 'bg-indigo-500 border-indigo-500 text-white'
-                                        : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 group-hover:border-indigo-400'
+                                    ? 'bg-indigo-500 border-indigo-500 text-white'
+                                    : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 group-hover:border-indigo-400'
                                     }`}>
                                     {filters.sourceType === option.id && <div className="w-2 h-2 bg-white rounded-full" />}
                                 </div>
@@ -94,8 +94,8 @@ const ImageFilters = ({ isOpen, onClose, filters, onFilterChange }) => {
                                     onFilterChange('tags', newTags);
                                 }}
                                 className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${(filters.tags || []).includes(tag)
-                                        ? 'bg-indigo-100 border-indigo-200 text-indigo-700 dark:bg-indigo-900/40 dark:border-indigo-500/30 dark:text-indigo-300'
-                                        : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
+                                    ? 'bg-indigo-100 border-indigo-200 text-indigo-700 dark:bg-indigo-900/40 dark:border-indigo-500/30 dark:text-indigo-300'
+                                    : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
                                     }`}
                             >
                                 #{tag}

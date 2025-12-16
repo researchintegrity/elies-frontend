@@ -16,7 +16,7 @@ import {
 } from 'react-icons/fi';
 import { useImages } from '../hooks/useImages';
 import { api } from '../services/api';
-import { showAlert, showToast } from '../utils/alert';
+import { showAlert, showToast, showConfirm } from '../utils/alert';
 import SelectionToolbar from '../components/SelectionToolbar';
 import ImageFilters from '../components/ImageFilters';
 import TagInput from '../components/TagInput';
@@ -370,27 +370,52 @@ const ViewImagesPage = () => {
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
 
-    const count = selectedIds.size;
-    // NOTE: Isso deve ser implementado no backend como rota de batch delete para ser eficiente
-    // Por enquanto, faremos loop sequencial (na v2, mover para endpoint batch)
-    if (confirm(`Tem certeza que deseja excluir ${count} imagens?`)) {
-      const idsArray = Array.from(selectedIds);
+    // Filter out extracted images
+    const selectedImages = images.filter(img => selectedIds.has(img.id));
+    const uploadedImages = selectedImages.filter(img => img.sourceType !== 'extracted');
+    const extractedCount = selectedImages.length - uploadedImages.length;
+
+    if (uploadedImages.length === 0) {
+      showAlert(
+        'Ação Bloqueada',
+        `Você selecionou ${extractedCount} imagem(ns) extraída(s). Elas só podem ser removidas excluindo o PDF original.`,
+        'warning'
+      );
+      return;
+    }
+
+    let confirmMessage = `Tem certeza que deseja excluir ${uploadedImages.length} imagens?`;
+    if (extractedCount > 0) {
+      confirmMessage += `\n\n(Atenção: ${extractedCount} imagens extraídas selecionadas serão ignoradas e não serão excluídas)`;
+    }
+
+    const confirmed = await showConfirm('Confirmação', confirmMessage);
+    if (confirmed) {
       let successCount = 0;
 
-      // UI Otismista: limpar seleção imediatamente
+      // UI Otimista: limpar seleção imediatamente
       handleClearSelection();
 
-      for (const id of idsArray) {
-        const img = images.find(i => i.id === id);
-        if (img) {
-          // Bypass confirm dialog individual
-          // TODO: Adicionar flag 'force' no hook deleteImage
-          await deleteImage(img);
-          successCount++;
-        }
+      for (const img of uploadedImages) {
+        // Bypass confirm dialog individual using the new option
+        const success = await deleteImage(img, { skipConfirm: true });
+        if (success) successCount++;
       }
-      showToast(`${successCount} imagens excluídas.`);
-      fetchImages();
+
+      // Update local state is tricky without the hook's setImages executed per item or batch
+      // So we call fetchImages to sync or manually update state if we exposed setImages (we didn't)
+      // Actually, standard pattern is to use hook functions. BUT deleteImage has confirm.
+      // Let's rely on fetchImages() at the end.
+
+      if (successCount > 0) {
+        showToast(`${successCount} imagens excluídas com sucesso.`, 'success');
+        fetchImages();
+      }
+
+      if (extractedCount > 0) {
+        // Delay small alert to not conflict with toast if necessary, usually toast is enough
+        setTimeout(() => showToast(`${extractedCount} imagens extraídas foram ignoradas.`, 'info'), 500);
+      }
     }
   };
 
