@@ -348,9 +348,8 @@ const ViewPDFPage = () => {
 
   // Hook de remoção de watermark com callback de sucesso
   const { removeWatermark, isRemoving } = useWatermarkRemoval((doc, level) => {
-    console.log(`Watermark removal completed for ${doc.filename} at level ${level}`);
-    // Opcional: atualizar status do documento ou recarregar lista
-    // fetchDocuments();
+    // Atualizar lista de documentos para mostrar o novo arquivo gerado
+    fetchDocuments();
   });
 
   useEffect(() => { fetchDocuments(); }, [fetchDocuments]);

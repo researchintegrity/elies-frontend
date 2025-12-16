@@ -126,5 +126,11 @@ export const api = {
 
     removeImageType: async (imageId, typeName) => {
         return api.delete(`/images/${imageId}/types/${typeName}`);
+    },
+
+    // --- Documents ---
+
+    getWatermarkRemovalStatus: async (documentId) => {
+        return api.get(`/documents/${documentId}/watermark-removal/status`);
     }
 };
