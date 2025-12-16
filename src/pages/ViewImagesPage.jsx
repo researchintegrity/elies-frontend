@@ -15,7 +15,9 @@ import {
   FiCheck,
   FiTarget,
   FiZap,
-  FiArrowLeft
+  FiArrowLeft,
+  FiChevronLeft,
+  FiChevronRight
 } from 'react-icons/fi';
 import { useImages } from '../hooks/useImages';
 import { api } from '../services/api';
@@ -225,7 +227,7 @@ const QueryImageThumbnail = ({ image, isSelected, onSelect, isSelectionMode }) =
         )}
       </div>
       <div className="min-w-0">
-        <span className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-bold">Consulta</span>
+        <span className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-bold">Query</span>
         <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[120px]" title={image.filename}>
           {image.filename}
         </p>
@@ -392,6 +394,7 @@ const ViewImagesPage = () => {
     images,
     loading,
     error,
+    pagination,
     fetchImages,
     deleteImage,
     addImageTypes,
@@ -404,8 +407,13 @@ const ViewImagesPage = () => {
   const [filters, setFilters] = useState({ sourceType: 'all', dateFrom: '', dateTo: '', tags: [] });
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
 
-  // Selection
-  const [selectedIds, setSelectedIds] = useState(new Set());
+  // Pagination state for current page
+  const [currentPage, setCurrentPage] = useState(1);
+  const IMAGES_PER_PAGE = 24;
+
+  // Selection - Map of id -> image data to support cross-page selection
+  const [selectedImages, setSelectedImages] = useState(new Map());
+  const selectedIds = useMemo(() => new Set(selectedImages.keys()), [selectedImages]);
   const [isBatchTagModalOpen, setIsBatchTagModalOpen] = useState(false);
 
   // Lightbox
@@ -421,37 +429,59 @@ const ViewImagesPage = () => {
   const [similarityThreshold, setSimilarityThreshold] = useState(0.5);
   const [similarityLabelFilter, setSimilarityLabelFilter] = useState('all');
 
-  // Extract available categories from all images for similarity filter
-  const availableCategoriesForSimilarity = useMemo(() => {
-    const categories = new Set();
-    images.forEach(img => {
-      (img.imageType || []).forEach(type => categories.add(type));
-    });
-    return Array.from(categories).sort();
+  // Accumulated categories from all visited pages (persisted state)
+  const [allCategories, setAllCategories] = useState(new Set());
+  
+  // Update available categories when images change (accumulate from all pages)
+  useEffect(() => {
+    if (images.length > 0) {
+      setAllCategories(prev => {
+        const newSet = new Set(prev);
+        images.forEach(img => {
+          (img.imageType || []).forEach(type => newSet.add(type));
+        });
+        return newSet;
+      });
+    }
   }, [images]);
+  
+  // Convert Set to sorted array for rendering
+  const availableCategoriesForSimilarity = useMemo(() => {
+    return Array.from(allCategories).sort();
+  }, [allCategories]);
 
   useEffect(() => {
-    fetchImages();
-  }, [fetchImages]);
+    fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE });
+  }, [fetchImages, currentPage]);
+
+  // Handle page change
+  const handlePageChange = useCallback((newPage) => {
+    const maxPage = Math.max(1, pagination.totalPages);
+    const boundedPage = Math.min(Math.max(1, newPage), maxPage);
+    if (boundedPage !== currentPage) {
+      setCurrentPage(boundedPage);
+      // Keep selection when changing pages to allow multi-page selection
+    }
+  }, [currentPage, pagination.totalPages]);
 
   // CBIR Search Handler
   const handleSimilaritySearch = useCallback(async (queryImage, labelFilterOverride) => {
     if (!queryImage) return;
     
-    // Auto-set label filter based on query image's labels (only on initial search)
+    // Use provided filter or default to 'all' (search across all categories)
     const effectiveLabelFilter = labelFilterOverride !== undefined 
       ? labelFilterOverride 
-      : (queryImage.imageType?.length > 0 ? queryImage.imageType[0] : 'all');
+      : 'all';
     
     if (labelFilterOverride === undefined) {
-      setSimilarityLabelFilter(effectiveLabelFilter);
+      setSimilarityLabelFilter('all');
     }
     
     setSimilarityMode(true);
     setSimilarityQueryImage(queryImage);
     setSimilarityLoading(true);
     setSimilarityResults([]);
-    setSelectedIds(new Set()); // Clear selection when entering similarity mode
+    setSelectedImages(new Map()); // Clear selection when entering similarity mode
 
     try {
       const payload = {
@@ -496,7 +526,7 @@ const ViewImagesPage = () => {
     setSimilarityMode(false);
     setSimilarityQueryImage(null);
     setSimilarityResults([]);
-    setSelectedIds(new Set());
+    setSelectedImages(new Map());
     setSimilarityLabelFilter('all'); // Reset label filter
   }, []);
 
@@ -567,43 +597,44 @@ const ViewImagesPage = () => {
   // Handlers
 
   const handleSelect = useCallback((id) => {
-    setSelectedIds(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
+    // Find the image data from current page images or similarity results
+    const imageData = images.find(img => img.id === id) || 
+                      filteredImages.find(img => img.id === id);
+    
+    setSelectedImages(prev => {
+      const newMap = new Map(prev);
+      if (newMap.has(id)) {
+        newMap.delete(id);
+      } else if (imageData) {
+        newMap.set(id, imageData);
       }
-      return newSet;
+      return newMap;
     });
-  }, []);
+  }, [images, filteredImages]);
 
-  const handleClearSelection = () => setSelectedIds(new Set());
+  const handleClearSelection = () => setSelectedImages(new Map());
 
   const handleDeleteSelected = async () => {
-    if (selectedIds.size === 0) return;
+    if (selectedImages.size === 0) return;
 
-    const count = selectedIds.size;
+    const count = selectedImages.size;
     // NOTE: Isso deve ser implementado no backend como rota de batch delete para ser eficiente
     // Por enquanto, faremos loop sequencial (na v2, mover para endpoint batch)
     if (confirm(`Tem certeza que deseja excluir ${count} imagens?`)) {
-      const idsArray = Array.from(selectedIds);
+      const selectedArray = Array.from(selectedImages.values());
       let successCount = 0;
 
       // UI Otismista: limpar seleção imediatamente
       handleClearSelection();
 
-      for (const id of idsArray) {
-        const img = images.find(i => i.id === id);
-        if (img) {
-          // Bypass confirm dialog individual
-          // TODO: Adicionar flag 'force' no hook deleteImage
-          await deleteImage(img);
-          successCount++;
-        }
+      for (const img of selectedArray) {
+        // Bypass confirm dialog individual
+        // TODO: Adicionar flag 'force' no hook deleteImage
+        await deleteImage(img);
+        successCount++;
       }
       showToast(`${successCount} imagens excluídas.`);
-      fetchImages();
+      fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE });
     }
   };
 
@@ -614,15 +645,12 @@ const ViewImagesPage = () => {
   const handleBatchTagConfirm = async (newTags) => {
     if (newTags.length === 0) return;
 
-    const idsArray = Array.from(selectedIds);
+    const selectedArray = Array.from(selectedImages.values());
     let successCount = 0;
 
-    for (const id of idsArray) {
-      const img = images.find(i => i.id === id);
-      if (img) {
-        await addImageTypes(img, newTags);
-        successCount++;
-      }
+    for (const img of selectedArray) {
+      await addImageTypes(img, newTags);
+      successCount++;
     }
     showToast(`${newTags.length} tags adicionadas a ${successCount} imagens.`);
     handleClearSelection();
@@ -634,16 +662,16 @@ const ViewImagesPage = () => {
 
   // Find similar images handler
   const handleFindSimilar = useCallback(() => {
-    if (selectedIds.size !== 1) {
+    if (selectedImages.size !== 1) {
       showToast('Selecione exatamente uma imagem para buscar similares.', 'warning');
       return;
     }
-    const selectedId = Array.from(selectedIds)[0];
-    const queryImage = images.find(img => img.id === selectedId);
+    // Get the image directly from the selectedImages Map
+    const queryImage = Array.from(selectedImages.values())[0];
     if (queryImage) {
       handleSimilaritySearch(queryImage);
     }
-  }, [selectedIds, images, handleSimilaritySearch]);
+  }, [selectedImages, handleSimilaritySearch]);
 
   const handleResetFilters = () => {
     setFilters({ sourceType: 'all', dateFrom: '', dateTo: '', tags: [] });
@@ -785,14 +813,41 @@ const ViewImagesPage = () => {
       {!similarityMode && (
       <header className="flex-none px-8 py-6 border-b border-gray-200 dark:border-gray-800 bg-bg-main dark:bg-bg-main z-30">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div>
-            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
-              Galeria
-              {loading && <FiRefreshCw className="animate-spin text-lg text-gray-400" />}
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Gerencie, organize e analise suas imagens extraídas e enviadas.
-            </p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
+                Galeria
+                {loading && <FiRefreshCw className="animate-spin text-lg text-gray-400" />}
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Gerencie, organize e analise suas imagens extraídas e enviadas.
+              </p>
+            </div>
+            
+            {/* Pagination Controls */}
+            {pagination.total > IMAGES_PER_PAGE && (
+              <div className="flex items-center gap-2 ml-4">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={!pagination.hasPrev || loading}
+                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  title="Página anterior"
+                >
+                  <FiChevronLeft />
+                </button>
+                <span className="text-sm text-gray-500 dark:text-gray-400 min-w-[140px] text-center">
+                  {currentPage} / {pagination.totalPages} ({pagination.total} imagens)
+                </span>
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={!pagination.hasNext || loading}
+                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  title="Próxima página"
+                >
+                  <FiChevronRight />
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
@@ -839,7 +894,7 @@ const ViewImagesPage = () => {
 
               <button
                 className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-indigo-600 hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 transition-all shadow-sm"
-                onClick={() => fetchImages()}
+                onClick={() => fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE })}
                 title="Atualizar"
               >
                 <FiRefreshCw />
@@ -878,28 +933,105 @@ const ViewImagesPage = () => {
             <FiAlertTriangle className="text-5xl text-red-400 mb-4" />
             <h3 className="text-xl font-bold text-gray-900 dark:text-white">Erro ao carregar imagens</h3>
             <p className="text-gray-500 mb-6">{error}</p>
-            <button onClick={() => fetchImages()} className="px-6 py-2 bg-indigo-600 text-white rounded-lg">Tentar Novamente</button>
+            <button onClick={() => fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE })} className="px-6 py-2 bg-indigo-600 text-white rounded-lg">Tentar Novamente</button>
           </div>
         ) : filteredImages.length === 0 ? (
           <EmptyState isSearch={!!searchQuery || hasActiveFilters || similarityMode} onUploadClick={() => showAlert('Info', 'Use o menu lateral para Upload', 'info')} />
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6 pb-20">
-            {filteredImages.map((image, index) => (
-              <ImageCard
-                key={image.id}
-                image={image}
-                onClick={(img, url) => {
-                  setLightboxImage(img);
-                  setLightboxUrl(url);
-                }}
-                onSelect={handleSelect}
-                isSelected={selectedIds.has(image.id)}
-                isSelectionMode={selectedIds.size > 0}
-                similarityScore={image.similarityScore !== undefined ? image.similarityScore : null}
-                rank={image.similarityScore !== undefined ? index + 1 : null}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+              {filteredImages.map((image, index) => (
+                <ImageCard
+                  key={image.id}
+                  image={image}
+                  onClick={(img, url) => {
+                    setLightboxImage(img);
+                    setLightboxUrl(url);
+                  }}
+                  onSelect={handleSelect}
+                  isSelected={selectedIds.has(image.id)}
+                  isSelectionMode={selectedIds.size > 0}
+                  similarityScore={image.similarityScore !== undefined ? image.similarityScore : null}
+                  rank={image.similarityScore !== undefined ? index + 1 : null}
+                />
+              ))}
+            </div>
+            
+            {/* Bottom Pagination Controls */}
+            {!similarityMode && pagination.total > IMAGES_PER_PAGE && (
+              <div className="flex items-center justify-center gap-4 mt-8 pb-8">
+                <button
+                  onClick={() => handlePageChange(1)}
+                  disabled={currentPage === 1 || loading}
+                  className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Primeira
+                </button>
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={!pagination.hasPrev || loading}
+                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <FiChevronLeft />
+                </button>
+                
+                {/* Page number buttons */}
+                <div className="flex items-center gap-1">
+                  {(() => {
+                    const pages = [];
+                    const totalPages = pagination.totalPages;
+                    const current = currentPage;
+                    
+                    // Show at most 5 page buttons
+                    let start = Math.max(1, current - 2);
+                    let end = Math.min(totalPages, start + 4);
+                    
+                    // Adjust start if we're near the end
+                    if (end - start < 4) {
+                      start = Math.max(1, end - 4);
+                    }
+                    
+                    for (let i = start; i <= end; i++) {
+                      pages.push(
+                        <button
+                          key={i}
+                          onClick={() => handlePageChange(i)}
+                          disabled={loading}
+                          className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
+                            i === current
+                              ? 'bg-indigo-600 text-white'
+                              : 'border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                          }`}
+                        >
+                          {i}
+                        </button>
+                      );
+                    }
+                    return pages;
+                  })()}
+                </div>
+                
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={!pagination.hasNext || loading}
+                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <FiChevronRight />
+                </button>
+                <button
+                  onClick={() => handlePageChange(pagination.totalPages)}
+                  disabled={currentPage === pagination.totalPages || loading}
+                  className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Última
+                </button>
+                
+                <span className="text-sm text-gray-500 dark:text-gray-400 ml-4">
+                  {pagination.total} imagens no total
+                </span>
+              </div>
+            )}
+          </>
         )}
       </div>
 

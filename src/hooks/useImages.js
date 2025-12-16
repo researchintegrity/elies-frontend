@@ -2,31 +2,73 @@ import { useState, useCallback } from 'react';
 import { api } from '../services/api';
 import { showAlert, showToast, showConfirm } from '../utils/alert';
 
+// Default page size for gallery pagination
+const DEFAULT_PER_PAGE = 24;
+
 export const useImages = () => {
     const [images, setImages] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    
+    // Pagination state
+    const [pagination, setPagination] = useState({
+        page: 1,
+        perPage: DEFAULT_PER_PAGE,
+        total: 0,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false
+    });
 
-    const fetchImages = useCallback(async (params = { page: 1, per_page: 100 }) => {
+    const fetchImages = useCallback(async (params = {}) => {
+        const { page = 1, per_page = DEFAULT_PER_PAGE, ...otherParams } = params;
+        
         setLoading(true);
         setError(null);
         try {
-            const data = await api.get('/images', params);
+            const data = await api.get('/images', { page, per_page, ...otherParams });
+
+            // Handle both array response (legacy) and paginated response object
+            let imageList = [];
+            let paginationData = {
+                page: page,
+                perPage: per_page,
+                total: 0,
+                totalPages: 1,
+                hasNext: false,
+                hasPrev: false
+            };
 
             if (Array.isArray(data)) {
-                const transformed = data.map(img => ({
-                    id: img._id,
-                    imageId: img._id,
-                    filename: img.filename,
-                    uploadedDate: img.uploaded_date,
-                    fileSize: img.file_size,
-                    sourceType: img.source_type,
-                    imageType: img.image_type || []
-                }));
-                setImages(transformed);
-            } else {
-                throw new Error('Formato de dados inválido');
+                // Legacy array response
+                imageList = data;
+                paginationData.total = data.length;
+                paginationData.totalPages = 1;
+            } else if (data && typeof data === 'object') {
+                // New paginated response: { items: [], total, page, per_page, total_pages, has_next, has_prev }
+                imageList = data.items || data.images || [];
+                paginationData = {
+                    page: data.page || page,
+                    perPage: data.per_page || per_page,
+                    total: data.total || imageList.length,
+                    totalPages: data.total_pages || Math.ceil((data.total || imageList.length) / per_page),
+                    hasNext: data.has_next ?? false,
+                    hasPrev: data.has_prev ?? (page > 1)
+                };
             }
+
+            const transformed = imageList.map(img => ({
+                id: img._id,
+                imageId: img._id,
+                filename: img.filename,
+                uploadedDate: img.uploaded_date,
+                fileSize: img.file_size,
+                sourceType: img.source_type,
+                imageType: img.image_type || []
+            }));
+            
+            setImages(transformed);
+            setPagination(paginationData);
         } catch (err) {
             console.error('Error fetching images:', err);
             setError(err.message);
@@ -99,6 +141,7 @@ export const useImages = () => {
         images,
         loading,
         error,
+        pagination,
         fetchImages,
         uploadImage,
         deleteImage,

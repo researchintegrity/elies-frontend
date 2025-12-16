@@ -1,5 +1,5 @@
 // src/pages/CBIRSearchPage.jsx
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   FiSearch,
   FiImage,
@@ -134,7 +134,7 @@ const ResultCard = ({ result, rank, onClick }) => {
           setImageUrl(url);
           setLoading(false);
         }
-      } catch (err) {
+      } catch {
         if (isMounted) {
           setError(true);
           setLoading(false);
@@ -144,7 +144,6 @@ const ResultCard = ({ result, rank, onClick }) => {
     loadImage();
     return () => {
       isMounted = false;
-      if (imageUrl) URL.revokeObjectURL(imageUrl);
     };
   }, [result.image_id]);
 
@@ -242,15 +241,16 @@ const ResultCard = ({ result, rank, onClick }) => {
 
 // Lightbox for viewing images in detail
 const LightboxModal = ({ image, imageUrl, onClose, isResult = false }) => {
-  if (!image) return null;
-
   useEffect(() => {
+    if (!image) return;
     const handleEsc = (e) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
-  }, [onClose]);
+  }, [image, onClose]);
+
+  if (!image) return null;
 
   return (
     <div
@@ -332,6 +332,9 @@ const LightboxModal = ({ image, imageUrl, onClose, isResult = false }) => {
   );
 };
 
+// --- Constants ---
+const IMAGES_PER_PAGE = 24; // Reasonable page size for performance
+
 // --- Main Component ---
 
 const CBIRSearchPage = () => {
@@ -360,51 +363,62 @@ const CBIRSearchPage = () => {
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [lightboxIsResult, setLightboxIsResult] = useState(false);
 
-  // Gallery pagination
-  const [galleryPage, setGalleryPage] = useState(0);
-  const IMAGES_PER_PAGE = 12;
+  // Gallery pagination (server-side)
+  const [galleryPage, setGalleryPage] = useState(1); // 1-indexed for API
+  const [totalImages, setTotalImages] = useState(0);
 
-  // Fetch all images on mount
+  // Fetch images when page changes (server-side pagination)
   useEffect(() => {
-    fetchImages();
-  }, []);
+    fetchImages(galleryPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [galleryPage]);
 
-  // Load image thumbnails
+  // Load image thumbnails for current page
   useEffect(() => {
     const loadImageUrls = async () => {
-      const paginatedImages = images.slice(
-        galleryPage * IMAGES_PER_PAGE,
-        (galleryPage + 1) * IMAGES_PER_PAGE
-      );
-
-      for (const img of paginatedImages) {
-        if (!imageUrls[img.id] && !loadingUrls[img.id]) {
-          setLoadingUrls(prev => ({ ...prev, [img.id]: true }));
-          try {
-            const blob = await api.download(`/images/${img.id}/download`);
-            const url = URL.createObjectURL(blob);
-            setImageUrls(prev => ({ ...prev, [img.id]: url }));
-          } catch (err) {
-            console.error(`Error loading image ${img.id}:`, err);
-          } finally {
-            setLoadingUrls(prev => ({ ...prev, [img.id]: false }));
-          }
-        }
+      // Load thumbnails for all images on current page
+      for (const img of images) {
+        // Check current state via refs pattern to avoid stale closures
+        setLoadingUrls(prev => {
+          if (prev[img.id]) return prev; // Already loading
+          return prev;
+        });
+        setImageUrls(prev => {
+          if (prev[img.id]) return prev; // Already loaded
+          // Trigger load in a separate effect-safe way
+          (async () => {
+            setLoadingUrls(p => ({ ...p, [img.id]: true }));
+            try {
+              const blob = await api.download(`/images/${img.id}/download`);
+              const url = URL.createObjectURL(blob);
+              setImageUrls(p => ({ ...p, [img.id]: url }));
+            } catch (_err) {
+              console.error(`Error loading image ${img.id}:`, _err);
+            } finally {
+              setLoadingUrls(p => ({ ...p, [img.id]: false }));
+            }
+          })();
+          return prev;
+        });
       }
     };
 
     if (images.length > 0) {
       loadImageUrls();
     }
-  }, [images, galleryPage]);
+  }, [images]);
 
-  // Extract available categories from images
+  // Add new categories from current page images
   useEffect(() => {
-    const categories = new Set();
-    images.forEach(img => {
-      (img.imageType || []).forEach(type => categories.add(type));
-    });
-    setAvailableCategories(Array.from(categories).sort());
+    if (images.length > 0) {
+      setAvailableCategories(prev => {
+        const categories = new Set(prev);
+        images.forEach(img => {
+          (img.imageType || []).forEach(type => categories.add(type));
+        });
+        return Array.from(categories).sort();
+      });
+    }
   }, [images]);
 
   // Auto-set category filter when selecting an image
@@ -419,30 +433,74 @@ const CBIRSearchPage = () => {
     }
   }, [selectedImage]);
 
-  const fetchImages = async () => {
+  const fetchImages = useCallback(async (page = 1) => {
     setLoadingImages(true);
     setErrorImages(null);
     try {
-      const data = await api.get('/images', { page: 1, per_page: 500 });
+      const data = await api.get('/images', { page, per_page: IMAGES_PER_PAGE });
+      
+      // Handle both array response and paginated response object
+      let imageList = [];
+      let total = 0;
+      
       if (Array.isArray(data)) {
-        const transformed = data.map(img => ({
-          id: img._id,
-          imageId: img._id,
-          filename: img.filename,
-          uploadedDate: img.uploaded_date,
-          fileSize: img.file_size,
-          sourceType: img.source_type,
-          imageType: img.image_type || []
-        }));
-        setImages(transformed);
+        imageList = data;
+        // If API returns array without total, estimate from current page
+        total = data.length >= IMAGES_PER_PAGE ? page * IMAGES_PER_PAGE + 1 : (page - 1) * IMAGES_PER_PAGE + data.length;
+      } else if (data && typeof data === 'object') {
+        // Handle paginated response: { items: [], total: number, page: number }
+        imageList = data.items || data.images || [];
+        total = data.total || data.total_count || imageList.length;
       }
+      
+      // Client-side safeguard: limit to IMAGES_PER_PAGE in case API doesn't respect per_page
+      const limitedImageList = imageList.slice(0, IMAGES_PER_PAGE);
+      
+      const transformed = limitedImageList.map(img => ({
+        id: img._id,
+        imageId: img._id,
+        filename: img.filename,
+        uploadedDate: img.uploaded_date,
+        fileSize: img.file_size,
+        sourceType: img.source_type,
+        imageType: img.image_type || []
+      }));
+      
+      // Update total if we had to limit client-side (API might have more)
+      if (imageList.length > IMAGES_PER_PAGE && total < imageList.length) {
+        total = Math.max(total, page * IMAGES_PER_PAGE + (imageList.length - IMAGES_PER_PAGE));
+      }
+      
+      setImages(transformed);
+      setTotalImages(total);
     } catch (err) {
       console.error('Error fetching images:', err);
       setErrorImages(err.message);
     } finally {
       setLoadingImages(false);
     }
-  };
+  }, []);
+
+  // Fetch categories separately (only on mount)
+  const fetchCategories = useCallback(async () => {
+    try {
+      // Try to get categories from a dedicated endpoint or fetch a sample
+      const data = await api.get('/images', { page: 1, per_page: 100 });
+      const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
+      const categories = new Set();
+      imageList.forEach(img => {
+        (img.image_type || []).forEach(type => categories.add(type));
+      });
+      setAvailableCategories(Array.from(categories).sort());
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+    }
+  }, []);
+
+  // Fetch categories on mount
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
   const handleSearch = async () => {
     if (!selectedImage) {
@@ -493,13 +551,17 @@ const CBIRSearchPage = () => {
     setCategoryFilter('all');
   };
 
-  // Paginated images for gallery
-  const paginatedImages = useMemo(() => {
-    const start = galleryPage * IMAGES_PER_PAGE;
-    return images.slice(start, start + IMAGES_PER_PAGE);
-  }, [images, galleryPage]);
+  // Calculate total pages from server-side total
+  const totalGalleryPages = Math.ceil(totalImages / IMAGES_PER_PAGE);
 
-  const totalGalleryPages = Math.ceil(images.length / IMAGES_PER_PAGE);
+  // Handle page change with bounds checking
+  const handlePageChange = useCallback((newPage) => {
+    const maxPage = Math.max(1, totalGalleryPages);
+    const boundedPage = Math.min(Math.max(1, newPage), maxPage);
+    if (boundedPage !== galleryPage) {
+      setGalleryPage(boundedPage);
+    }
+  }, [galleryPage, totalGalleryPages]);
 
   return (
     <div className="flex flex-col h-full bg-bg-main dark:bg-bg-main overflow-hidden">
@@ -548,21 +610,21 @@ const CBIRSearchPage = () => {
               </div>
 
               {/* Gallery Navigation */}
-              {images.length > IMAGES_PER_PAGE && (
+              {totalImages > IMAGES_PER_PAGE && (
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setGalleryPage(p => Math.max(0, p - 1))}
-                    disabled={galleryPage === 0}
+                    onClick={() => handlePageChange(galleryPage - 1)}
+                    disabled={galleryPage <= 1 || loadingImages}
                     className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
                     <FiChevronLeft />
                   </button>
-                  <span className="text-sm text-gray-500 dark:text-gray-400 min-w-[80px] text-center">
-                    {galleryPage + 1} / {totalGalleryPages}
+                  <span className="text-sm text-gray-500 dark:text-gray-400 min-w-[100px] text-center">
+                    {galleryPage} / {totalGalleryPages} ({totalImages} imagens)
                   </span>
                   <button
-                    onClick={() => setGalleryPage(p => Math.min(totalGalleryPages - 1, p + 1))}
-                    disabled={galleryPage >= totalGalleryPages - 1}
+                    onClick={() => handlePageChange(galleryPage + 1)}
+                    disabled={galleryPage >= totalGalleryPages || loadingImages}
                     className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
                     <FiChevronRight />
@@ -574,24 +636,24 @@ const CBIRSearchPage = () => {
             <div className="p-5">
               {loadingImages ? (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-                  {[...Array(12)].map((_, i) => <SkeletonCard key={i} />)}
+                  {[...Array(IMAGES_PER_PAGE)].map((_, i) => <SkeletonCard key={i} />)}
                 </div>
               ) : errorImages ? (
                 <div className="text-center py-8">
                   <FiAlertTriangle className="text-4xl text-red-400 mx-auto mb-3" />
                   <p className="text-gray-600 dark:text-gray-400">{errorImages}</p>
                   <button
-                    onClick={fetchImages}
+                    onClick={() => fetchImages(galleryPage)}
                     className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
                   >
                     Tentar Novamente
                   </button>
                 </div>
-              ) : images.length === 0 ? (
-                <EmptyGallery onRefresh={fetchImages} />
+              ) : images.length === 0 && !loadingImages ? (
+                <EmptyGallery onRefresh={() => fetchImages(1)} />
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-                  {paginatedImages.map((img) => (
+                  {images.map((img) => (
                     <SourceImageCard
                       key={img.id}
                       image={img}
