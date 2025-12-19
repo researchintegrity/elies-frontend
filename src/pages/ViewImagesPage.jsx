@@ -67,7 +67,8 @@ const EmptyState = ({ isSearch, onUploadClick, t }) => (
   </div>
 );
 
-const LightboxModal = ({ image, onClose, imageUrl, onTagAdd, onTagRemove }) => {
+
+const LightboxModal = ({ image, onClose, imageUrl, onTagAdd, onTagRemove, t, locale }) => {
   if (!image) return null;
 
   useEffect(() => {
@@ -105,7 +106,7 @@ const LightboxModal = ({ image, onClose, imageUrl, onTagAdd, onTagRemove }) => {
         )}
       </div>
 
-      {/* Sidebar de Metadados */}
+      {/* Metadata Sidebar */}
       <div
         className="w-[360px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 p-6 overflow-y-auto flex flex-col gap-6"
         onClick={e => e.stopPropagation()}
@@ -115,14 +116,14 @@ const LightboxModal = ({ image, onClose, imageUrl, onTagAdd, onTagRemove }) => {
             {image.filename}
           </h2>
           <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
-            <span>{new Date(image.uploadedDate).toLocaleDateString()}</span>
+            <span>{new Date(image.uploadedDate).toLocaleDateString(locale)}</span>
             <span>•</span>
             <span>{(image.fileSize / 1024).toFixed(1)} KB</span>
           </div>
         </div>
 
         <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Tags & Classificação</h3>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">{t('lightbox.tagsClassification')}</h3>
           <TagInput
             tags={image.imageType || []}
             onAdd={(tag) => onTagAdd(image, tag)}
@@ -131,15 +132,14 @@ const LightboxModal = ({ image, onClose, imageUrl, onTagAdd, onTagRemove }) => {
         </div>
 
         <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Metadados</h3>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">{t('lightbox.metadata')}</h3>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-              <span className="block text-gray-500 text-xs mb-1">Origem</span>
+              <span className="block text-gray-500 text-xs mb-1">{t('lightbox.origin')}</span>
               <span className="font-medium dark:text-gray-200 capitalize">{image.sourceType}</span>
             </div>
-            {/* Placeholder para Dimensões/Resolução se disponível no futuro */}
             <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-              <span className="block text-gray-500 text-xs mb-1">Formato</span>
+              <span className="block text-gray-500 text-xs mb-1">{t('lightbox.format')}</span>
               <span className="font-medium dark:text-gray-200 uppercase">{image.filename.split('.').pop()}</span>
             </div>
           </div>
@@ -400,7 +400,7 @@ const ViewImagesPage = () => {
     removeImageType
   } = useImages();
 
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
 
   // States
   const [searchQuery, setSearchQuery] = useState('');
@@ -1074,6 +1074,8 @@ const ViewImagesPage = () => {
           }}
           onTagAdd={addImageTypes}
           onTagRemove={removeImageType}
+          t={t}
+          locale={locale}
         />
       )}
     </div>

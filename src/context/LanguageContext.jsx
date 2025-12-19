@@ -121,6 +121,12 @@ const translations = {
         'gallery.previousPage': 'Página anterior',
         'gallery.nextPage': 'Próxima página',
 
+        // Lightbox Modal
+        'lightbox.tagsClassification': 'Tags & Classificação',
+        'lightbox.metadata': 'Metadados',
+        'lightbox.origin': 'Origem',
+        'lightbox.format': 'Formato',
+
         // Similarity Search
         'similarity.title': 'Busca por Similaridade',
         'similarity.searching': 'Buscando...',
@@ -296,6 +302,12 @@ const translations = {
         'gallery.last': 'Last',
         'gallery.previousPage': 'Previous page',
         'gallery.nextPage': 'Next page',
+
+        // Lightbox Modal
+        'lightbox.tagsClassification': 'Tags & Classification',
+        'lightbox.metadata': 'Metadata',
+        'lightbox.origin': 'Source',
+        'lightbox.format': 'Format',
 
         // Similarity Search
         'similarity.title': 'Similarity Search',
