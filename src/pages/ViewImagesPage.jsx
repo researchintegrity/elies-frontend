@@ -753,7 +753,7 @@ const ViewImagesPage = () => {
                 className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm"
               >
                 <FiArrowLeft />
-                <span className="text-sm font-medium">Voltar</span>
+                <span className="text-sm font-medium">{t('common.back')}</span>
               </button>
 
               {/* Query Image Thumbnail */}
@@ -767,12 +767,12 @@ const ViewImagesPage = () => {
               <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   <FiTarget className="text-amber-500" />
-                  Busca por Similaridade
+                  {t('similarity.title')}
                   {similarityLoading && <FiRefreshCw className="animate-spin text-sm text-gray-400" />}
                 </h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {!similarityLoading && `${filteredImages.length} resultados encontrados`}
-                  {similarityLoading && 'Buscando...'}
+                  {!similarityLoading && `${filteredImages.length} ${t('similarity.resultsFound')}`}
+                  {similarityLoading && t('similarity.searching')}
                 </p>
               </div>
             </div>
@@ -796,7 +796,7 @@ const ViewImagesPage = () => {
 
               {/* Threshold Slider */}
               <div className="flex items-center gap-3 bg-white dark:bg-gray-800 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-                <label className="text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">Limiar:</label>
+                <label className="text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{t('similarity.threshold')}:</label>
                 <input
                   type="range"
                   min="0"
@@ -811,13 +811,13 @@ const ViewImagesPage = () => {
 
               {/* Label Filter Dropdown */}
               <div className="flex items-center gap-3 bg-white dark:bg-gray-800 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-                <label className="text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">Categoria:</label>
+                <label className="text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{t('similarity.category')}:</label>
                 <select
                   value={similarityLabelFilter}
                   onChange={(e) => setSimilarityLabelFilter(e.target.value)}
                   className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-amber-500/50 cursor-pointer min-w-[100px]"
                 >
-                  <option value="all" className="bg-white dark:bg-gray-700 text-gray-900 dark:text-white">Todas</option>
+                  <option value="all" className="bg-white dark:bg-gray-700 text-gray-900 dark:text-white">{t('common.all')}</option>
                   {availableCategoriesForSimilarity.map(cat => (
                     <option key={cat} value={cat} className="bg-white dark:bg-gray-700 text-gray-900 dark:text-white">{cat}</option>
                   ))}
@@ -831,7 +831,7 @@ const ViewImagesPage = () => {
                 className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white rounded-lg font-medium transition-colors shadow-sm"
               >
                 <FiZap />
-                <span>Atualizar</span>
+                <span>{t('common.update')}</span>
               </button>
             </div>
           </div>
