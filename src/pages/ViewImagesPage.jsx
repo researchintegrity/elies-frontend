@@ -501,13 +501,13 @@ const ViewImagesPage = () => {
       setSimilarityResults(filteredMatches);
 
       if (filteredMatches.length === 0) {
-        showToast('Nenhuma imagem similar encontrada.', 'info');
+        showToast(t('similarity.noResults'), 'info');
       } else {
-        showToast(`Encontradas ${filteredMatches.length} imagens similares!`, 'success');
+        showToast(`${t('similarity.found')} ${filteredMatches.length} ${t('similarity.similarImages')}`, 'success');
       }
     } catch (err) {
       console.error('Similarity search error:', err);
-      showAlert('Erro na busca', err.message || 'Erro ao buscar imagens similares.', 'error');
+      showAlert(t('similarity.searchError'), err.message || t('similarity.searchErrorMessage'), 'error');
       setSimilarityMode(false);
       setSimilarityQueryImage(null);
     } finally {
@@ -692,7 +692,7 @@ const ViewImagesPage = () => {
   // Find similar images handler
   const handleFindSimilar = useCallback(() => {
     if (selectedImages.size !== 1) {
-      showToast('Selecione exatamente uma imagem para buscar similares.', 'warning');
+      showToast(t('similarity.selectOneImage'), 'warning');
       return;
     }
     // Get the image directly from the selectedImages Map

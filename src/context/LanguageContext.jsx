@@ -146,6 +146,11 @@ const translations = {
         'similarity.category': 'Categoria',
         'similarity.noResults': 'Nenhuma imagem similar encontrada.',
         'similarity.foundResults': 'imagens similares encontradas!',
+        'similarity.found': 'Encontradas',
+        'similarity.similarImages': 'imagens similares!',
+        'similarity.searchError': 'Erro na busca',
+        'similarity.searchErrorMessage': 'Erro ao buscar imagens similares.',
+        'similarity.selectOneImage': 'Selecione exatamente uma imagem para buscar similares.',
 
         // Profile Page
         'profile.title': 'Meu Perfil',
@@ -338,6 +343,11 @@ const translations = {
         'similarity.category': 'Category',
         'similarity.noResults': 'No similar images found.',
         'similarity.foundResults': 'similar images found!',
+        'similarity.found': 'Found',
+        'similarity.similarImages': 'similar images!',
+        'similarity.searchError': 'Search Error',
+        'similarity.searchErrorMessage': 'Error searching for similar images.',
+        'similarity.selectOneImage': 'Select exactly one image to search for similar ones.',
 
         // Profile Page
         'profile.title': 'My Profile',
