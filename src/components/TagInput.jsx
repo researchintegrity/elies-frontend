@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FiX, FiPlus, FiTag } from 'react-icons/fi';
+import { useLanguage } from '../context/LanguageContext';
 
 const TagInput = ({ tags = [], onAdd, onRemove, suggestions = [], readOnly = false, onInputChange }) => {
+    const { t } = useLanguage();
     const [inputValue, setInputValue] = useState('');
     const [isFocused, setIsFocused] = useState(false);
     const inputRef = useRef(null);
@@ -46,7 +48,7 @@ const TagInput = ({ tags = [], onAdd, onRemove, suggestions = [], readOnly = fal
                 {tags.length === 0 && !isFocused && (
                     <div className="text-gray-400 text-sm flex items-center gap-2 px-1">
                         <FiTag />
-                        <span>Adicionar tags...</span>
+                        <span>{t('tags.addTags')}</span>
                     </div>
                 )}
 

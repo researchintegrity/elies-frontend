@@ -137,6 +137,16 @@ const translations = {
         'selection.analyze': 'Analisar',
         'selection.delete': 'Excluir',
 
+        // Batch Operations
+        'batch.imagesDeleted': 'imagens excluídas com sucesso.',
+        'batch.extractedIgnored': 'imagens extraídas foram ignoradas.',
+        'batch.tagsAdded': 'tags adicionadas a',
+        'batch.images': 'imagens.',
+        'batch.analyzeComingSoon': 'Funcionalidade de análise em lote em breve!',
+
+        // Tag Input
+        'tags.addTags': 'Adicionar tags...',
+
         // Similarity Search
         'similarity.title': 'Busca por Similaridade',
         'similarity.searching': 'Buscando...',
@@ -408,6 +418,16 @@ const translations = {
         'selection.classify': 'Classify',
         'selection.analyze': 'Analyze',
         'selection.delete': 'Delete',
+
+        // Batch Operations
+        'batch.imagesDeleted': 'images deleted successfully.',
+        'batch.extractedIgnored': 'extracted images were ignored.',
+        'batch.tagsAdded': 'tags added to',
+        'batch.images': 'images.',
+        'batch.analyzeComingSoon': 'Batch analysis feature coming soon!',
+
+        // Tag Input
+        'tags.addTags': 'Add tags...',
 
         // Similarity Search
         'similarity.title': 'Similarity Search',

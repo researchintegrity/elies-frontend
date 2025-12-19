@@ -656,13 +656,13 @@ const ViewImagesPage = () => {
       // Let's rely on fetchImages() at the end.
 
       if (successCount > 0) {
-        showToast(`${successCount} imagens excluídas com sucesso.`, 'success');
+        showToast(`${successCount} ${t('batch.imagesDeleted')}`, 'success');
         fetchImages();
       }
 
       if (extractedCount > 0) {
         // Delay small alert to not conflict with toast if necessary, usually toast is enough
-        setTimeout(() => showToast(`${extractedCount} imagens extraídas foram ignoradas.`, 'info'), 500);
+        setTimeout(() => showToast(`${extractedCount} ${t('batch.extractedIgnored')}`, 'info'), 500);
       }
     }
   };
@@ -681,12 +681,12 @@ const ViewImagesPage = () => {
       await addImageTypes(img, newTags);
       successCount++;
     }
-    showToast(`${newTags.length} tags adicionadas a ${successCount} imagens.`);
+    showToast(`${newTags.length} ${t('batch.tagsAdded')} ${successCount} ${t('batch.images')}`);
     handleClearSelection();
   };
 
   const handleAnalyzeSelected = () => {
-    showToast("Funcionalidade de análise em lote em breve!", "info");
+    showToast(t('batch.analyzeComingSoon'), "info");
   };
 
   // Find similar images handler
