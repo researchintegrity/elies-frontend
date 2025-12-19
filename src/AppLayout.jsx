@@ -3,6 +3,7 @@ import React, { useState, Suspense, lazy } from 'react';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import LoadingFallback from './components/LoadingFallback';
+import { useLanguage } from './context/LanguageContext';
 
 // ✅ CODE SPLITTING: Lazy load all pages
 const UploadPDFPage = lazy(() => import('./pages/UploadPDFPage'));
@@ -27,6 +28,7 @@ const PAGES = {
 
 function AppLayout() {
   const [activePage, setActivePage] = useState(PAGES.VIEW_IMAGES);
+  const { t } = useLanguage();
 
   const renderActivePage = () => {
     switch (activePage) {
@@ -43,7 +45,7 @@ function AppLayout() {
       case PAGES.PROFILE:
         return <ProfilePage />;
       case PAGES.SEARCH:
-        return <div className="flex items-center justify-center h-full text-gray-400">Página "Search" (Em breve)</div>;
+        return <div className="flex items-center justify-center h-full text-gray-400">{t('common.searchPage')}</div>;
       case PAGES.CBIR_SEARCH:
         return <CBIRSearchPage />;
       default:

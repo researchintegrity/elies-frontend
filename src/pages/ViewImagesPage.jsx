@@ -20,6 +20,7 @@ import {
   FiChevronRight
 } from 'react-icons/fi';
 import { useImages } from '../hooks/useImages';
+import { useLanguage } from '../context/LanguageContext';
 import { api } from '../services/api';
 import { showAlert, showToast, showConfirm } from '../utils/alert';
 import SelectionToolbar from '../components/SelectionToolbar';
@@ -42,25 +43,25 @@ const SkeletonCard = () => (
   </div>
 );
 
-const EmptyState = ({ isSearch, onUploadClick }) => (
+const EmptyState = ({ isSearch, onUploadClick, t }) => (
   <div className="col-span-full flex flex-col items-center justify-center px-8 py-20 text-center bg-bg-card dark:bg-dark-card rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
     <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-full mb-6">
       <FiImage className="text-4xl text-gray-400 dark:text-gray-500" />
     </div>
     <h3 className="text-xl font-bold mb-2 text-gray-900 dark:text-white">
-      {isSearch ? 'Nenhum resultado encontrado' : 'Galeria vazia'}
+      {isSearch ? t('gallery.noResults') : t('gallery.empty')}
     </h3>
     <p className="max-w-md mb-8 text-gray-500 dark:text-gray-400">
       {isSearch
-        ? 'Tente ajustar seus filtros ou buscar por outros termos.'
-        : 'Comece enviando algumas imagens para análise ou extraindo de PDFs.'}
+        ? t('gallery.noResultsDescription')
+        : t('gallery.emptyDescription')}
     </p>
     {!isSearch && (
       <button
         className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all shadow-lg shadow-indigo-500/20"
         onClick={onUploadClick}
       >
-        <FiUploadCloud /> Fazer Upload
+        <FiUploadCloud /> {t('gallery.upload')}
       </button>
     )}
   </div>
@@ -193,25 +194,23 @@ const QueryImageThumbnail = ({ image, isSelected, onSelect, isSelectionMode }) =
   };
 
   return (
-    <div 
+    <div
       onClick={handleClick}
-      className={`group relative flex items-center gap-3 p-2 pr-4 rounded-xl shadow-md cursor-pointer transition-all duration-200 ${
-        isSelected 
-          ? 'bg-indigo-50 dark:bg-indigo-900/30 border-2 border-indigo-500 ring-2 ring-indigo-500/30' 
-          : 'bg-white dark:bg-gray-800 border-2 border-amber-400 dark:border-amber-500 hover:border-amber-500 dark:hover:border-amber-400'
-      }`}
+      className={`group relative flex items-center gap-3 p-2 pr-4 rounded-xl shadow-md cursor-pointer transition-all duration-200 ${isSelected
+        ? 'bg-indigo-50 dark:bg-indigo-900/30 border-2 border-indigo-500 ring-2 ring-indigo-500/30'
+        : 'bg-white dark:bg-gray-800 border-2 border-amber-400 dark:border-amber-500 hover:border-amber-500 dark:hover:border-amber-400'
+        }`}
     >
       <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0">
         {/* Selection Checkbox - inside the thumbnail */}
-        <div 
+        <div
           className={`absolute top-1 left-1 z-10 transition-opacity duration-200 ${isSelected || isSelectionMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
           onClick={(e) => { e.stopPropagation(); handleClick(); }}
         >
-          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors shadow-sm ${
-            isSelected
-              ? 'bg-indigo-600 border-indigo-600 text-white'
-              : 'bg-white/90 dark:bg-gray-800/90 border-white dark:border-gray-400 hover:border-indigo-500'
-          }`}>
+          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors shadow-sm ${isSelected
+            ? 'bg-indigo-600 border-indigo-600 text-white'
+            : 'bg-white/90 dark:bg-gray-800/90 border-white dark:border-gray-400 hover:border-indigo-500'
+            }`}>
             {isSelected && <FiCheck size={12} strokeWidth={3} />}
           </div>
         </div>
@@ -345,7 +344,7 @@ const ImageCard = ({ image, onClick, onSelect, isSelected, isSelectionMode, simi
               <div className={`w-1.5 h-1.5 rounded-full ${getScoreBgColor(similarityScore)}`}></div>
             </div>
             <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div 
+              <div
                 className={`h-full rounded-full transition-all ${getScoreBgColor(similarityScore)}`}
                 style={{ width: `${similarityScore * 100}%` }}
               ></div>
@@ -358,20 +357,20 @@ const ImageCard = ({ image, onClick, onSelect, isSelected, isSelectionMode, simi
 
         {/* Tags - Only show when NOT in similarity mode */}
         {similarityScore === null && (
-        <div className="flex items-center gap-2 mt-2 overflow-hidden h-6">
-          {image.imageType && image.imageType.length > 0 ? (
-            image.imageType.slice(0, 2).map(tag => (
-              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 font-medium truncate max-w-[80px]">
-                #{tag}
-              </span>
-            ))
-          ) : (
-            <span className="text-[10px] text-gray-400 italic">Sem tags</span>
-          )}
-          {image.imageType && image.imageType.length > 2 && (
-            <span className="text-[10px] text-gray-400">+{image.imageType.length - 2}</span>
-          )}
-        </div>
+          <div className="flex items-center gap-2 mt-2 overflow-hidden h-6">
+            {image.imageType && image.imageType.length > 0 ? (
+              image.imageType.slice(0, 2).map(tag => (
+                <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 font-medium truncate max-w-[80px]">
+                  #{tag}
+                </span>
+              ))
+            ) : (
+              <span className="text-[10px] text-gray-400 italic">Sem tags</span>
+            )}
+            {image.imageType && image.imageType.length > 2 && (
+              <span className="text-[10px] text-gray-400">+{image.imageType.length - 2}</span>
+            )}
+          </div>
         )}
 
         <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
@@ -400,6 +399,8 @@ const ViewImagesPage = () => {
     addImageTypes,
     removeImageType
   } = useImages();
+
+  const { t } = useLanguage();
 
   // States
   const [searchQuery, setSearchQuery] = useState('');
@@ -431,7 +432,7 @@ const ViewImagesPage = () => {
 
   // Accumulated categories from all visited pages (persisted state)
   const [allCategories, setAllCategories] = useState(new Set());
-  
+
   // Update available categories when images change (accumulate from all pages)
   useEffect(() => {
     if (images.length > 0) {
@@ -444,7 +445,7 @@ const ViewImagesPage = () => {
       });
     }
   }, [images]);
-  
+
   // Convert Set to sorted array for rendering
   const availableCategoriesForSimilarity = useMemo(() => {
     return Array.from(allCategories).sort();
@@ -467,16 +468,16 @@ const ViewImagesPage = () => {
   // CBIR Search Handler
   const handleSimilaritySearch = useCallback(async (queryImage, labelFilterOverride) => {
     if (!queryImage) return;
-    
+
     // Use provided filter or default to 'all' (search across all categories)
-    const effectiveLabelFilter = labelFilterOverride !== undefined 
-      ? labelFilterOverride 
+    const effectiveLabelFilter = labelFilterOverride !== undefined
+      ? labelFilterOverride
       : 'all';
-    
+
     if (labelFilterOverride === undefined) {
       setSimilarityLabelFilter('all');
     }
-    
+
     setSimilarityMode(true);
     setSimilarityQueryImage(queryImage);
     setSimilarityLoading(true);
@@ -598,9 +599,9 @@ const ViewImagesPage = () => {
 
   const handleSelect = useCallback((id) => {
     // Find the image data from current page images or similarity results
-    const imageData = images.find(img => img.id === id) || 
-                      filteredImages.find(img => img.id === id);
-    
+    const imageData = images.find(img => img.id === id) ||
+      filteredImages.find(img => img.id === id);
+
     setSelectedImages(prev => {
       const newMap = new Map(prev);
       if (newMap.has(id)) {
@@ -756,13 +757,13 @@ const ViewImagesPage = () => {
               </button>
 
               {/* Query Image Thumbnail */}
-              <QueryImageThumbnail 
-                image={similarityQueryImage} 
+              <QueryImageThumbnail
+                image={similarityQueryImage}
                 isSelected={selectedIds.has(similarityQueryImage?.id)}
                 onSelect={handleSelect}
                 isSelectionMode={selectedIds.size > 0}
               />
-              
+
               <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   <FiTarget className="text-amber-500" />
@@ -839,115 +840,115 @@ const ViewImagesPage = () => {
 
       {/* Header - Hidden in similarity mode */}
       {!similarityMode && (
-      <header className="flex-none px-8 py-6 border-b border-gray-200 dark:border-gray-800 bg-bg-main dark:bg-bg-main z-30">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div className="flex items-center gap-4">
-            <div>
-              <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
-                Galeria
-                {loading && <FiRefreshCw className="animate-spin text-lg text-gray-400" />}
-              </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Gerencie, organize e analise suas imagens extraídas e enviadas.
-              </p>
-            </div>
-            
-            {/* Pagination Controls */}
-            {pagination.total > IMAGES_PER_PAGE && (
-              <div className="flex items-center gap-2 ml-4">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={!pagination.hasPrev || loading}
-                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                  title="Página anterior"
-                >
-                  <FiChevronLeft />
-                </button>
-                <span className="text-sm text-gray-500 dark:text-gray-400 min-w-[140px] text-center">
-                  {currentPage} / {pagination.totalPages} ({pagination.total} imagens)
-                </span>
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={!pagination.hasNext || loading}
-                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                  title="Próxima página"
-                >
-                  <FiChevronRight />
-                </button>
+        <header className="flex-none px-8 py-6 border-b border-gray-200 dark:border-gray-800 bg-bg-main dark:bg-bg-main z-30">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="flex items-center gap-4">
+              <div>
+                <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
+                  {t('gallery.title')}
+                  {loading && <FiRefreshCw className="animate-spin text-lg text-gray-400" />}
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  {t('gallery.subtitle')}
+                </p>
               </div>
-            )}
-          </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64 group">
-              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
-              <input
-                type="text"
-                className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-10 pr-4 py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all placeholder:text-gray-400 shadow-sm"
-                placeholder="Buscar imagens..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                  <FiX />
-                </button>
+              {/* Pagination Controls */}
+              {pagination.total > IMAGES_PER_PAGE && (
+                <div className="flex items-center gap-2 ml-4">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={!pagination.hasPrev || loading}
+                    className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    title={t('gallery.previousPage')}
+                  >
+                    <FiChevronLeft />
+                  </button>
+                  <span className="text-sm text-gray-500 dark:text-gray-400 min-w-[140px] text-center">
+                    {currentPage} / {pagination.totalPages} ({pagination.total} {t('gallery.images')})
+                  </span>
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={!pagination.hasNext || loading}
+                    className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    title={t('gallery.nextPage')}
+                  >
+                    <FiChevronRight />
+                  </button>
+                </div>
               )}
             </div>
 
-            <div className="flex gap-2">
-              <select
-                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-xl px-4 py-2.5 outline-none focus:border-indigo-500 cursor-pointer shadow-sm text-sm"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-              >
-                <option value="newest">Mais recentes</option>
-                <option value="oldest">Mais antigas</option>
-                <option value="name_asc">Nome (A-Z)</option>
-                <option value="name_desc">Nome (Z-A)</option>
-                <option value="size_desc">Tamanho</option>
-              </select>
+            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+              <div className="relative flex-1 md:w-64 group">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
+                <input
+                  type="text"
+                  className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white rounded-xl pl-10 pr-4 py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all placeholder:text-gray-400 shadow-sm"
+                  placeholder={t('gallery.searchPlaceholder')}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    <FiX />
+                  </button>
+                )}
+              </div>
 
-              <button
-                className={`px-4 py-2.5 rounded-xl border transition-all flex items-center gap-2 shadow-sm ${hasActiveFilters
-                  ? 'bg-indigo-50 border-indigo-200 text-indigo-600 dark:bg-indigo-900/30 dark:border-indigo-500/50 dark:text-indigo-300'
-                  : 'bg-white border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 hover:bg-gray-50'
-                  }`}
-                onClick={() => setIsFilterPanelOpen(true)}
-              >
-                <FiFilter className={hasActiveFilters ? "fill-current" : ""} />
-                <span className="hidden sm:inline">Filtros</span>
-                {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-indigo-500"></span>}
-              </button>
+              <div className="flex gap-2">
+                <select
+                  className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-xl px-4 py-2.5 outline-none focus:border-indigo-500 cursor-pointer shadow-sm text-sm"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                >
+                  <option value="newest">{t('gallery.sortNewest')}</option>
+                  <option value="oldest">{t('gallery.sortOldest')}</option>
+                  <option value="name_asc">{t('gallery.sortNameAsc')}</option>
+                  <option value="name_desc">{t('gallery.sortNameDesc')}</option>
+                  <option value="size_desc">{t('gallery.sortSize')}</option>
+                </select>
 
-              <button
-                className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-indigo-600 hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 transition-all shadow-sm"
-                onClick={() => fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE })}
-                title="Atualizar"
-              >
-                <FiRefreshCw />
-              </button>
+                <button
+                  className={`px-4 py-2.5 rounded-xl border transition-all flex items-center gap-2 shadow-sm ${hasActiveFilters
+                    ? 'bg-indigo-50 border-indigo-200 text-indigo-600 dark:bg-indigo-900/30 dark:border-indigo-500/50 dark:text-indigo-300'
+                    : 'bg-white border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 hover:bg-gray-50'
+                    }`}
+                  onClick={() => setIsFilterPanelOpen(true)}
+                >
+                  <FiFilter className={hasActiveFilters ? "fill-current" : ""} />
+                  <span className="hidden sm:inline">{t('common.filters')}</span>
+                  {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-indigo-500"></span>}
+                </button>
+
+                <button
+                  className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-indigo-600 hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 transition-all shadow-sm"
+                  onClick={() => fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE })}
+                  title={t('common.update')}
+                >
+                  <FiRefreshCw />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Active Filters Chips */}
-        {hasActiveFilters && (
-          <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800/50 animate-in fade-in slide-in-from-top-2">
-            <span className="text-xs text-gray-400 self-center uppercase font-bold tracking-wider mr-2">Ativos:</span>
-            {filters.sourceType !== 'all' && (
-              <span className="text-xs flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100">
-                Origem: {filters.sourceType} <button onClick={() => setFilters(f => ({ ...f, sourceType: 'all' }))}><FiX /></button>
-              </span>
-            )}
-            {filters.tags.map(tag => (
-              <span key={tag} className="text-xs flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100">
-                #{tag} <button onClick={() => setFilters(f => ({ ...f, tags: f.tags.filter(t => t !== tag) }))}><FiX /></button>
-              </span>
-            ))}
-          </div>
-        )}
-      </header>
+          {/* Active Filters Chips */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800/50 animate-in fade-in slide-in-from-top-2">
+              <span className="text-xs text-gray-400 self-center uppercase font-bold tracking-wider mr-2">{t('common.active')}:</span>
+              {filters.sourceType !== 'all' && (
+                <span className="text-xs flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100">
+                  {t('common.origin')}: {filters.sourceType} <button onClick={() => setFilters(f => ({ ...f, sourceType: 'all' }))}><FiX /></button>
+                </span>
+              )}
+              {filters.tags.map(tag => (
+                <span key={tag} className="text-xs flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-100">
+                  #{tag} <button onClick={() => setFilters(f => ({ ...f, tags: f.tags.filter(t => t !== tag) }))}><FiX /></button>
+                </span>
+              ))}
+            </div>
+          )}
+        </header>
       )}
 
       {/* Scrollable Content */}
@@ -959,12 +960,12 @@ const ViewImagesPage = () => {
         ) : error ? (
           <div className="h-full flex flex-col items-center justify-center text-center">
             <FiAlertTriangle className="text-5xl text-red-400 mb-4" />
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Erro ao carregar imagens</h3>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">{t('gallery.errorLoading')}</h3>
             <p className="text-gray-500 mb-6">{error}</p>
-            <button onClick={() => fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE })} className="px-6 py-2 bg-indigo-600 text-white rounded-lg">Tentar Novamente</button>
+            <button onClick={() => fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE })} className="px-6 py-2 bg-indigo-600 text-white rounded-lg">{t('common.tryAgain')}</button>
           </div>
         ) : filteredImages.length === 0 ? (
-          <EmptyState isSearch={!!searchQuery || hasActiveFilters || similarityMode} onUploadClick={() => showAlert('Info', 'Use o menu lateral para Upload', 'info')} />
+          <EmptyState isSearch={!!searchQuery || hasActiveFilters || similarityMode} onUploadClick={() => showAlert('Info', t('sidebar.uploadImages'), 'info')} t={t} />
         ) : (
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
@@ -984,7 +985,7 @@ const ViewImagesPage = () => {
                 />
               ))}
             </div>
-            
+
             {/* Bottom Pagination Controls */}
             {!similarityMode && pagination.total > IMAGES_PER_PAGE && (
               <div className="flex items-center justify-center gap-4 mt-8 pb-8">
@@ -993,7 +994,7 @@ const ViewImagesPage = () => {
                   disabled={currentPage === 1 || loading}
                   className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
-                  Primeira
+                  {t('gallery.first')}
                 </button>
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
@@ -1002,34 +1003,33 @@ const ViewImagesPage = () => {
                 >
                   <FiChevronLeft />
                 </button>
-                
+
                 {/* Page number buttons */}
                 <div className="flex items-center gap-1">
                   {(() => {
                     const pages = [];
                     const totalPages = pagination.totalPages;
                     const current = currentPage;
-                    
+
                     // Show at most 5 page buttons
                     let start = Math.max(1, current - 2);
                     let end = Math.min(totalPages, start + 4);
-                    
+
                     // Adjust start if we're near the end
                     if (end - start < 4) {
                       start = Math.max(1, end - 4);
                     }
-                    
+
                     for (let i = start; i <= end; i++) {
                       pages.push(
                         <button
                           key={i}
                           onClick={() => handlePageChange(i)}
                           disabled={loading}
-                          className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
-                            i === current
-                              ? 'bg-indigo-600 text-white'
-                              : 'border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
-                          }`}
+                          className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${i === current
+                            ? 'bg-indigo-600 text-white'
+                            : 'border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`}
                         >
                           {i}
                         </button>
@@ -1038,7 +1038,7 @@ const ViewImagesPage = () => {
                     return pages;
                   })()}
                 </div>
-                
+
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={!pagination.hasNext || loading}
@@ -1051,11 +1051,11 @@ const ViewImagesPage = () => {
                   disabled={currentPage === pagination.totalPages || loading}
                   className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
-                  Última
+                  {t('gallery.last')}
                 </button>
-                
+
                 <span className="text-sm text-gray-500 dark:text-gray-400 ml-4">
-                  {pagination.total} imagens no total
+                  {pagination.total} {t('gallery.imagesTotal')}
                 </span>
               </div>
             )}
