@@ -1,12 +1,25 @@
 // src/components/LoadingFallback.jsx
 import React from 'react';
 import { FiShield } from 'react-icons/fi';
+import { useLanguage } from '../context/LanguageContext';
 
 /**
  * Premium loading component for Suspense fallback
  * Displayed while lazy-loaded pages are loading
  */
-const LoadingFallback = ({ message = 'Carregando...' }) => {
+const LoadingFallback = () => {
+    // Try to use language context, but provide fallback if not available
+    let message = 'Carregando...';
+    let subMessage = 'Aguarde um momento...';
+
+    try {
+        const { t } = useLanguage();
+        message = t('common.loading');
+        subMessage = t('common.pleaseWait');
+    } catch {
+        // Context not available, use defaults
+    }
+
     return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in">
             {/* Animated logo container */}
@@ -26,7 +39,7 @@ const LoadingFallback = ({ message = 'Carregando...' }) => {
             {/* Loading text */}
             <div className="text-center">
                 <p className="text-lg font-semibold text-gray-800 dark:text-white mb-2">{message}</p>
-                <p className="text-sm text-gray-400 dark:text-gray-500">Aguarde um momento...</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500">{subMessage}</p>
             </div>
 
             {/* Loading bar */}

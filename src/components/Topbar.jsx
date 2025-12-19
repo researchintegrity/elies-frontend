@@ -1,22 +1,24 @@
 // src/components/Topbar.jsx
 import React from 'react';
-import { FiUser, FiLogOut, FiSun, FiMoon, FiBell } from 'react-icons/fi';
+import { FiLogOut, FiSun, FiMoon, FiBell, FiGlobe } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../hooks/useTheme';
+import { useLanguage } from '../context/LanguageContext';
 
 const Topbar = () => {
   const { logout, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { language, toggleLanguage, t } = useLanguage();
 
   return (
     <header className="flex items-center justify-between px-1 py-4 mb-6">
       {/* Left: Title & Breadcrumb */}
       <div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
-          ELIS Scientific Integrity
+          {t('topbar.title')}
         </h2>
         <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">
-          Ferramentas avançadas para análise de imagens científicas
+          {t('topbar.subtitle')}
         </p>
       </div>
 
@@ -27,6 +29,23 @@ const Topbar = () => {
           <FiBell className="w-5 h-5" />
           {/* Notification badge */}
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary-500 rounded-full ring-2 ring-white dark:ring-dark-deep" />
+        </button>
+
+        {/* Language Toggle */}
+        <button
+          onClick={toggleLanguage}
+          className="group relative flex items-center gap-2 px-3 py-2.5 rounded-xl bg-gray-100/80 dark:bg-dark-card/50 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-dark-card hover:text-gray-700 dark:hover:text-white transition-all duration-200 border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
+          aria-label="Toggle language"
+          title={language === 'pt' ? 'Switch to English' : 'Mudar para Português'}
+        >
+          <FiGlobe className="w-5 h-5" />
+          <span className="text-xs font-bold uppercase tracking-wide min-w-[24px]">
+            {language === 'pt' ? 'PT' : 'EN'}
+          </span>
+          {/* Hover tooltip */}
+          <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 text-[10px] bg-gray-900 dark:bg-gray-700 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+            {language === 'pt' ? 'English' : 'Português'}
+          </span>
         </button>
 
         {/* Theme Toggle */}
@@ -49,10 +68,10 @@ const Topbar = () => {
         <div className="flex items-center gap-3 pl-2">
           <div className="text-right hidden sm:block">
             <p className="text-sm font-medium text-gray-900 dark:text-white">
-              {user?.username || 'Usuário'}
+              {user?.username || t('common.user')}
             </p>
             <p className="text-xs text-gray-400 dark:text-gray-500">
-              Pesquisador
+              {t('sidebar.researcher')}
             </p>
           </div>
           <button className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-accent-500 flex items-center justify-center text-white font-semibold shadow-sm hover:shadow-md hover:shadow-primary-500/20 transition-all duration-200">
@@ -64,7 +83,8 @@ const Topbar = () => {
         <button
           onClick={logout}
           className="p-2.5 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 transition-all duration-200 border border-transparent hover:border-red-200 dark:hover:border-red-500/30"
-          aria-label="Sair"
+          aria-label={t('common.logout')}
+          title={t('common.logout')}
         >
           <FiLogOut className="w-5 h-5" />
         </button>

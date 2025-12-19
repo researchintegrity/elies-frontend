@@ -1,6 +1,7 @@
 // src/components/Sidebar.jsx
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   FiImage,
   FiFileText,
@@ -17,6 +18,7 @@ import {
 
 const Sidebar = ({ activePage, onNavigate, pages }) => {
   const { user } = useAuth();
+  const { t } = useLanguage();
 
   const getItemClass = (pageKey) => {
     const isActive = activePage === pageKey;
@@ -74,7 +76,7 @@ const Sidebar = ({ activePage, onNavigate, pages }) => {
           </div>
           <div>
             <h1 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">ELIS</h1>
-            <p className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">Scientific Integrity</p>
+            <p className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">{t('sidebar.platform')}</p>
           </div>
         </div>
 
@@ -85,9 +87,9 @@ const Sidebar = ({ activePage, onNavigate, pages }) => {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-              {user?.username || 'Usuário'}
+              {user?.username || t('common.user')}
             </p>
-            <p className="text-xs text-gray-400 dark:text-gray-500">Pesquisador</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">{t('sidebar.researcher')}</p>
           </div>
         </div>
       </div>
@@ -101,7 +103,7 @@ const Sidebar = ({ activePage, onNavigate, pages }) => {
                      transition-all duration-200 group"
         >
           <FiSearch className="w-4 h-4 group-hover:text-primary-500 transition-colors" />
-          <span className="text-sm">Buscar...</span>
+          <span className="text-sm">{t('sidebar.search')}</span>
           <kbd className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-gray-200/50 dark:bg-gray-700/50 text-gray-400 font-mono">⌘K</kbd>
         </button>
       </div>
@@ -109,38 +111,38 @@ const Sidebar = ({ activePage, onNavigate, pages }) => {
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-6 scrollbar-custom">
 
-        <NavSection title="Imagens">
-          <NavItem pageKey={pages.UPLOAD_IMAGE} icon={FiUpload} label="Upload Imagens" />
-          <NavItem pageKey={pages.VIEW_IMAGES} icon={FiGrid} label="Galeria" />
-          <NavItem pageKey={pages.ANNOTATION} icon={FiEdit} label="Anotar Imagens" />
+        <NavSection title={t('sidebar.images')}>
+          <NavItem pageKey={pages.UPLOAD_IMAGE} icon={FiUpload} label={t('sidebar.uploadImages')} />
+          <NavItem pageKey={pages.VIEW_IMAGES} icon={FiGrid} label={t('sidebar.gallery')} />
+          <NavItem pageKey={pages.ANNOTATION} icon={FiEdit} label={t('sidebar.annotate')} />
         </NavSection>
 
-        <NavSection title="Documentos">
-          <NavItem pageKey={pages.VIEW_PDFS} icon={FiFileText} label="Visualizar PDFs" />
-          <NavItem pageKey={pages.UPLOAD_PDF} icon={FiUpload} label="Enviar PDF" />
+        <NavSection title={t('sidebar.documents')}>
+          <NavItem pageKey={pages.VIEW_PDFS} icon={FiFileText} label={t('sidebar.viewPdfs')} />
+          <NavItem pageKey={pages.UPLOAD_PDF} icon={FiUpload} label={t('sidebar.uploadPdf')} />
         </NavSection>
 
-        <NavSection title="Ferramentas">
-          <NavItem pageKey={pages.CBIR_SEARCH} icon={FiSearch} label="Buscar Similares" />
+        <NavSection title={t('sidebar.tools')}>
+          <NavItem pageKey={pages.CBIR_SEARCH} icon={FiSearch} label={t('sidebar.findSimilar')} />
           <button className="flex items-center gap-3 px-4 py-3 rounded-xl w-full text-sm font-medium text-gray-500 dark:text-gray-500 cursor-not-allowed opacity-60">
             <FiTag className="w-5 h-5" />
-            <span>Etiquetas</span>
-            <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400">Em breve</span>
+            <span>{t('sidebar.tags')}</span>
+            <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400">{t('sidebar.comingSoon')}</span>
           </button>
           <button className="flex items-center gap-3 px-4 py-3 rounded-xl w-full text-sm font-medium text-gray-500 dark:text-gray-500 cursor-not-allowed opacity-60">
             <FiLayers className="w-5 h-5" />
-            <span>Categorias</span>
-            <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400">Em breve</span>
+            <span>{t('sidebar.categories')}</span>
+            <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400">{t('sidebar.comingSoon')}</span>
           </button>
         </NavSection>
 
-        <NavSection title="Configurações">
+        <NavSection title={t('sidebar.settings')}>
           <button className="flex items-center gap-3 px-4 py-3 rounded-xl w-full text-sm font-medium text-gray-500 dark:text-gray-500 cursor-not-allowed opacity-60">
             <FiSettings className="w-5 h-5" />
-            <span>Geral</span>
-            <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400">Em breve</span>
+            <span>{t('sidebar.general')}</span>
+            <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400">{t('sidebar.comingSoon')}</span>
           </button>
-          <NavItem pageKey={pages.PROFILE} icon={FiUser} label="Perfil" />
+          <NavItem pageKey={pages.PROFILE} icon={FiUser} label={t('sidebar.profile')} />
         </NavSection>
       </div>
 
@@ -150,7 +152,7 @@ const Sidebar = ({ activePage, onNavigate, pages }) => {
           <span>v1.0.0</span>
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            Online
+            {t('sidebar.online')}
           </span>
         </div>
       </div>
