@@ -1,52 +1,70 @@
 // src/components/Topbar.jsx
 import React from 'react';
-import { FiEdit, FiUser, FiLogOut, FiSun, FiMoon } from 'react-icons/fi';
+import { FiUser, FiLogOut, FiSun, FiMoon, FiBell } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../hooks/useTheme';
 
 const Topbar = () => {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <header className="border-b border-gray-200 dark:border-gray-800 px-8 py-4 flex items-center justify-between transition-colors duration-300">
+    <header className="flex items-center justify-between px-1 py-4 mb-6">
+      {/* Left: Title & Breadcrumb */}
       <div>
-        <h2 className="text-xl font-semibold text-text-primary dark:text-white">
-          ELIS - Scientific Integrity Toolkit
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+          ELIS Scientific Integrity
         </h2>
+        <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">
+          Ferramentas avançadas para análise de imagens científicas
+        </p>
       </div>
 
-      <div className="flex items-center gap-3">
-        <button className="p-2.5 rounded-lg bg-surface dark:bg-surface-dark text-text-primary dark:text-white hover:bg-hover-light dark:hover:bg-hover-dark transition-all duration-200">
-          <FiEdit className="w-5 h-5" />
+      {/* Right: Actions */}
+      <div className="flex items-center gap-2">
+        {/* Notifications */}
+        <button className="relative p-2.5 rounded-xl bg-gray-100/80 dark:bg-dark-card/50 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-dark-card hover:text-gray-700 dark:hover:text-white transition-all duration-200 border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
+          <FiBell className="w-5 h-5" />
+          {/* Notification badge */}
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary-500 rounded-full ring-2 ring-white dark:ring-dark-deep" />
         </button>
 
-        {/* Toggle de Tema */}
-        <label className="relative inline-block w-[54px] h-7 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={theme === 'dark'}
-            onChange={toggleTheme}
-            className="opacity-0 w-0 h-0 peer"
-          />
-          <span className="absolute inset-0 bg-gray-300 dark:bg-toggle-accent transition-all duration-400 rounded-[34px] flex items-center justify-between px-[5px] overflow-hidden peer-checked:bg-toggle-accent">
-            <span className="flex items-center justify-center text-amber-500 text-sm z-10">
-              <FiSun />
-            </span>
-            <span className="flex items-center justify-center text-slate-100 text-sm z-10">
-              <FiMoon />
-            </span>
-            <span className="absolute h-5 w-5 left-1 bottom-1 bg-white rounded-full transition-transform duration-400 shadow-md peer-checked:translate-x-[26px] z-20"></span>
-          </span>
-        </label>
-
-        <button className="p-2.5 rounded-lg bg-surface dark:bg-surface-dark text-text-primary dark:text-white hover:bg-hover-light dark:hover:bg-hover-dark transition-all duration-200">
-          <FiUser className="w-5 h-5" />
-        </button>
-
+        {/* Theme Toggle */}
         <button
-          className="p-2.5 rounded-lg bg-surface dark:bg-surface-dark text-text-primary dark:text-white hover:bg-hover-light dark:hover:bg-hover-dark transition-all duration-200"
+          onClick={toggleTheme}
+          className="p-2.5 rounded-xl bg-gray-100/80 dark:bg-dark-card/50 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-dark-card hover:text-gray-700 dark:hover:text-white transition-all duration-200 border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {theme === 'dark' ? (
+            <FiSun className="w-5 h-5 text-amber-400" />
+          ) : (
+            <FiMoon className="w-5 h-5" />
+          )}
+        </button>
+
+        {/* Divider */}
+        <div className="w-px h-8 bg-gray-200 dark:bg-gray-700 mx-2" />
+
+        {/* User dropdown */}
+        <div className="flex items-center gap-3 pl-2">
+          <div className="text-right hidden sm:block">
+            <p className="text-sm font-medium text-gray-900 dark:text-white">
+              {user?.username || 'Usuário'}
+            </p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              Pesquisador
+            </p>
+          </div>
+          <button className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-accent-500 flex items-center justify-center text-white font-semibold shadow-sm hover:shadow-md hover:shadow-primary-500/20 transition-all duration-200">
+            {user?.username?.[0]?.toUpperCase() || 'U'}
+          </button>
+        </div>
+
+        {/* Logout */}
+        <button
           onClick={logout}
+          className="p-2.5 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 transition-all duration-200 border border-transparent hover:border-red-200 dark:hover:border-red-500/30"
+          aria-label="Sair"
         >
           <FiLogOut className="w-5 h-5" />
         </button>

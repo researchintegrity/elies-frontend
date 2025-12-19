@@ -615,7 +615,7 @@ const ViewImagesPage = () => {
   const handleClearSelection = () => setSelectedImages(new Map());
 
   const handleDeleteSelected = async () => {
-    if (selectedImages.size === 0) return;
+    if (selectedIds.size === 0) return;
 
     // Filter out extracted images
     const selectedImages = images.filter(img => selectedIds.has(img.id));
