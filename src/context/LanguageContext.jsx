@@ -152,6 +152,14 @@ const translations = {
         'similarity.searchErrorMessage': 'Erro ao buscar imagens similares.',
         'similarity.selectOneImage': 'Selecione exatamente uma imagem para buscar similares.',
 
+        // Batch Tag Modal
+        'batchTag.title': 'Classificar Imagens',
+        'batchTag.description': 'Adicione tags para classificar as',
+        'batchTag.selectedImages': 'imagens selecionadas',
+        'batchTag.addToExisting': 'Elas serão adicionadas às tags existentes.',
+        'batchTag.newTags': 'Novas Tags',
+        'batchTag.addTags': 'Adicionar Tags',
+
         // Profile Page
         'profile.title': 'Meu Perfil',
         'profile.subtitle': 'Gerencie suas informações pessoais e configurações',
@@ -348,6 +356,14 @@ const translations = {
         'similarity.searchError': 'Search Error',
         'similarity.searchErrorMessage': 'Error searching for similar images.',
         'similarity.selectOneImage': 'Select exactly one image to search for similar ones.',
+
+        // Batch Tag Modal
+        'batchTag.title': 'Classify Images',
+        'batchTag.description': 'Add tags to classify the',
+        'batchTag.selectedImages': 'selected images',
+        'batchTag.addToExisting': 'They will be added to existing tags.',
+        'batchTag.newTags': 'New Tags',
+        'batchTag.addTags': 'Add Tags',
 
         // Profile Page
         'profile.title': 'My Profile',

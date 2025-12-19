@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { FiX, FiTag } from 'react-icons/fi';
 import TagInput from './TagInput';
+import { useLanguage } from '../context/LanguageContext';
 
 const BatchTagModal = ({ isOpen, onClose, onConfirm, count }) => {
+    const { t } = useLanguage();
     const [tags, setTags] = useState([]);
     const [inputValue, setInputValue] = useState('');
 
@@ -31,7 +33,7 @@ const BatchTagModal = ({ isOpen, onClose, onConfirm, count }) => {
                             <FiTag className="text-xl" />
                         </div>
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                            Classificar Imagens
+                            {t('batchTag.title')}
                         </h3>
                     </div>
                     <button
@@ -45,12 +47,12 @@ const BatchTagModal = ({ isOpen, onClose, onConfirm, count }) => {
                 {/* Content */}
                 <div className="p-6 space-y-4">
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Adicione tags para classificar as <strong className="text-gray-900 dark:text-white">{count} imagens selecionadas</strong>.
-                        Elas serão adicionadas às tags existentes.
+                        {t('batchTag.description')} <strong className="text-gray-900 dark:text-white">{count} {t('batchTag.selectedImages')}</strong>.
+                        {' '}{t('batchTag.addToExisting')}
                     </p>
 
                     <div className="space-y-2">
-                        <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Novas Tags</label>
+                        <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('batchTag.newTags')}</label>
                         <TagInput
                             tags={tags}
                             onAdd={(tag) => setTags(prev => [...prev, tag])}
@@ -66,14 +68,14 @@ const BatchTagModal = ({ isOpen, onClose, onConfirm, count }) => {
                         onClick={onClose}
                         className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg transition-colors"
                     >
-                        Cancelar
+                        {t('common.cancel')}
                     </button>
                     <button
                         onClick={handleConfirm}
                         disabled={tags.length === 0 && !inputValue.trim()}
                         className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-lg shadow-indigo-500/20 transition-all"
                     >
-                        Adicionar Tags
+                        {t('batchTag.addTags')}
                     </button>
                 </div>
             </div>
