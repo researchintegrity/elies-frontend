@@ -127,6 +127,16 @@ const translations = {
         'lightbox.origin': 'Origem',
         'lightbox.format': 'Formato',
 
+        // Selection Toolbar
+        'selection.selected': 'selecionado',
+        'selection.selectedPlural': 'selecionados',
+        'selection.clearSelection': 'Limpar seleção',
+        'selection.findSimilar': 'Buscar Similares',
+        'selection.findSimilarTitle': 'Buscar imagens similares',
+        'selection.classify': 'Classificar',
+        'selection.analyze': 'Analisar',
+        'selection.delete': 'Excluir',
+
         // Similarity Search
         'similarity.title': 'Busca por Similaridade',
         'similarity.searching': 'Buscando...',
@@ -308,6 +318,16 @@ const translations = {
         'lightbox.metadata': 'Metadata',
         'lightbox.origin': 'Source',
         'lightbox.format': 'Format',
+
+        // Selection Toolbar
+        'selection.selected': 'selected',
+        'selection.selectedPlural': 'selected',
+        'selection.clearSelection': 'Clear selection',
+        'selection.findSimilar': 'Find Similar',
+        'selection.findSimilarTitle': 'Find similar images',
+        'selection.classify': 'Classify',
+        'selection.analyze': 'Analyze',
+        'selection.delete': 'Delete',
 
         // Similarity Search
         'similarity.title': 'Similarity Search',
