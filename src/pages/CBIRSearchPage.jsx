@@ -16,6 +16,7 @@ import {
 } from 'react-icons/fi';
 import { api } from '../services/api';
 import { showAlert, showToast } from '../utils/alert';
+import { useLanguage } from '../context/LanguageContext';
 
 // --- Sub-Components ---
 
@@ -29,36 +30,36 @@ const SkeletonCard = () => (
   </div>
 );
 
-const EmptyGallery = ({ onRefresh }) => (
+const EmptyGallery = ({ onRefresh, t }) => (
   <div className="flex flex-col items-center justify-center px-8 py-16 text-center bg-white dark:bg-gray-800 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
     <div className="bg-gray-50 dark:bg-gray-700 p-5 rounded-full mb-5">
       <FiImage className="text-3xl text-gray-400 dark:text-gray-500" />
     </div>
     <h3 className="text-lg font-bold mb-2 text-gray-900 dark:text-white">
-      Nenhuma imagem disponível
+      {t('cbir.noImages')}
     </h3>
     <p className="max-w-md mb-6 text-gray-500 dark:text-gray-400 text-sm">
-      Faça upload de imagens primeiro para usar a busca por similaridade.
+      {t('cbir.noImagesDescription')}
     </p>
     <button
       className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all text-sm"
       onClick={onRefresh}
     >
-      <FiRefreshCw /> Atualizar
+      <FiRefreshCw /> {t('common.update')}
     </button>
   </div>
 );
 
-const NoResults = () => (
+const NoResults = ({ t }) => (
   <div className="flex flex-col items-center justify-center px-8 py-16 text-center bg-white dark:bg-gray-800 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
     <div className="bg-amber-50 dark:bg-amber-900/20 p-5 rounded-full mb-5">
       <FiSearch className="text-3xl text-amber-500" />
     </div>
     <h3 className="text-lg font-bold mb-2 text-gray-900 dark:text-white">
-      Nenhuma imagem similar encontrada
+      {t('cbir.noSimilarFound')}
     </h3>
     <p className="max-w-md text-gray-500 dark:text-gray-400 text-sm">
-      Tente ajustar os parâmetros de busca ou selecionar outra imagem de origem.
+      {t('cbir.noSimilarDescription')}
     </p>
   </div>
 );
@@ -67,11 +68,10 @@ const NoResults = () => (
 const SourceImageCard = ({ image, isSelected, onClick, imageUrl, loading, error }) => (
   <div
     onClick={onClick}
-    className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-200 border-2 ${
-      isSelected
+    className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-200 border-2 ${isSelected
         ? 'border-indigo-500 ring-2 ring-indigo-500/30 shadow-lg scale-[1.02]'
         : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
-    }`}
+      }`}
   >
     <div className="aspect-square bg-gray-100 dark:bg-gray-800 overflow-hidden">
       {loading ? (
@@ -90,14 +90,12 @@ const SourceImageCard = ({ image, isSelected, onClick, imageUrl, loading, error 
       )}
     </div>
 
-    {/* Selection Indicator */}
     {isSelected && (
       <div className="absolute top-2 right-2 bg-indigo-600 text-white p-1.5 rounded-full shadow-lg">
         <FiCheck size={14} strokeWidth={3} />
       </div>
     )}
 
-    {/* Info Overlay */}
     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2">
       <p className="text-white text-xs font-medium truncate">{image.filename}</p>
       {image.imageType?.length > 0 && (
@@ -114,7 +112,7 @@ const SourceImageCard = ({ image, isSelected, onClick, imageUrl, loading, error 
 );
 
 // Result Card for Search Results
-const ResultCard = ({ result, rank, onClick }) => {
+const ResultCard = ({ result, rank, onClick, t }) => {
   const [imageUrl, setImageUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -177,14 +175,13 @@ const ResultCard = ({ result, rank, onClick }) => {
       onClick={() => onClick?.(result, imageUrl)}
       className="group bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all cursor-pointer hover:shadow-lg"
     >
-      {/* Clean image without overlays */}
       <div className="aspect-square bg-gray-100 dark:bg-gray-900 overflow-hidden">
         {loading ? (
           <div className="w-full h-full bg-gray-200 dark:bg-gray-700 animate-pulse" />
         ) : error ? (
           <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 bg-gray-50 dark:bg-gray-800">
             <FiAlertTriangle size={24} className="mb-2 text-amber-500" />
-            <span className="text-xs">Erro</span>
+            <span className="text-xs">{t('cbir.error')}</span>
           </div>
         ) : (
           <img
@@ -196,7 +193,6 @@ const ResultCard = ({ result, rank, onClick }) => {
         )}
       </div>
 
-      {/* Rank and Similarity below the image */}
       <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-700">
         <div className="flex items-center gap-1.5">
           <span className="text-xs font-bold text-gray-500 dark:text-gray-400">#{rank}</span>
@@ -211,7 +207,7 @@ const ResultCard = ({ result, rank, onClick }) => {
 
       <div className="p-3">
         <h4 className="font-medium text-gray-900 dark:text-gray-100 truncate text-sm mb-2" title={result.filename}>
-          {result.filename || 'Sem nome'}
+          {result.filename || t('cbir.noTags')}
         </h4>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -222,13 +218,13 @@ const ResultCard = ({ result, rank, onClick }) => {
               </span>
             ))
           ) : (
-            <span className="text-[10px] text-gray-400 italic">Sem tags</span>
+            <span className="text-[10px] text-gray-400 italic">{t('cbir.noTags')}</span>
           )}
         </div>
 
         <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
           <span className="text-[10px] text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded capitalize">
-            {result.source_type === 'uploaded' ? 'Upload' : 'Extraída'}
+            {result.source_type === 'uploaded' ? 'Upload' : t('gallery.extracted')}
           </span>
           <span className="text-[10px] text-gray-400">
             {result.file_size ? `${(result.file_size / 1024).toFixed(0)} KB` : ''}
@@ -240,7 +236,7 @@ const ResultCard = ({ result, rank, onClick }) => {
 };
 
 // Lightbox for viewing images in detail
-const LightboxModal = ({ image, imageUrl, onClose, isResult = false }) => {
+const LightboxModal = ({ image, imageUrl, onClose, isResult = false, t }) => {
   useEffect(() => {
     if (!image) return;
     const handleEsc = (e) => {
@@ -279,7 +275,6 @@ const LightboxModal = ({ image, imageUrl, onClose, isResult = false }) => {
         )}
       </div>
 
-      {/* Sidebar with Metadata */}
       <div
         className="w-[360px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 p-6 overflow-y-auto flex flex-col gap-6"
         onClick={e => e.stopPropagation()}
@@ -290,13 +285,13 @@ const LightboxModal = ({ image, imageUrl, onClose, isResult = false }) => {
           </h2>
           {isResult && image.similarity_score !== undefined && (
             <div className="text-sm text-indigo-600 dark:text-indigo-400 font-semibold mb-2">
-              Similaridade: {(image.similarity_score * 100).toFixed(1)}%
+              {t('cbir.similarity')}: {(image.similarity_score * 100).toFixed(1)}%
             </div>
           )}
         </div>
 
         <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Tags</h3>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">{t('cbir.tags')}</h3>
           <div className="flex flex-wrap gap-2">
             {(image.imageType || image.image_type)?.length > 0 ? (
               (image.imageType || image.image_type).map(tag => (
@@ -305,22 +300,22 @@ const LightboxModal = ({ image, imageUrl, onClose, isResult = false }) => {
                 </span>
               ))
             ) : (
-              <span className="text-xs text-gray-400 italic">Sem tags</span>
+              <span className="text-xs text-gray-400 italic">{t('cbir.noTags')}</span>
             )}
           </div>
         </div>
 
         <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Informações</h3>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">{t('cbir.info')}</h3>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-              <span className="block text-gray-500 text-xs mb-1">Origem</span>
+              <span className="block text-gray-500 text-xs mb-1">{t('cbir.origin')}</span>
               <span className="font-medium dark:text-gray-200 capitalize">
-                {(image.sourceType || image.source_type) === 'uploaded' ? 'Upload' : 'Extraída'}
+                {(image.sourceType || image.source_type) === 'uploaded' ? 'Upload' : t('gallery.extracted')}
               </span>
             </div>
             <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-              <span className="block text-gray-500 text-xs mb-1">Tamanho</span>
+              <span className="block text-gray-500 text-xs mb-1">{t('pdfs.size')}</span>
               <span className="font-medium dark:text-gray-200">
                 {image.fileSize || image.file_size ? `${((image.fileSize || image.file_size) / 1024).toFixed(1)} KB` : 'N/A'}
               </span>
@@ -333,11 +328,13 @@ const LightboxModal = ({ image, imageUrl, onClose, isResult = false }) => {
 };
 
 // --- Constants ---
-const IMAGES_PER_PAGE = 24; // Reasonable page size for performance
+const IMAGES_PER_PAGE = 24;
 
 // --- Main Component ---
 
 const CBIRSearchPage = () => {
+  const { t } = useLanguage();
+
   // Gallery State
   const [images, setImages] = useState([]);
   const [imageUrls, setImageUrls] = useState({});
@@ -363,29 +360,23 @@ const CBIRSearchPage = () => {
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [lightboxIsResult, setLightboxIsResult] = useState(false);
 
-  // Gallery pagination (server-side)
-  const [galleryPage, setGalleryPage] = useState(1); // 1-indexed for API
+  // Gallery pagination
+  const [galleryPage, setGalleryPage] = useState(1);
   const [totalImages, setTotalImages] = useState(0);
 
-  // Fetch images when page changes (server-side pagination)
   useEffect(() => {
     fetchImages(galleryPage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [galleryPage]);
 
-  // Load image thumbnails for current page
   useEffect(() => {
     const loadImageUrls = async () => {
-      // Load thumbnails for all images on current page
       for (const img of images) {
-        // Check current state via refs pattern to avoid stale closures
         setLoadingUrls(prev => {
-          if (prev[img.id]) return prev; // Already loading
+          if (prev[img.id]) return prev;
           return prev;
         });
         setImageUrls(prev => {
-          if (prev[img.id]) return prev; // Already loaded
-          // Trigger load in a separate effect-safe way
+          if (prev[img.id]) return prev;
           (async () => {
             setLoadingUrls(p => ({ ...p, [img.id]: true }));
             try {
@@ -408,7 +399,6 @@ const CBIRSearchPage = () => {
     }
   }, [images]);
 
-  // Add new categories from current page images
   useEffect(() => {
     if (images.length > 0) {
       setAvailableCategories(prev => {
@@ -421,7 +411,6 @@ const CBIRSearchPage = () => {
     }
   }, [images]);
 
-  // Auto-set category filter when selecting an image
   useEffect(() => {
     if (selectedImage) {
       const imageTypes = selectedImage.imageType || [];
@@ -438,24 +427,20 @@ const CBIRSearchPage = () => {
     setErrorImages(null);
     try {
       const data = await api.get('/images', { page, per_page: IMAGES_PER_PAGE });
-      
-      // Handle both array response and paginated response object
+
       let imageList = [];
       let total = 0;
-      
+
       if (Array.isArray(data)) {
         imageList = data;
-        // If API returns array without total, estimate from current page
         total = data.length >= IMAGES_PER_PAGE ? page * IMAGES_PER_PAGE + 1 : (page - 1) * IMAGES_PER_PAGE + data.length;
       } else if (data && typeof data === 'object') {
-        // Handle paginated response: { items: [], total: number, page: number }
         imageList = data.items || data.images || [];
         total = data.total || data.total_count || imageList.length;
       }
-      
-      // Client-side safeguard: limit to IMAGES_PER_PAGE in case API doesn't respect per_page
+
       const limitedImageList = imageList.slice(0, IMAGES_PER_PAGE);
-      
+
       const transformed = limitedImageList.map(img => ({
         id: img._id,
         imageId: img._id,
@@ -465,12 +450,11 @@ const CBIRSearchPage = () => {
         sourceType: img.source_type,
         imageType: img.image_type || []
       }));
-      
-      // Update total if we had to limit client-side (API might have more)
+
       if (imageList.length > IMAGES_PER_PAGE && total < imageList.length) {
         total = Math.max(total, page * IMAGES_PER_PAGE + (imageList.length - IMAGES_PER_PAGE));
       }
-      
+
       setImages(transformed);
       setTotalImages(total);
     } catch (err) {
@@ -481,10 +465,8 @@ const CBIRSearchPage = () => {
     }
   }, []);
 
-  // Fetch categories separately (only on mount)
   const fetchCategories = useCallback(async () => {
     try {
-      // Try to get categories from a dedicated endpoint or fetch a sample
       const data = await api.get('/images', { page: 1, per_page: 100 });
       const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
       const categories = new Set();
@@ -497,14 +479,13 @@ const CBIRSearchPage = () => {
     }
   }, []);
 
-  // Fetch categories on mount
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
 
   const handleSearch = async () => {
     if (!selectedImage) {
-      showAlert('Atenção', 'Selecione uma imagem de origem primeiro.', 'warning');
+      showAlert(t('common.warning'), t('cbir.selectSourceFirst'), 'warning');
       return;
     }
 
@@ -520,7 +501,6 @@ const CBIRSearchPage = () => {
 
       const response = await api.post('/cbir/search/sync', payload);
 
-      // Filter out the query image itself and apply minimum similarity threshold
       const filteredMatches = response.matches.filter(
         match => match.image_id !== selectedImage.id && match.similarity_score >= minSimilarity
       );
@@ -533,13 +513,13 @@ const CBIRSearchPage = () => {
       });
 
       if (filteredMatches.length === 0) {
-        showToast('Nenhuma imagem similar encontrada com os critérios atuais.', 'info');
+        showToast(t('cbir.noResultsWithCriteria'), 'info');
       } else {
-        showToast(`Encontradas ${filteredMatches.length} imagens similares!`, 'success');
+        showToast(`${t('similarity.found')} ${filteredMatches.length} ${t('similarity.similarImages')}`, 'success');
       }
     } catch (err) {
       console.error('Search error:', err);
-      showAlert('Erro na busca', err.message || 'Erro ao buscar imagens similares.', 'error');
+      showAlert(t('similarity.searchError'), err.message || t('similarity.searchErrorMessage'), 'error');
     } finally {
       setSearching(false);
     }
@@ -551,10 +531,8 @@ const CBIRSearchPage = () => {
     setCategoryFilter('all');
   };
 
-  // Calculate total pages from server-side total
   const totalGalleryPages = Math.ceil(totalImages / IMAGES_PER_PAGE);
 
-  // Handle page change with bounds checking
   const handlePageChange = useCallback((newPage) => {
     const maxPage = Math.max(1, totalGalleryPages);
     const boundedPage = Math.min(Math.max(1, newPage), maxPage);
@@ -571,10 +549,10 @@ const CBIRSearchPage = () => {
           <div>
             <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
               <FiSearch className="text-indigo-600" />
-              Buscar Imagens Similares
+              {t('cbir.title')}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Selecione uma imagem de origem e encontre imagens visualmente similares na sua galeria.
+              {t('cbir.subtitle')}
             </p>
           </div>
 
@@ -583,7 +561,7 @@ const CBIRSearchPage = () => {
               onClick={handleClearSearch}
               className="inline-flex items-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
             >
-              <FiX /> Limpar busca
+              <FiX /> {t('cbir.clearSearch')}
             </button>
           )}
         </div>
@@ -601,15 +579,14 @@ const CBIRSearchPage = () => {
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900 dark:text-white">
-                    Selecionar Imagem de Origem
+                    {t('cbir.selectSource')}
                   </h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Escolha a imagem que será usada como referência para a busca
+                    {t('cbir.selectSourceDescription')}
                   </p>
                 </div>
               </div>
 
-              {/* Gallery Navigation */}
               {totalImages > IMAGES_PER_PAGE && (
                 <div className="flex items-center gap-2">
                   <button
@@ -620,7 +597,7 @@ const CBIRSearchPage = () => {
                     <FiChevronLeft />
                   </button>
                   <span className="text-sm text-gray-500 dark:text-gray-400 min-w-[100px] text-center">
-                    {galleryPage} / {totalGalleryPages} ({totalImages} imagens)
+                    {galleryPage} / {totalGalleryPages} ({totalImages} {t('gallery.images')})
                   </span>
                   <button
                     onClick={() => handlePageChange(galleryPage + 1)}
@@ -646,11 +623,11 @@ const CBIRSearchPage = () => {
                     onClick={() => fetchImages(galleryPage)}
                     className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
                   >
-                    Tentar Novamente
+                    {t('common.tryAgain')}
                   </button>
                 </div>
               ) : images.length === 0 && !loadingImages ? (
-                <EmptyGallery onRefresh={() => fetchImages(1)} />
+                <EmptyGallery onRefresh={() => fetchImages(1)} t={t} />
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
                   {images.map((img) => (
@@ -678,10 +655,10 @@ const CBIRSearchPage = () => {
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900 dark:text-white">
-                    Parâmetros de Busca
+                    {t('cbir.searchParams')}
                   </h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Configure os critérios para refinar sua busca
+                    {t('cbir.searchParamsDescription')}
                   </p>
                 </div>
               </div>
@@ -693,7 +670,7 @@ const CBIRSearchPage = () => {
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                     <FiTarget className="text-indigo-500" />
-                    Número de Resultados (Top-K)
+                    {t('cbir.topK')}
                   </label>
                   <input
                     type="number"
@@ -704,7 +681,7 @@ const CBIRSearchPage = () => {
                     className="w-full px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Quantidade máxima de imagens similares a retornar (1-100)
+                    {t('cbir.topKDescription')}
                   </p>
                 </div>
 
@@ -712,7 +689,7 @@ const CBIRSearchPage = () => {
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                     <FiZap className="text-indigo-500" />
-                    Similaridade Mínima
+                    {t('cbir.minSimilarity')}
                   </label>
                   <div className="flex items-center gap-3">
                     <input
@@ -729,7 +706,7 @@ const CBIRSearchPage = () => {
                     </span>
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Filtrar resultados abaixo deste limiar de similaridade
+                    {t('cbir.minSimilarityDescription')}
                   </p>
                 </div>
 
@@ -737,22 +714,22 @@ const CBIRSearchPage = () => {
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                     <FiLayers className="text-indigo-500" />
-                    Filtro por Categoria/Tipo
+                    {t('cbir.categoryFilter')}
                   </label>
                   <select
                     value={categoryFilter}
                     onChange={(e) => setCategoryFilter(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all cursor-pointer"
                   >
-                    <option value="all">Todos os Tipos</option>
+                    <option value="all">{t('cbir.allTypes')}</option>
                     {availableCategories.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     {selectedImage?.imageType?.length > 0
-                      ? `Auto-selecionado baseado na imagem de origem`
-                      : 'Filtrar resultados por tipo de imagem'}
+                      ? t('cbir.autoSelected')
+                      : t('cbir.filterByType')}
                   </p>
                 </div>
               </div>
@@ -774,7 +751,7 @@ const CBIRSearchPage = () => {
                     </div>
                     <div>
                       <p className="font-medium text-gray-900 dark:text-white text-sm">
-                        Imagem selecionada:
+                        {t('cbir.selectedImage')}
                       </p>
                       <p className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
                         {selectedImage.filename}
@@ -783,7 +760,7 @@ const CBIRSearchPage = () => {
                   </div>
                 ) : (
                   <p className="text-gray-500 dark:text-gray-400 text-sm italic">
-                    Nenhuma imagem selecionada
+                    {t('cbir.noImageSelected')}
                   </p>
                 )}
 
@@ -795,12 +772,12 @@ const CBIRSearchPage = () => {
                   {searching ? (
                     <>
                       <FiRefreshCw className="animate-spin" />
-                      Buscando...
+                      {t('cbir.searching')}
                     </>
                   ) : (
                     <>
                       <FiSearch />
-                      Analisar
+                      {t('cbir.analyze')}
                     </>
                   )}
                 </button>
@@ -819,13 +796,13 @@ const CBIRSearchPage = () => {
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900 dark:text-white">
-                        Resultados da Busca
+                        {t('cbir.searchResults')}
                       </h3>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {searchResults.filteredCount} de {searchResults.originalCount} imagens encontradas
+                        {searchResults.filteredCount} {t('cbir.imagesFound')} {searchResults.originalCount} {t('cbir.imagesFoundSuffix')}
                         {searchResults.filteredCount < searchResults.originalCount && (
                           <span className="text-amber-500 ml-1">
-                            ({searchResults.originalCount - searchResults.filteredCount} filtradas por similaridade mínima)
+                            ({searchResults.originalCount - searchResults.filteredCount} {t('cbir.filteredBySimilarity')})
                           </span>
                         )}
                       </p>
@@ -836,7 +813,7 @@ const CBIRSearchPage = () => {
 
               <div className="p-5">
                 {searchResults.matches.length === 0 ? (
-                  <NoResults />
+                  <NoResults t={t} />
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                     {searchResults.matches.map((result, index) => (
@@ -849,6 +826,7 @@ const CBIRSearchPage = () => {
                           setLightboxUrl(url);
                           setLightboxIsResult(true);
                         }}
+                        t={t}
                       />
                     ))}
                   </div>
@@ -870,6 +848,7 @@ const CBIRSearchPage = () => {
             setLightboxUrl(null);
             setLightboxIsResult(false);
           }}
+          t={t}
         />
       )}
     </div>
