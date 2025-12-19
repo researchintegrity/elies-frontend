@@ -103,11 +103,18 @@ const Sidebar = ({ activePage, onNavigate, pages }) => {
           </button>
         </div>
 
-        {/* Seção de Ferramentas (Placeholder) */}
+        {/* Seção de Ferramentas */}
         <div className="flex flex-col gap-2">
           <h4 className="text-xs text-sidebar-text-secondary font-semibold uppercase tracking-wider mb-2 pl-4 opacity-60">
             Ferramentas
           </h4>
+          <button
+            className={getItemClass(pages.CBIR_SEARCH)}
+            onClick={() => onNavigate(pages.CBIR_SEARCH)}
+          >
+            <FiSearch className="text-xl" />
+            <span>Buscar Similares</span>
+          </button>
           <a href="#" className="flex items-center gap-4 px-4 py-3.5 rounded-lg transition-all duration-200 ease-out cursor-pointer text-sidebar-text-secondary hover:bg-sidebar-hover-light dark:hover:bg-sidebar-hover-dark hover:text-text-primary dark:hover:text-white font-medium text-[0.95rem]">
             <FiTag className="text-xl" />
             <span>Etiquetas</span>

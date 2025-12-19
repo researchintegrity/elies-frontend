@@ -12,6 +12,7 @@ const ViewImagesPage = lazy(() => import('./pages/ViewImagesPage'));
 const ViewPDFPage = lazy(() => import('./pages/ViewPDFPage'));
 const AnnotationPage = lazy(() => import('./pages/AnnotationPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const CBIRSearchPage = lazy(() => import('./pages/CBIRSearchPage'));
 
 // Define as chaves para todas as páginas
 const PAGES = {
@@ -22,6 +23,7 @@ const PAGES = {
   VIEW_PDFS: 'viewPDFs',
   PROFILE: 'profile',
   SEARCH: 'search',
+  CBIR_SEARCH: 'cbirSearch',
 };
 
 function AppLayout() {
@@ -45,6 +47,8 @@ function AppLayout() {
         return <ProfilePage />;
       case PAGES.SEARCH:
         return <div>Página "Search" (Em breve)</div>;
+      case PAGES.CBIR_SEARCH:
+        return <CBIRSearchPage />;
       default:
         return <ViewImagesPage />;
     }
