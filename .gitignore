@@ -32,4 +32,5 @@ dist-ssr
 *.code-workspace
 workspace/
 .agent/
-package-lock.json
+*lock.json
+pf/
