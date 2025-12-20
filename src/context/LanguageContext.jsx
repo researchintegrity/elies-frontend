@@ -132,8 +132,7 @@ const translations = {
         'filters.dateTo': 'Até',
         'filters.tags': 'Tags',
         'filters.clearFilters': 'Limpar Filtros',
-        'gallery.previousPage': 'Página anterior',
-        'gallery.nextPage': 'Próxima página',
+
 
         // Lightbox Modal
         'lightbox.tagsClassification': 'Tags & Classificação',

@@ -840,22 +840,22 @@ const ViewImagesPage = () => {
 
       {/* Header - Hidden in similarity mode */}
       {!similarityMode && (
-        <header className="flex-none px-8 py-6 border-b border-gray-200 dark:border-gray-800 bg-bg-main dark:bg-bg-main z-30">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-            <div className="flex items-center gap-4">
+        <header className="flex-none px-4 sm:px-6 lg:px-8 py-4 sm:py-6 border-b border-gray-200 dark:border-gray-800 bg-bg-main dark:bg-bg-main z-30">
+          <div className="flex flex-wrap justify-between items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               <div>
-                <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
                   {t('gallery.title')}
                   {loading && <FiRefreshCw className="animate-spin text-lg text-gray-400" />}
                 </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 hidden md:block">
                   {t('gallery.subtitle')}
                 </p>
               </div>
 
               {/* Pagination Controls */}
               {pagination.total > IMAGES_PER_PAGE && (
-                <div className="flex items-center gap-2 ml-4">
+                <div className="flex items-center gap-1 sm:gap-2">
                   <button
                     onClick={() => handlePageChange(currentPage - 1)}
                     disabled={!pagination.hasPrev || loading}
@@ -864,8 +864,8 @@ const ViewImagesPage = () => {
                   >
                     <FiChevronLeft />
                   </button>
-                  <span className="text-sm text-gray-500 dark:text-gray-400 min-w-[140px] text-center">
-                    {currentPage} / {pagination.totalPages} ({pagination.total} {t('gallery.images')})
+                  <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 min-w-[60px] sm:min-w-[100px] text-center">
+                    {currentPage}/{pagination.totalPages} <span className="hidden sm:inline">({pagination.total})</span>
                   </span>
                   <button
                     onClick={() => handlePageChange(currentPage + 1)}
@@ -879,8 +879,8 @@ const ViewImagesPage = () => {
               )}
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-              <div className="relative flex-1 md:w-64 group">
+            <div className="flex flex-wrap gap-2 sm:gap-3 flex-1 justify-end">
+              <div className="relative flex-1 min-w-[120px] max-w-xs group">
                 <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
                 <input
                   type="text"
@@ -917,7 +917,7 @@ const ViewImagesPage = () => {
                   onClick={() => setIsFilterPanelOpen(true)}
                 >
                   <FiFilter className={hasActiveFilters ? "fill-current" : ""} />
-                  <span className="hidden sm:inline">{t('common.filters')}</span>
+                  <span>{t('common.filters')}</span>
                   {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-indigo-500"></span>}
                 </button>
 
