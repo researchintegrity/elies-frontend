@@ -1,8 +1,8 @@
 import React from 'react';
-import { FiX, FiTrash2, FiTag, FiBarChart2, FiTarget, FiInfo } from 'react-icons/fi';
+import { FiX, FiTrash2, FiTag, FiBarChart2, FiTarget, FiInfo, FiGrid } from 'react-icons/fi';
 import { useLanguage } from '../context/LanguageContext';
 
-const SelectionToolbar = ({ selectedCount, onClearSelection, onDelete, onTag, onAnalyze, onFindSimilar, onViewMetadata }) => {
+const SelectionToolbar = ({ selectedCount, onClearSelection, onDelete, onTag, onAnalyze, onFindSimilar, onViewMetadata, onExtractPanels, isExtracting }) => {
     const { t } = useLanguage();
 
     if (selectedCount === 0) return null;
@@ -44,6 +44,19 @@ const SelectionToolbar = ({ selectedCount, onClearSelection, onDelete, onTag, on
                     >
                         <FiTarget className="text-lg" />
                         <span>{t('selection.findSimilar')}</span>
+                    </button>
+                )}
+
+                {/* Extract Panels - Works with 1+ images */}
+                {onExtractPanels && (
+                    <button
+                        onClick={onExtractPanels}
+                        disabled={isExtracting}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={t('selection.extractPanelsTitle')}
+                    >
+                        <FiGrid className={`text-lg ${isExtracting ? 'animate-pulse' : ''}`} />
+                        <span>{isExtracting ? t('selection.extracting') : t('selection.extractPanels')}</span>
                     </button>
                 )}
 

@@ -20,6 +20,7 @@ import {
   FiChevronRight
 } from 'react-icons/fi';
 import { useImages } from '../hooks/useImages';
+import { usePanelExtraction } from '../hooks/usePanelExtraction';
 import { useLanguage } from '../context/LanguageContext';
 import { api } from '../services/api';
 import { showAlert, showToast, showConfirm } from '../utils/alert';
@@ -361,6 +362,13 @@ const ViewImagesPage = () => {
     removeImageType
   } = useImages();
 
+  // Panel extraction
+  const {
+    isExtracting,
+    startExtraction,
+    status: extractionStatus
+  } = usePanelExtraction();
+
   const { t, locale } = useLanguage();
 
   // States
@@ -682,6 +690,34 @@ const ViewImagesPage = () => {
     }
   }, [selectedImages, t]);
 
+  // Extract panels handler
+  const handleExtractPanels = useCallback(async () => {
+    if (selectedImages.size === 0) return;
+
+    const imageIds = Array.from(selectedImages.keys());
+    const result = await startExtraction(imageIds);
+
+    // If extraction started successfully, wait for completion via polling
+    // The hook will show toasts and update state
+    // After a successful extraction, refresh the gallery
+    if (result.success && !result.pending) {
+      // Extraction completed synchronously (edge case)
+      fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE });
+      handleClearSelection();
+    } else if (result.success && result.pending) {
+      // Extraction started, clear selection but don't refresh yet
+      // The hook will notify on completion
+      handleClearSelection();
+    }
+  }, [selectedImages, startExtraction, fetchImages, currentPage, IMAGES_PER_PAGE, handleClearSelection]);
+
+  // Refresh gallery when extraction completes
+  useEffect(() => {
+    if (extractionStatus === 'completed') {
+      fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE });
+    }
+  }, [extractionStatus, fetchImages, currentPage, IMAGES_PER_PAGE]);
+
   const handleResetFilters = () => {
     setFilters({ sourceType: 'all', dateFrom: '', dateTo: '', tags: [] });
   };
@@ -710,6 +746,8 @@ const ViewImagesPage = () => {
         onAnalyze={handleAnalyzeSelected}
         onFindSimilar={!similarityMode ? handleFindSimilar : undefined}
         onViewMetadata={handleViewMetadata}
+        onExtractPanels={handleExtractPanels}
+        isExtracting={isExtracting}
       />
 
       {/* Filter Sidebar */}

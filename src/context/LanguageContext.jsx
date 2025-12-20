@@ -152,6 +152,18 @@ const translations = {
         'selection.classify': 'Classificar',
         'selection.analyze': 'Analisar',
         'selection.delete': 'Excluir',
+        'selection.extractPanels': 'Extrair Painéis',
+        'selection.extractPanelsTitle': 'Extrair painéis individuais das imagens selecionadas',
+        'selection.extracting': 'Extraindo...',
+
+        // Panel Extraction
+        'panelExtraction.started': 'Extração de painéis iniciada',
+        'panelExtraction.processing': 'Processando imagens...',
+        'panelExtraction.success': 'Extraídos {count} painéis com sucesso',
+        'panelExtraction.failed': 'Falha na extração de painéis',
+        'panelExtraction.noPanelsFound': 'Nenhum painel encontrado nas imagens selecionadas',
+        'panelExtraction.timeout': 'Extração de painéis expirou',
+        'panelExtraction.noImagesSelected': 'Nenhuma imagem selecionada para extração',
 
         // Batch Operations
         'batch.imagesDeleted': 'imagens excluídas com sucesso.',
@@ -489,6 +501,18 @@ const translations = {
         'selection.classify': 'Classify',
         'selection.analyze': 'Analyze',
         'selection.delete': 'Delete',
+        'selection.extractPanels': 'Extract Panels',
+        'selection.extractPanelsTitle': 'Extract individual panels from selected images',
+        'selection.extracting': 'Extracting...',
+
+        // Panel Extraction
+        'panelExtraction.started': 'Panel extraction started',
+        'panelExtraction.processing': 'Processing images...',
+        'panelExtraction.success': 'Successfully extracted {count} panels',
+        'panelExtraction.failed': 'Panel extraction failed',
+        'panelExtraction.noPanelsFound': 'No panels found in the selected images',
+        'panelExtraction.timeout': 'Panel extraction timed out',
+        'panelExtraction.noImagesSelected': 'No images selected for extraction',
 
         // Batch Operations
         'batch.imagesDeleted': 'images deleted successfully.',
