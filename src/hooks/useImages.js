@@ -1,15 +1,17 @@
 import { useState, useCallback } from 'react';
 import { api } from '../services/api';
 import { showAlert, showToast, showConfirm } from '../utils/alert';
+import { useLanguage } from '../context/LanguageContext';
 
 // Default page size for gallery pagination
 const DEFAULT_PER_PAGE = 24;
 
 export const useImages = () => {
+    const { t } = useLanguage();
     const [images, setImages] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    
+
     // Pagination state
     const [pagination, setPagination] = useState({
         page: 1,
@@ -22,7 +24,7 @@ export const useImages = () => {
 
     const fetchImages = useCallback(async (params = {}) => {
         const { page = 1, per_page = DEFAULT_PER_PAGE, ...otherParams } = params;
-        
+
         setLoading(true);
         setError(null);
         try {
@@ -66,7 +68,7 @@ export const useImages = () => {
                 sourceType: img.source_type,
                 imageType: img.image_type || []
             }));
-            
+
             setImages(transformed);
             setPagination(paginationData);
         } catch (err) {
@@ -93,8 +95,8 @@ export const useImages = () => {
     const deleteImage = useCallback(async (image, options = {}) => {
         if (image.sourceType === 'extracted') {
             showAlert(
-                'Ação Bloqueada',
-                'Imagens extraídas não podem ser excluídas individualmente. Para remover esta imagem, você deve excluir o PDF original na aba "Documentos".',
+                t('images.actionBlocked'),
+                t('images.extractedCannotDelete'),
                 'warning'
             );
             return false;
@@ -104,8 +106,8 @@ export const useImages = () => {
 
         if (!skipConfirm) {
             const confirmed = await showConfirm(
-                'Tem certeza?',
-                `Deseja realmente excluir a imagem "${image.filename}"?`
+                t('images.confirmDeleteTitle'),
+                t('images.confirmDeleteMessage').replace('{filename}', image.filename)
             );
             if (!confirmed) return false;
         }
@@ -117,17 +119,17 @@ export const useImages = () => {
 
             // Only show toast if individual action (otherwise batch handler manages toast)
             if (!skipConfirm) {
-                showToast('Imagem deletada com sucesso!', 'success');
+                showToast(t('images.deleteSuccess'), 'success');
             }
             return true;
         } catch (err) {
             // Only show alert if individual action
             if (!skipConfirm) {
-                showAlert('Erro', `Erro ao deletar: ${err.message}`, 'error');
+                showAlert(t('common.error'), `${t('images.deleteError')}: ${err.message}`, 'error');
             }
             return false;
         }
-    }, []);
+    }, [t]);
 
     const addImageTypes = useCallback(async (image, types) => {
         try {
@@ -135,13 +137,13 @@ export const useImages = () => {
             setImages(prev => prev.map(img =>
                 img.id === image.id ? { ...img, imageType: updatedImage.image_type } : img
             ));
-            showToast('Tags adicionadas com sucesso!', 'success');
+            showToast(t('images.tagsAddedSuccess'), 'success');
             return true;
         } catch (err) {
-            showAlert('Erro', `Erro ao adicionar tags: ${err.message}`, 'error');
+            showAlert(t('common.error'), `${t('images.tagsAddError')}: ${err.message}`, 'error');
             return false;
         }
-    }, []);
+    }, [t]);
 
     const removeImageType = useCallback(async (image, typeName) => {
         try {
@@ -149,13 +151,13 @@ export const useImages = () => {
             setImages(prev => prev.map(img =>
                 img.id === image.id ? { ...img, imageType: updatedImage.image_type } : img
             ));
-            showToast('Tag removida com sucesso.', 'success');
+            showToast(t('images.tagRemovedSuccess'), 'success');
             return true;
         } catch (err) {
-            showAlert('Erro', `Erro ao remover tag: ${err.message}`, 'error');
+            showAlert(t('common.error'), `${t('images.tagRemoveError')}: ${err.message}`, 'error');
             return false;
         }
-    }, []);
+    }, [t]);
 
     return {
         images,

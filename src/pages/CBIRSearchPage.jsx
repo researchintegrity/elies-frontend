@@ -17,52 +17,9 @@ import {
 import { api } from '../services/api';
 import { showAlert, showToast } from '../utils/alert';
 import { useLanguage } from '../context/LanguageContext';
+import { SkeletonCard, EmptyState } from '../components/common';
 
 // --- Sub-Components ---
-
-const SkeletonCard = () => (
-  <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800">
-    <div className="w-full aspect-square bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
-    <div className="p-3 space-y-2">
-      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse"></div>
-      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2 animate-pulse"></div>
-    </div>
-  </div>
-);
-
-const EmptyGallery = ({ onRefresh, t }) => (
-  <div className="flex flex-col items-center justify-center px-8 py-16 text-center bg-white dark:bg-gray-800 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
-    <div className="bg-gray-50 dark:bg-gray-700 p-5 rounded-full mb-5">
-      <FiImage className="text-3xl text-gray-400 dark:text-gray-500" />
-    </div>
-    <h3 className="text-lg font-bold mb-2 text-gray-900 dark:text-white">
-      {t('cbir.noImages')}
-    </h3>
-    <p className="max-w-md mb-6 text-gray-500 dark:text-gray-400 text-sm">
-      {t('cbir.noImagesDescription')}
-    </p>
-    <button
-      className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all text-sm"
-      onClick={onRefresh}
-    >
-      <FiRefreshCw /> {t('common.update')}
-    </button>
-  </div>
-);
-
-const NoResults = ({ t }) => (
-  <div className="flex flex-col items-center justify-center px-8 py-16 text-center bg-white dark:bg-gray-800 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
-    <div className="bg-amber-50 dark:bg-amber-900/20 p-5 rounded-full mb-5">
-      <FiSearch className="text-3xl text-amber-500" />
-    </div>
-    <h3 className="text-lg font-bold mb-2 text-gray-900 dark:text-white">
-      {t('cbir.noSimilarFound')}
-    </h3>
-    <p className="max-w-md text-gray-500 dark:text-gray-400 text-sm">
-      {t('cbir.noSimilarDescription')}
-    </p>
-  </div>
-);
 
 // Image Card for Source Selection Gallery
 const SourceImageCard = ({ image, isSelected, onClick, imageUrl, loading, error }) => (
@@ -627,7 +584,14 @@ const CBIRSearchPage = () => {
                   </button>
                 </div>
               ) : images.length === 0 && !loadingImages ? (
-                <EmptyGallery onRefresh={() => fetchImages(1)} t={t} />
+                <EmptyState
+                  title={t('cbir.noImages')}
+                  description={t('cbir.noImagesDescription')}
+                  icon="image"
+                  actionLabel={t('common.update')}
+                  onAction={() => fetchImages(1)}
+                  showAction={true}
+                />
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
                   {images.map((img) => (
@@ -813,7 +777,12 @@ const CBIRSearchPage = () => {
 
               <div className="p-5">
                 {searchResults.matches.length === 0 ? (
-                  <NoResults t={t} />
+                  <EmptyState
+                    title={t('cbir.noSimilarFound')}
+                    description={t('cbir.noSimilarDescription')}
+                    icon="search"
+                    showAction={false}
+                  />
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                     {searchResults.matches.map((result, index) => (

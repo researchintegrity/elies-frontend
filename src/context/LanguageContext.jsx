@@ -157,9 +157,33 @@ const translations = {
         'batch.tagsAdded': 'tags adicionadas a',
         'batch.images': 'imagens.',
         'batch.analyzeComingSoon': 'Funcionalidade de análise em lote em breve!',
+        'batch.actionBlocked': 'Ação Bloqueada',
+        'batch.extractedOnlyMessage': 'Você selecionou {count} imagem(ns) extraída(s). Elas só podem ser removidas excluindo o PDF original.',
+        'batch.confirmDelete': 'Tem certeza que deseja excluir {count} imagens?',
+        'batch.confirmDeleteNote': '(Atenção: {count} imagens extraídas selecionadas serão ignoradas e não serão excluídas)',
+        'batch.confirmation': 'Confirmação',
 
         // Tag Input
         'tags.addTags': 'Adicionar tags...',
+
+        // Image display
+        'image.error': 'Erro',
+        'image.noTags': 'Sem tags',
+        'image.uploaded': 'Upload',
+        'image.extracted': 'Extraída',
+        'image.noName': 'Sem nome',
+
+        // Image operations (useImages hook)
+        'images.actionBlocked': 'Ação Bloqueada',
+        'images.extractedCannotDelete': 'Imagens extraídas não podem ser excluídas individualmente. Para remover esta imagem, você deve excluir o PDF original na aba "Documentos".',
+        'images.confirmDeleteTitle': 'Tem certeza?',
+        'images.confirmDeleteMessage': 'Deseja realmente excluir a imagem "{filename}"?',
+        'images.deleteSuccess': 'Imagem deletada com sucesso!',
+        'images.deleteError': 'Erro ao deletar',
+        'images.tagsAddedSuccess': 'Tags adicionadas com sucesso!',
+        'images.tagsAddError': 'Erro ao adicionar tags',
+        'images.tagRemovedSuccess': 'Tag removida com sucesso.',
+        'images.tagRemoveError': 'Erro ao remover tag',
 
         // Similarity Search
         'similarity.title': 'Busca por Similaridade',
@@ -452,9 +476,33 @@ const translations = {
         'batch.tagsAdded': 'tags added to',
         'batch.images': 'images.',
         'batch.analyzeComingSoon': 'Batch analysis feature coming soon!',
+        'batch.actionBlocked': 'Action Blocked',
+        'batch.extractedOnlyMessage': 'You selected {count} extracted image(s). They can only be removed by deleting the original PDF.',
+        'batch.confirmDelete': 'Are you sure you want to delete {count} images?',
+        'batch.confirmDeleteNote': '(Note: {count} selected extracted images will be ignored and not deleted)',
+        'batch.confirmation': 'Confirmation',
 
         // Tag Input
         'tags.addTags': 'Add tags...',
+
+        // Image display
+        'image.error': 'Error',
+        'image.noTags': 'No tags',
+        'image.uploaded': 'Uploaded',
+        'image.extracted': 'Extracted',
+        'image.noName': 'No name',
+
+        // Image operations (useImages hook)
+        'images.actionBlocked': 'Action Blocked',
+        'images.extractedCannotDelete': 'Extracted images cannot be deleted individually. To remove this image, you must delete the original PDF in the "Documents" tab.',
+        'images.confirmDeleteTitle': 'Are you sure?',
+        'images.confirmDeleteMessage': 'Do you really want to delete the image "{filename}"?',
+        'images.deleteSuccess': 'Image deleted successfully!',
+        'images.deleteError': 'Error deleting',
+        'images.tagsAddedSuccess': 'Tags added successfully!',
+        'images.tagsAddError': 'Error adding tags',
+        'images.tagRemovedSuccess': 'Tag removed successfully.',
+        'images.tagRemoveError': 'Error removing tag',
 
         // Similarity Search
         'similarity.title': 'Similarity Search',

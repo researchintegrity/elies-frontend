@@ -11,40 +11,7 @@ import { api } from '../services/api';
 import { showAlert } from '../utils/alert';
 import PDFViewer from '../components/PDFViewer';
 import { useLanguage } from '../context/LanguageContext';
-
-// --- Components ---
-
-const SkeletonCard = () => (
-  <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden h-80 border border-gray-200 dark:border-gray-700 shadow-sm">
-    <div className="w-full aspect-[4/3] bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
-    <div className="p-5 space-y-3">
-      <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse"></div>
-      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 animate-pulse"></div>
-    </div>
-  </div>
-);
-
-const EmptyState = ({ isSearch, onUploadClick, t }) => (
-  <div className="col-span-full flex flex-col items-center justify-center px-8 py-16 text-center bg-white dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700">
-    <FiFileText className="text-6xl mb-6 text-gray-400 dark:text-gray-500" />
-    <h3 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
-      {isSearch ? t('pdfs.noDocFound') : t('pdfs.empty')}
-    </h3>
-    <p className="max-w-md mb-8 text-gray-600 dark:text-gray-400">
-      {isSearch
-        ? t('pdfs.searchNoResults')
-        : t('pdfs.emptyDescription')}
-    </p>
-    {!isSearch && (
-      <button
-        className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-lg hover:shadow-indigo-500/30"
-        onClick={onUploadClick}
-      >
-        <FiUploadCloud className="text-lg" /> {t('pdfs.uploadNow')}
-      </button>
-    )}
-  </div>
-);
+import { SkeletonCard, EmptyState } from '../components/common';
 
 // --- Watermark Actions Component ---
 const WatermarkActionMenu = ({ doc, onRemoveWatermark, t }) => {
@@ -436,7 +403,14 @@ const ViewPDFPage = () => {
               {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
             </div>
           ) : filteredDocuments.length === 0 ? (
-            <EmptyState isSearch={!!searchQuery} onUploadClick={() => showAlert('Info', t('pdfs.goToUpload'), 'info')} t={t} />
+            <EmptyState
+              title={searchQuery ? t('pdfs.noDocFound') : t('pdfs.empty')}
+              description={searchQuery ? t('pdfs.searchNoResults') : t('pdfs.emptyDescription')}
+              icon="document"
+              actionLabel={!searchQuery ? t('pdfs.uploadNow') : undefined}
+              onAction={!searchQuery ? () => showAlert('Info', t('pdfs.goToUpload'), 'info') : undefined}
+              showAction={!searchQuery}
+            />
           ) : (
             <div className={viewMode === 'grid' && !isSplitView ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-10' : 'w-full pb-10'}>
               {viewMode === 'grid' && !isSplitView ? (

@@ -27,57 +27,22 @@ import SelectionToolbar from '../components/SelectionToolbar';
 import ImageFilters from '../components/ImageFilters';
 import TagInput from '../components/TagInput';
 import BatchTagModal from '../components/BatchTagModal';
+import { SkeletonCard, EmptyState } from '../components/common';
 
 // --- Components ---
 
-const SkeletonCard = () => (
-  <div className="bg-bg-card dark:bg-dark-card rounded-xl overflow-hidden h-72 border border-gray-200 dark:border-gray-800">
-    <div className="w-full aspect-[4/3] bg-gray-200 dark:bg-gray-800 animate-pulse"></div>
-    <div className="p-4 space-y-3">
-      <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-3/4 animate-pulse"></div>
-      <div className="flex gap-2">
-        <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-16 animate-pulse"></div>
-        <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-12 animate-pulse"></div>
-      </div>
-    </div>
-  </div>
-);
-
-const EmptyState = ({ isSearch, onUploadClick, t }) => (
-  <div className="col-span-full flex flex-col items-center justify-center px-8 py-20 text-center bg-bg-card dark:bg-dark-card rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
-    <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-full mb-6">
-      <FiImage className="text-4xl text-gray-400 dark:text-gray-500" />
-    </div>
-    <h3 className="text-xl font-bold mb-2 text-gray-900 dark:text-white">
-      {isSearch ? t('gallery.noResults') : t('gallery.empty')}
-    </h3>
-    <p className="max-w-md mb-8 text-gray-500 dark:text-gray-400">
-      {isSearch
-        ? t('gallery.noResultsDescription')
-        : t('gallery.emptyDescription')}
-    </p>
-    {!isSearch && (
-      <button
-        className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all shadow-lg shadow-indigo-500/20"
-        onClick={onUploadClick}
-      >
-        <FiUploadCloud /> {t('gallery.upload')}
-      </button>
-    )}
-  </div>
-);
-
-
 const LightboxModal = ({ image, onClose, imageUrl, onTagAdd, onTagRemove, t, locale }) => {
-  if (!image) return null;
-
+  // Hook must be called before any conditional returns (React rules of hooks)
   useEffect(() => {
+    if (!image) return;
     const handleEsc = (e) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
-  }, [onClose]);
+  }, [image, onClose]);
+
+  if (!image) return null;
 
   return (
     <div
@@ -235,6 +200,7 @@ const QueryImageThumbnail = ({ image, isSelected, onSelect, isSelectionMode }) =
   );
 };
 const ImageCard = ({ image, onClick, onSelect, isSelected, isSelectionMode, similarityScore, rank }) => {
+  const { t } = useLanguage();
   const [imageUrl, setImageUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -314,7 +280,7 @@ const ImageCard = ({ image, onClick, onSelect, isSelected, isSelectionMode, simi
         ) : error ? (
           <div className="flex flex-col items-center justify-center w-full h-full text-gray-400 bg-gray-50 dark:bg-gray-800">
             <FiAlertTriangle size={24} className="mb-2 text-amber-500" />
-            <span className="text-xs">Erro</span>
+            <span className="text-xs">{t('image.error')}</span>
           </div>
         ) : (
           <img
@@ -365,7 +331,7 @@ const ImageCard = ({ image, onClick, onSelect, isSelected, isSelectionMode, simi
                 </span>
               ))
             ) : (
-              <span className="text-[10px] text-gray-400 italic">Sem tags</span>
+              <span className="text-[10px] text-gray-400 italic">{t('image.noTags')}</span>
             )}
             {image.imageType && image.imageType.length > 2 && (
               <span className="text-[10px] text-gray-400">+{image.imageType.length - 2}</span>
@@ -375,7 +341,7 @@ const ImageCard = ({ image, onClick, onSelect, isSelected, isSelectionMode, simi
 
         <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
           <span className="text-[10px] text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded capitalize">
-            {image.sourceType === 'uploaded' ? 'Upload' : 'Extraída'}
+            {image.sourceType === 'uploaded' ? t('image.uploaded') : t('image.extracted')}
           </span>
           <span className="text-[10px] text-gray-400">
             {new Date(image.uploadedDate).toLocaleDateString()}
@@ -538,7 +504,7 @@ const ViewImagesPage = () => {
       return similarityResults.map(result => ({
         id: result.image_id,
         imageId: result.image_id,
-        filename: result.filename || 'Sem nome',
+        filename: result.filename || t('image.noName'),
         uploadedDate: result.uploaded_date || new Date().toISOString(),
         fileSize: result.file_size || 0,
         sourceType: result.source_type || 'unknown',
@@ -625,19 +591,19 @@ const ViewImagesPage = () => {
 
     if (uploadedImages.length === 0) {
       showAlert(
-        'Ação Bloqueada',
-        `Você selecionou ${extractedCount} imagem(ns) extraída(s). Elas só podem ser removidas excluindo o PDF original.`,
+        t('batch.actionBlocked'),
+        t('batch.extractedOnlyMessage').replace('{count}', extractedCount),
         'warning'
       );
       return;
     }
 
-    let confirmMessage = `Tem certeza que deseja excluir ${uploadedImages.length} imagens?`;
+    let confirmMessage = t('batch.confirmDelete').replace('{count}', uploadedImages.length);
     if (extractedCount > 0) {
-      confirmMessage += `\n\n(Atenção: ${extractedCount} imagens extraídas selecionadas serão ignoradas e não serão excluídas)`;
+      confirmMessage += `\n\n${t('batch.confirmDeleteNote').replace('{count}', extractedCount)}`;
     }
 
-    const confirmed = await showConfirm('Confirmação', confirmMessage);
+    const confirmed = await showConfirm(t('batch.confirmation'), confirmMessage);
     if (confirmed) {
       let successCount = 0;
 
@@ -966,7 +932,14 @@ const ViewImagesPage = () => {
             <button onClick={() => fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE })} className="px-6 py-2 bg-indigo-600 text-white rounded-lg">{t('common.tryAgain')}</button>
           </div>
         ) : filteredImages.length === 0 ? (
-          <EmptyState isSearch={!!searchQuery || hasActiveFilters || similarityMode} onUploadClick={() => showAlert('Info', t('sidebar.uploadImages'), 'info')} t={t} />
+          <EmptyState
+            title={(searchQuery || hasActiveFilters || similarityMode) ? t('gallery.noResults') : t('gallery.empty')}
+            description={(searchQuery || hasActiveFilters || similarityMode) ? t('gallery.noResultsDescription') : t('gallery.emptyDescription')}
+            icon="image"
+            actionLabel={!(searchQuery || hasActiveFilters || similarityMode) ? t('gallery.upload') : undefined}
+            onAction={!(searchQuery || hasActiveFilters || similarityMode) ? () => showAlert('Info', t('sidebar.uploadImages'), 'info') : undefined}
+            showAction={!(searchQuery || hasActiveFilters || similarityMode)}
+          />
         ) : (
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
