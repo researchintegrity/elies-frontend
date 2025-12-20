@@ -13,6 +13,7 @@ const ViewPDFPage = lazy(() => import('./pages/ViewPDFPage'));
 const AnnotationPage = lazy(() => import('./pages/AnnotationPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const CBIRSearchPage = lazy(() => import('./pages/CBIRSearchPage'));
+const ImageAnalysisPage = lazy(() => import('./pages/ImageAnalysisPage'));
 
 // Page keys
 const PAGES = {
@@ -24,6 +25,7 @@ const PAGES = {
   PROFILE: 'profile',
   SEARCH: 'search',
   CBIR_SEARCH: 'cbirSearch',
+  IMAGE_ANALYSIS: 'imageAnalysis',
 };
 
 function AppLayout() {
@@ -51,6 +53,8 @@ function AppLayout() {
         return <div className="flex items-center justify-center h-full text-gray-400">{t('common.searchPage')}</div>;
       case PAGES.CBIR_SEARCH:
         return <CBIRSearchPage />;
+      case PAGES.IMAGE_ANALYSIS:
+        return <ImageAnalysisPage />;
       default:
         return <ViewImagesPage />;
     }

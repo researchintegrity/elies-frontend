@@ -16,6 +16,7 @@ import {
   FiLayers,
   FiChevronsLeft,
   FiMenu,
+  FiCpu,
 } from 'react-icons/fi';
 
 const Sidebar = ({ activePage, onNavigate, pages, isCollapsed = false, onToggle }) => {
@@ -197,6 +198,7 @@ const Sidebar = ({ activePage, onNavigate, pages, isCollapsed = false, onToggle 
 
         <NavSection title={t('sidebar.tools')}>
           <NavItem pageKey={pages.CBIR_SEARCH} icon={FiSearch} label={t('sidebar.findSimilar')} />
+          <NavItem pageKey={pages.IMAGE_ANALYSIS} icon={FiCpu} label={t('sidebar.imageAnalysis') || 'Image Analysis'} />
           <DisabledItem icon={FiTag} label={t('sidebar.tags')} />
           <DisabledItem icon={FiLayers} label={t('sidebar.categories')} />
         </NavSection>
