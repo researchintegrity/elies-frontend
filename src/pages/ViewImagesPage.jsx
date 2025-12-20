@@ -896,9 +896,9 @@ const ViewImagesPage = () => {
                 )}
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <select
-                  className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-xl px-4 py-2.5 outline-none focus:border-indigo-500 cursor-pointer shadow-sm text-sm"
+                  className="flex-shrink-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-indigo-500 cursor-pointer shadow-sm text-sm min-w-0"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
                 >
@@ -910,7 +910,7 @@ const ViewImagesPage = () => {
                 </select>
 
                 <button
-                  className={`px-4 py-2.5 rounded-xl border transition-all flex items-center gap-2 shadow-sm ${hasActiveFilters
+                  className={`flex-shrink-0 px-3 py-2.5 rounded-xl border transition-all flex items-center gap-2 shadow-sm ${hasActiveFilters
                     ? 'bg-indigo-50 border-indigo-200 text-indigo-600 dark:bg-indigo-900/30 dark:border-indigo-500/50 dark:text-indigo-300'
                     : 'bg-white border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 hover:bg-gray-50'
                     }`}
@@ -922,7 +922,7 @@ const ViewImagesPage = () => {
                 </button>
 
                 <button
-                  className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-indigo-600 hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 transition-all shadow-sm"
+                  className="flex-shrink-0 p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-indigo-600 hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 transition-all shadow-sm"
                   onClick={() => fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE })}
                   title={t('common.update')}
                 >

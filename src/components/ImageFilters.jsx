@@ -1,15 +1,24 @@
 import React from 'react';
 import { FiX, FiFilter, FiCalendar, FiImage, FiDatabase } from 'react-icons/fi';
+import { useLanguage } from '../context/LanguageContext';
 
 const ImageFilters = ({ isOpen, onClose, filters, onFilterChange }) => {
+    const { t } = useLanguage();
+
     if (!isOpen) return null;
+
+    const sourceOptions = [
+        { id: 'all', label: t('filters.originAll') },
+        { id: 'uploaded', label: t('filters.originUploaded') },
+        { id: 'extracted', label: t('filters.originExtracted') }
+    ];
 
     return (
         <div className="fixed inset-y-0 right-0 w-80 bg-white dark:bg-gray-900 shadow-2xl border-l border-gray-200 dark:border-gray-800 z-40 transform transition-transform duration-300 ease-in-out flex flex-col">
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">
                 <div className="flex items-center gap-2 text-gray-900 dark:text-white font-bold text-lg">
                     <FiFilter className="text-indigo-500" />
-                    Filtros
+                    {t('filters.title')}
                 </div>
                 <button
                     onClick={onClose}
@@ -24,14 +33,10 @@ const ImageFilters = ({ isOpen, onClose, filters, onFilterChange }) => {
                 {/* Source Type */}
                 <section>
                     <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white mb-4">
-                        <FiDatabase className="text-gray-400" /> Origem
+                        <FiDatabase className="text-gray-400" /> {t('filters.origin')}
                     </h4>
                     <div className="space-y-2">
-                        {[
-                            { id: 'all', label: 'Todas' },
-                            { id: 'uploaded', label: 'Enviadas por Mim' },
-                            { id: 'extracted', label: 'Extraídas de PDF' }
-                        ].map((option) => (
+                        {sourceOptions.map((option) => (
                             <label key={option.id} className="flex items-center gap-3 cursor-pointer group">
                                 <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${filters.sourceType === option.id
                                     ? 'bg-indigo-500 border-indigo-500 text-white'
@@ -57,17 +62,17 @@ const ImageFilters = ({ isOpen, onClose, filters, onFilterChange }) => {
                 {/* Date Range */}
                 <section>
                     <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white mb-4">
-                        <FiCalendar className="text-gray-400" /> Data
+                        <FiCalendar className="text-gray-400" /> {t('filters.date')}
                     </h4>
                     <div className="space-y-3">
-                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">De</label>
+                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('filters.dateFrom')}</label>
                         <input
                             type="date"
                             className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                             value={filters.dateFrom || ''}
                             onChange={(e) => onFilterChange('dateFrom', e.target.value)}
                         />
-                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Até</label>
+                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('filters.dateTo')}</label>
                         <input
                             type="date"
                             className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
@@ -80,7 +85,7 @@ const ImageFilters = ({ isOpen, onClose, filters, onFilterChange }) => {
                 {/* Tags */}
                 <section>
                     <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white mb-4">
-                        <FiImage className="text-gray-400" /> Tags
+                        <FiImage className="text-gray-400" /> {t('filters.tags')}
                     </h4>
                     <div className="flex flex-wrap gap-2">
                         {['figure', 'table', 'equation', 'diagram', 'plot'].map(tag => (
@@ -111,7 +116,7 @@ const ImageFilters = ({ isOpen, onClose, filters, onFilterChange }) => {
                     onClick={() => onFilterChange('reset')}
                     className="w-full py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium hover:bg-white dark:hover:bg-gray-800 transition-colors text-sm"
                 >
-                    Limpar Filtros
+                    {t('filters.clearFilters')}
                 </button>
             </div>
         </div>

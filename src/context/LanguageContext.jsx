@@ -121,6 +121,20 @@ const translations = {
         'gallery.previousPage': 'Página anterior',
         'gallery.nextPage': 'Próxima página',
 
+        // Image Filters Panel
+        'filters.title': 'Filtros',
+        'filters.origin': 'Origem',
+        'filters.originAll': 'Todas',
+        'filters.originUploaded': 'Enviadas por Mim',
+        'filters.originExtracted': 'Extraídas de PDF',
+        'filters.date': 'Data',
+        'filters.dateFrom': 'De',
+        'filters.dateTo': 'Até',
+        'filters.tags': 'Tags',
+        'filters.clearFilters': 'Limpar Filtros',
+        'gallery.previousPage': 'Página anterior',
+        'gallery.nextPage': 'Próxima página',
+
         // Lightbox Modal
         'lightbox.tagsClassification': 'Tags & Classificação',
         'lightbox.metadata': 'Metadados',
@@ -402,6 +416,18 @@ const translations = {
         'gallery.last': 'Last',
         'gallery.previousPage': 'Previous page',
         'gallery.nextPage': 'Next page',
+
+        // Image Filters Panel
+        'filters.title': 'Filters',
+        'filters.origin': 'Source',
+        'filters.originAll': 'All',
+        'filters.originUploaded': 'Uploaded by Me',
+        'filters.originExtracted': 'Extracted from PDF',
+        'filters.date': 'Date',
+        'filters.dateFrom': 'From',
+        'filters.dateTo': 'To',
+        'filters.tags': 'Tags',
+        'filters.clearFilters': 'Clear Filters',
 
         // Lightbox Modal
         'lightbox.tagsClassification': 'Tags & Classification',
