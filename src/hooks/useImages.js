@@ -1,32 +1,76 @@
 import { useState, useCallback } from 'react';
 import { api } from '../services/api';
 import { showAlert, showToast, showConfirm } from '../utils/alert';
+import { useLanguage } from '../context/LanguageContext';
+
+// Default page size for gallery pagination
+const DEFAULT_PER_PAGE = 24;
 
 export const useImages = () => {
+    const { t } = useLanguage();
     const [images, setImages] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    const fetchImages = useCallback(async (params = { page: 1, per_page: 100 }) => {
+    // Pagination state
+    const [pagination, setPagination] = useState({
+        page: 1,
+        perPage: DEFAULT_PER_PAGE,
+        total: 0,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false
+    });
+
+    const fetchImages = useCallback(async (params = {}) => {
+        const { page = 1, per_page = DEFAULT_PER_PAGE, ...otherParams } = params;
+
         setLoading(true);
         setError(null);
         try {
-            const data = await api.get('/images', params);
+            const data = await api.get('/images', { page, per_page, ...otherParams });
+
+            // Handle both array response (legacy) and paginated response object
+            let imageList = [];
+            let paginationData = {
+                page: page,
+                perPage: per_page,
+                total: 0,
+                totalPages: 1,
+                hasNext: false,
+                hasPrev: false
+            };
 
             if (Array.isArray(data)) {
-                const transformed = data.map(img => ({
-                    id: img._id,
-                    imageId: img._id,
-                    filename: img.filename,
-                    uploadedDate: img.uploaded_date,
-                    fileSize: img.file_size,
-                    sourceType: img.source_type,
-                    imageType: img.image_type || []
-                }));
-                setImages(transformed);
-            } else {
-                throw new Error('Formato de dados inválido');
+                // Legacy array response
+                imageList = data;
+                paginationData.total = data.length;
+                paginationData.totalPages = 1;
+            } else if (data && typeof data === 'object') {
+                // New paginated response: { items: [], total, page, per_page, total_pages, has_next, has_prev }
+                imageList = data.items || data.images || [];
+                paginationData = {
+                    page: data.page || page,
+                    perPage: data.per_page || per_page,
+                    total: data.total || imageList.length,
+                    totalPages: data.total_pages || Math.ceil((data.total || imageList.length) / per_page),
+                    hasNext: data.has_next ?? false,
+                    hasPrev: data.has_prev ?? (page > 1)
+                };
             }
+
+            const transformed = imageList.map(img => ({
+                id: img._id,
+                imageId: img._id,
+                filename: img.filename,
+                uploadedDate: img.uploaded_date,
+                fileSize: img.file_size,
+                sourceType: img.source_type,
+                imageType: img.image_type || []
+            }));
+
+            setImages(transformed);
+            setPagination(paginationData);
         } catch (err) {
             console.error('Error fetching images:', err);
             setError(err.message);
@@ -48,24 +92,44 @@ export const useImages = () => {
         }
     }, []);
 
-    const deleteImage = useCallback(async (image) => {
-        const confirmed = await showConfirm(
-            'Tem certeza?',
-            `Deseja realmente excluir a imagem "${image.filename}"?`
-        );
+    const deleteImage = useCallback(async (image, options = {}) => {
+        if (image.sourceType === 'extracted') {
+            showAlert(
+                t('images.actionBlocked'),
+                t('images.extractedCannotDelete'),
+                'warning'
+            );
+            return false;
+        }
 
-        if (!confirmed) return false;
+        const { skipConfirm = false } = options;
+
+        if (!skipConfirm) {
+            const confirmed = await showConfirm(
+                t('images.confirmDeleteTitle'),
+                t('images.confirmDeleteMessage').replace('{filename}', image.filename)
+            );
+            if (!confirmed) return false;
+        }
 
         try {
             await api.delete(`/images/${image.id}`);
+            // Optimistic update
             setImages(prev => prev.filter(img => img.id !== image.id));
-            showToast('Imagem deletada com sucesso!', 'success');
+
+            // Only show toast if individual action (otherwise batch handler manages toast)
+            if (!skipConfirm) {
+                showToast(t('images.deleteSuccess'), 'success');
+            }
             return true;
         } catch (err) {
-            showAlert('Erro', `Erro ao deletar: ${err.message}`, 'error');
+            // Only show alert if individual action
+            if (!skipConfirm) {
+                showAlert(t('common.error'), `${t('images.deleteError')}: ${err.message}`, 'error');
+            }
             return false;
         }
-    }, []);
+    }, [t]);
 
     const addImageTypes = useCallback(async (image, types) => {
         try {
@@ -73,13 +137,13 @@ export const useImages = () => {
             setImages(prev => prev.map(img =>
                 img.id === image.id ? { ...img, imageType: updatedImage.image_type } : img
             ));
-            showToast('Tags adicionadas com sucesso!', 'success');
+            showToast(t('images.tagsAddedSuccess'), 'success');
             return true;
         } catch (err) {
-            showAlert('Erro', `Erro ao adicionar tags: ${err.message}`, 'error');
+            showAlert(t('common.error'), `${t('images.tagsAddError')}: ${err.message}`, 'error');
             return false;
         }
-    }, []);
+    }, [t]);
 
     const removeImageType = useCallback(async (image, typeName) => {
         try {
@@ -87,18 +151,19 @@ export const useImages = () => {
             setImages(prev => prev.map(img =>
                 img.id === image.id ? { ...img, imageType: updatedImage.image_type } : img
             ));
-            showToast('Tag removida com sucesso.', 'success');
+            showToast(t('images.tagRemovedSuccess'), 'success');
             return true;
         } catch (err) {
-            showAlert('Erro', `Erro ao remover tag: ${err.message}`, 'error');
+            showAlert(t('common.error'), `${t('images.tagRemoveError')}: ${err.message}`, 'error');
             return false;
         }
-    }, []);
+    }, [t]);
 
     return {
         images,
         loading,
         error,
+        pagination,
         fetchImages,
         uploadImage,
         deleteImage,

@@ -126,5 +126,44 @@ export const api = {
 
     removeImageType: async (imageId, typeName) => {
         return api.delete(`/images/${imageId}/types/${typeName}`);
+    },
+
+    // --- Documents ---
+
+    getWatermarkRemovalStatus: async (documentId) => {
+        return api.get(`/documents/${documentId}/watermark-removal/status`);
+    },
+
+    // --- Panel Extraction ---
+
+    /**
+     * Initiate panel extraction for selected images
+     * @param {string[]} imageIds - Array of image IDs to extract panels from
+     * @param {string} modelType - Model type for extraction (default: 'default')
+     * @returns {Promise<{task_id: string, status: string, image_ids: string[], message: string}>}
+     */
+    extractPanels: async (imageIds, modelType = 'default') => {
+        return api.post('/images/extract-panels', {
+            image_ids: imageIds,
+            model_type: modelType
+        });
+    },
+
+    /**
+     * Get status of a panel extraction task
+     * @param {string} taskId - Celery task ID from extraction initiation
+     * @returns {Promise<{task_id: string, status: string, extracted_panels_count: number, extracted_panels?: Array}>}
+     */
+    getExtractionStatus: async (taskId) => {
+        return api.get(`/images/extract-panels/status/${taskId}`);
+    },
+
+    /**
+     * Get all panels extracted from a specific source image
+     * @param {string} imageId - Source image ID
+     * @returns {Promise<Array>} Array of panel image objects
+     */
+    getPanelsFromImage: async (imageId) => {
+        return api.get(`/images/${imageId}/panels`);
     }
 };

@@ -1,7 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { FiX, FiPlus, FiTag } from 'react-icons/fi';
+import { useLanguage } from '../context/LanguageContext';
 
-const TagInput = ({ tags = [], onAdd, onRemove, suggestions = [], readOnly = false }) => {
+const TagInput = ({ tags = [], onAdd, onRemove, suggestions = [], readOnly = false, onInputChange }) => {
+    const { t } = useLanguage();
     const [inputValue, setInputValue] = useState('');
     const [isFocused, setIsFocused] = useState(false);
     const inputRef = useRef(null);
@@ -40,11 +42,13 @@ const TagInput = ({ tags = [], onAdd, onRemove, suggestions = [], readOnly = fal
             <div className={`flex flex-wrap items-center gap-2 p-2 rounded-lg border transition-all duration-200 ${isFocused
                 ? 'border-indigo-500 ring-2 ring-indigo-500/20 bg-white dark:bg-gray-800'
                 : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 hover:bg-white dark:hover:bg-gray-800'
-                }`}>
+                }`}
+                onClick={() => !readOnly && inputRef.current?.focus()}
+            >
                 {tags.length === 0 && !isFocused && (
                     <div className="text-gray-400 text-sm flex items-center gap-2 px-1">
                         <FiTag />
-                        <span>Adicionar tags...</span>
+                        <span>{t('tags.addTags')}</span>
                     </div>
                 )}
 
@@ -72,7 +76,10 @@ const TagInput = ({ tags = [], onAdd, onRemove, suggestions = [], readOnly = fal
                             type="text"
                             className="w-full bg-transparent border-none outline-none text-sm text-gray-900 dark:text-white placeholder:text-gray-400"
                             value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
+                            onChange={(e) => {
+                                setInputValue(e.target.value);
+                                if (onInputChange) onInputChange(e.target.value);
+                            }}
                             onKeyDown={handleKeyDown}
                             onFocus={() => setIsFocused(true)}
                             onBlur={() => setTimeout(() => setIsFocused(false), 200)}

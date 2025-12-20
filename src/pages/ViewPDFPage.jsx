@@ -10,43 +10,11 @@ import { useWatermarkRemoval } from '../hooks/useWatermarkRemoval';
 import { api } from '../services/api';
 import { showAlert } from '../utils/alert';
 import PDFViewer from '../components/PDFViewer';
+import { useLanguage } from '../context/LanguageContext';
+import { SkeletonCard, EmptyState } from '../components/common';
 
-// --- Components ---
-
-const SkeletonCard = () => (
-  <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden h-80 border border-gray-200 dark:border-gray-700 shadow-sm">
-    <div className="w-full aspect-[4/3] bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
-    <div className="p-5 space-y-3">
-      <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse"></div>
-      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 animate-pulse"></div>
-    </div>
-  </div>
-);
-
-const EmptyState = ({ isSearch, onUploadClick }) => (
-  <div className="col-span-full flex flex-col items-center justify-center px-8 py-16 text-center bg-white dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700">
-    <FiFileText className="text-6xl mb-6 text-gray-400 dark:text-gray-500" />
-    <h3 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
-      {isSearch ? 'Nenhum documento encontrado' : 'Nenhum PDF enviado'}
-    </h3>
-    <p className="max-w-md mb-8 text-gray-600 dark:text-gray-400">
-      {isSearch
-        ? 'Tente buscar com outros termos ou limpe os filtros.'
-        : 'Você ainda não enviou nenhum documento PDF para a plataforma.'}
-    </p>
-    {!isSearch && (
-      <button
-        className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-lg hover:shadow-indigo-500/30"
-        onClick={onUploadClick}
-      >
-        <FiUploadCloud className="text-lg" /> Fazer Upload Agora
-      </button>
-    )}
-  </div>
-);
-
-// --- Watermark Actions Component (CORRIGIDO) ---
-const WatermarkActionMenu = ({ doc, onRemoveWatermark }) => {
+// --- Watermark Actions Component ---
+const WatermarkActionMenu = ({ doc, onRemoveWatermark, t }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -60,6 +28,13 @@ const WatermarkActionMenu = ({ doc, onRemoveWatermark }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const options = [
+    { level: 0, label: t('pdfs.none'), sub: t('pdfs.keepOriginal'), color: 'bg-gray-500', icon: '—' },
+    { level: 1, label: t('pdfs.level1'), sub: t('pdfs.level1Sub'), color: 'bg-emerald-500', icon: '1' },
+    { level: 2, label: t('pdfs.level2'), sub: t('pdfs.level2Sub'), color: 'bg-amber-500', icon: '2' },
+    { level: 3, label: t('pdfs.level3'), sub: t('pdfs.level3Sub'), color: 'bg-red-500', icon: '3' }
+  ];
+
   return (
     <div className="relative flex-shrink-0" ref={menuRef} onClick={e => e.stopPropagation()}>
       <button
@@ -68,7 +43,7 @@ const WatermarkActionMenu = ({ doc, onRemoveWatermark }) => {
           : 'bg-transparent border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:text-amber-500 hover:border-amber-500 dark:hover:text-amber-400'
           }`}
         onClick={() => setIsOpen(!isOpen)}
-        title="Opções de Marca d'água"
+        title={t('pdfs.watermarkOptions')}
       >
         <FiDroplet className="text-lg" />
       </button>
@@ -77,16 +52,11 @@ const WatermarkActionMenu = ({ doc, onRemoveWatermark }) => {
         <div className="absolute top-[calc(100%+8px)] right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-2 min-w-[280px] z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
           <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700 mb-2 flex items-center gap-2 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
             <FiDroplet className="text-amber-500" />
-            Remover Marca d'Água
+            {t('pdfs.removeWatermark')}
           </div>
 
           <div className="flex flex-col gap-1">
-            {[
-              { level: 0, label: 'Nenhum', sub: 'Manter original', color: 'bg-gray-500', icon: '—' },
-              { level: 1, label: 'Nível 1', sub: 'Remoção leve', color: 'bg-emerald-500', icon: '1' },
-              { level: 2, label: 'Nível 2', sub: 'Remoção média', color: 'bg-amber-500', icon: '2' },
-              { level: 3, label: 'Nível 3', sub: 'Remoção agressiva', color: 'bg-red-500', icon: '3' }
-            ].map((option) => (
+            {options.map((option) => (
               <button
                 key={option.level}
                 className="group flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-left"
@@ -113,7 +83,7 @@ const WatermarkActionMenu = ({ doc, onRemoveWatermark }) => {
 };
 
 // --- PDF Panel (Loader/Error Handling) ---
-const PDFPanel = ({ doc }) => {
+const PDFPanel = ({ doc, t }) => {
   const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -134,7 +104,7 @@ const PDFPanel = ({ doc }) => {
       } catch (err) {
         if (isMounted) {
           console.error('Error loading PDF:', err);
-          setError('Não foi possível carregar o documento.');
+          setError(t('pdfs.loadError'));
           setLoading(false);
         }
       }
@@ -144,13 +114,13 @@ const PDFPanel = ({ doc }) => {
       isMounted = false;
       if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
     };
-  }, [doc]);
+  }, [doc, t]);
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-full w-full gap-4 text-gray-500 dark:text-gray-400">
         <FiLoader className="text-4xl animate-spin text-indigo-500" />
-        <p className="font-medium">Carregando documento...</p>
+        <p className="font-medium">{t('pdfs.loadingDoc')}</p>
       </div>
     );
   }
@@ -168,12 +138,14 @@ const PDFPanel = ({ doc }) => {
 };
 
 // --- Modal ---
-const PDFViewerModal = ({ doc, onClose }) => {
+const PDFViewerModal = ({ doc, onClose, locale }) => {
   useEffect(() => {
     const handleEsc = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
+
+  const { t } = useLanguage();
 
   if (!doc) return null;
 
@@ -184,7 +156,7 @@ const PDFViewerModal = ({ doc, onClose }) => {
           <div>
             <h3 className="text-lg font-bold text-gray-900 dark:text-white truncate">{doc.filename}</h3>
             <span className="text-sm text-gray-500 dark:text-gray-400">
-              {new Date(doc.uploadedDate).toLocaleDateString()} • {(doc.fileSize / 1024 / 1024).toFixed(2)} MB
+              {new Date(doc.uploadedDate).toLocaleDateString(locale)} • {(doc.fileSize / 1024 / 1024).toFixed(2)} MB
             </span>
           </div>
           <button
@@ -195,7 +167,7 @@ const PDFViewerModal = ({ doc, onClose }) => {
           </button>
         </div>
         <div className="flex-1 overflow-hidden bg-gray-100 dark:bg-gray-950">
-          <PDFPanel doc={doc} />
+          <PDFPanel doc={doc} t={t} />
         </div>
       </div>
     </div>
@@ -203,43 +175,34 @@ const PDFViewerModal = ({ doc, onClose }) => {
 };
 
 // --- Card Component ---
-// Substitua o componente DocumentCard existente por este:
-
-const DocumentCard = ({ doc, onView, onDownload, onDelete, onRemoveWatermark }) => {
+const DocumentCard = ({ doc, onView, onDownload, onDelete, onRemoveWatermark, t }) => {
   return (
-    // REMOVIDO: overflow-hidden do pai principal
-    // ADICIONADO: z-index relativo ao hover para garantir que o card focado fique acima dos vizinhos
     <div className="group relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-indigo-500/50 flex flex-col hover:z-20">
-
-      {/* Preview Area - ONDE O OVERFLOW DEVE FICAR */}
       <div
         className="relative w-full pt-[65%] bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center justify-center cursor-pointer rounded-t-xl overflow-hidden"
         onClick={() => onView(doc)}
       >
         <FiFileText className="absolute text-6xl text-gray-300 dark:text-gray-700 transition-transform duration-300 group-hover:scale-110 group-hover:text-indigo-400/50" />
 
-        {/* Overlay Actions */}
         <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-3">
-          <button className="p-3 rounded-full bg-white/20 hover:bg-indigo-600 text-white backdrop-blur-md transition-all hover:scale-110 shadow-lg border border-white/10" onClick={(e) => { e.stopPropagation(); onView(doc); }} title="Visualizar">
+          <button className="p-3 rounded-full bg-white/20 hover:bg-indigo-600 text-white backdrop-blur-md transition-all hover:scale-110 shadow-lg border border-white/10" onClick={(e) => { e.stopPropagation(); onView(doc); }} title={t('pdfs.view')}>
             <FiEye className="text-xl" />
           </button>
-          <button className="p-3 rounded-full bg-white/20 hover:bg-emerald-600 text-white backdrop-blur-md transition-all hover:scale-110 shadow-lg border border-white/10" onClick={(e) => { e.stopPropagation(); onDownload(doc); }} title="Baixar">
+          <button className="p-3 rounded-full bg-white/20 hover:bg-emerald-600 text-white backdrop-blur-md transition-all hover:scale-110 shadow-lg border border-white/10" onClick={(e) => { e.stopPropagation(); onDownload(doc); }} title={t('pdfs.download')}>
             <FiDownload className="text-xl" />
           </button>
-          <button className="p-3 rounded-full bg-white/20 hover:bg-red-600 text-white backdrop-blur-md transition-all hover:scale-110 shadow-lg border border-white/10" onClick={(e) => { e.stopPropagation(); onDelete(doc); }} title="Excluir">
+          <button className="p-3 rounded-full bg-white/20 hover:bg-red-600 text-white backdrop-blur-md transition-all hover:scale-110 shadow-lg border border-white/10" onClick={(e) => { e.stopPropagation(); onDelete(doc); }} title={t('pdfs.delete')}>
             <FiTrash2 className="text-xl" />
           </button>
         </div>
       </div>
 
-      {/* Content - AGORA COM OVERFLOW VISÍVEL */}
       <div className="p-4 flex-1 flex flex-col gap-3 relative">
         <div className="flex justify-between items-start gap-3 relative z-10">
           <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate flex-1" title={doc.filename}>
             {doc.filename}
           </h4>
-          {/* O Dropdown vive aqui e agora pode sair do card */}
-          <WatermarkActionMenu doc={doc} onRemoveWatermark={onRemoveWatermark} />
+          <WatermarkActionMenu doc={doc} onRemoveWatermark={onRemoveWatermark} t={t} />
         </div>
 
         <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400 font-medium">
@@ -257,7 +220,7 @@ const DocumentCard = ({ doc, onView, onDownload, onDelete, onRemoveWatermark }) 
             <span className={`w-1.5 h-1.5 rounded-full ${doc.extractionStatus === 'completed' ? 'bg-emerald-500' :
               doc.extractionStatus === 'processing' ? 'bg-blue-500 animate-pulse' : 'bg-amber-500'
               }`}></span>
-            {doc.extractionStatus === 'completed' ? 'Completo' : doc.extractionStatus === 'processing' ? 'Processando' : 'Aguardando'}
+            {doc.extractionStatus === 'completed' ? t('pdfs.complete') : doc.extractionStatus === 'processing' ? t('pdfs.processing') : t('pdfs.waiting')}
           </span>
         </div>
       </div>
@@ -266,30 +229,24 @@ const DocumentCard = ({ doc, onView, onDownload, onDelete, onRemoveWatermark }) 
 };
 
 // --- List Row Component ---
-// Substitua o componente DocumentListRow por este:
-
-const DocumentListRow = ({ doc, onView, onDownload, onDelete, onRemoveWatermark, isActive, isCompact }) => {
+const DocumentListRow = ({ doc, onView, onDownload, onDelete, onRemoveWatermark, isActive, isCompact, t }) => {
   return (
     <div
       className={`group grid items-center px-4 py-3 border-b border-gray-100 dark:border-gray-700 transition-all hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer
       ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20 border-l-4 border-l-indigo-500 pl-[calc(1rem-4px)]' : 'border-l-4 border-l-transparent'}
-      ${/* Lógica de Grid Responsivo */
-        isCompact
-          ? 'grid-cols-[auto_1fr_auto] gap-3' // Layout Compacto (Split View)
-          : 'grid-cols-[48px_2fr_140px_110px_130px_160px] gap-4' // Layout Completo
+      ${isCompact
+          ? 'grid-cols-[auto_1fr_auto] gap-3'
+          : 'grid-cols-[48px_2fr_140px_110px_130px_160px] gap-4'
         }`}
     >
-      {/* Coluna 1: Ícone */}
       <div className={`text-gray-400 group-hover:text-indigo-500 flex justify-center ${isCompact ? 'text-xl' : 'text-2xl'}`} onClick={() => onView(doc)}>
         <FiFileText />
       </div>
 
-      {/* Coluna 2: Nome e Info (se compacto) */}
       <div className="truncate pr-2 overflow-hidden" onClick={() => onView(doc)}>
         <span className="block text-sm font-semibold text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate" title={doc.filename}>
           {doc.filename}
         </span>
-        {/* Mostra data/tamanho abaixo do nome SOMENTE no modo compacto */}
         {isCompact && (
           <span className="text-xs text-gray-500 dark:text-gray-400 block mt-0.5">
             {new Date(doc.uploadedDate).toLocaleDateString()} • {(doc.fileSize / 1024 / 1024).toFixed(1)} MB
@@ -297,7 +254,6 @@ const DocumentListRow = ({ doc, onView, onDownload, onDelete, onRemoveWatermark,
         )}
       </div>
 
-      {/* Colunas escondidas no modo compacto */}
       {!isCompact && (
         <>
           <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -311,27 +267,19 @@ const DocumentListRow = ({ doc, onView, onDownload, onDelete, onRemoveWatermark,
               doc.extractionStatus === 'processing' ? 'text-blue-600 border-blue-200 bg-blue-50 dark:text-blue-400 dark:border-blue-500/30 dark:bg-transparent' :
                 'text-amber-600 border-amber-200 bg-amber-50 dark:text-amber-400 dark:border-amber-500/30 dark:bg-transparent'
               }`}>
-              {doc.extractionStatus === 'completed' ? 'Completo' : doc.extractionStatus === 'processing' ? 'Proc...' : 'Aguard...'}
+              {doc.extractionStatus === 'completed' ? t('pdfs.complete') : doc.extractionStatus === 'processing' ? t('pdfs.processing') : t('pdfs.waiting')}
             </span>
           </div>
         </>
       )}
 
-      {/* Coluna Ações: Sempre visível, mas adaptada */}
       <div className={`flex items-center justify-end ${isCompact ? 'gap-1' : 'gap-2 opacity-0 group-hover:opacity-100 transition-opacity'}`}>
-
-        {/* Watermark Action - CRUCIAL: Agora sempre visível */}
-        <WatermarkActionMenu doc={doc} onRemoveWatermark={onRemoveWatermark} />
-
-        {/* Outras ações */}
+        <WatermarkActionMenu doc={doc} onRemoveWatermark={onRemoveWatermark} t={t} />
         {!isCompact && (
-          <button className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors" onClick={() => onView(doc)} title="Visualizar"><FiEye /></button>
+          <button className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors" onClick={() => onView(doc)} title={t('pdfs.view')}><FiEye /></button>
         )}
-
-        {/* No modo compacto, mantemos apenas Delete e Download se couber, ou simplificamos */}
-        <button className="p-2 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-colors" onClick={() => onDownload(doc)} title="Baixar"><FiDownload /></button>
-
-        <button className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors" onClick={() => onDelete(doc)} title="Excluir"><FiTrash2 /></button>
+        <button className="p-2 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-colors" onClick={() => onDownload(doc)} title={t('pdfs.download')}><FiDownload /></button>
+        <button className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors" onClick={() => onDelete(doc)} title={t('pdfs.delete')}><FiTrash2 /></button>
       </div>
     </div>
   );
@@ -340,17 +288,15 @@ const DocumentListRow = ({ doc, onView, onDownload, onDelete, onRemoveWatermark,
 // --- Main Page Component ---
 const ViewPDFPage = () => {
   const { documents, loading, error, fetchDocuments, deleteDocument, downloadDocument } = useDocuments();
+  const { t, locale } = useLanguage();
   const [viewMode, setViewMode] = useState('grid');
   const [isSplitView, setIsSplitView] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('newest');
   const [selectedDoc, setSelectedDoc] = useState(null);
 
-  // Hook de remoção de watermark com callback de sucesso
   const { removeWatermark, isRemoving } = useWatermarkRemoval((doc, level) => {
-    console.log(`Watermark removal completed for ${doc.filename} at level ${level}`);
-    // Opcional: atualizar status do documento ou recarregar lista
-    // fetchDocuments();
+    fetchDocuments();
   });
 
   useEffect(() => { fetchDocuments(); }, [fetchDocuments]);
@@ -381,52 +327,52 @@ const ViewPDFPage = () => {
     <div className="w-full h-full flex flex-col p-6 md:p-8 overflow-hidden relative text-gray-900 dark:text-gray-100 transition-colors duration-300">
 
       {/* Header & Toolbar */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6 pb-6 border-b border-gray-200 dark:border-gray-800">
+      <header className="flex flex-wrap justify-between items-center mb-6 md:mb-8 gap-4 pb-4 md:pb-6 border-b border-gray-200 dark:border-gray-800">
         <div>
-          <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-1">Meus Documentos</h2>
-          <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-            {loading ? 'Carregando...' : `${filteredDocuments.length} documentos encontrados`}
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-1">{t('pdfs.title')}</h2>
+          <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium">
+            {loading ? t('common.loading') : `${filteredDocuments.length} ${t('pdfs.documentsFound')}`}
           </span>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+        <div className="flex flex-wrap gap-2 sm:gap-3 flex-1 justify-end">
           {/* Search */}
-          <div className="relative flex-1 md:w-72 group">
+          <div className="relative flex-1 min-w-[120px] max-w-xs group">
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
             <input
               type="text"
-              className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg pl-10 pr-4 py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-gray-400"
-              placeholder="Buscar documentos..."
+              className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg pl-10 pr-4 py-2 md:py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-gray-400 text-sm"
+              placeholder={t('pdfs.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <select
-              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-4 py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-3 py-2 md:py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 cursor-pointer text-sm"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
             >
-              <option value="newest">Mais recentes</option>
-              <option value="oldest">Mais antigos</option>
+              <option value="newest">{t('pdfs.sortNewest')}</option>
+              <option value="oldest">{t('pdfs.sortOldest')}</option>
               <option value="name_asc">A-Z</option>
               <option value="name_desc">Z-A</option>
-              <option value="size_desc">Maior tamanho</option>
+              <option value="size_desc">{t('pdfs.sortSize')}</option>
             </select>
 
             <div className="flex bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg p-1">
               <button
                 className={`p-2 rounded md:px-3 transition-colors ${viewMode === 'grid' && !isSplitView ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
                 onClick={() => { setViewMode('grid'); setIsSplitView(false); }}
-                title="Grade"
+                title={t('pdfs.grid')}
               >
                 <FiGrid />
               </button>
               <button
                 className={`p-2 rounded md:px-3 transition-colors ${viewMode === 'list' && !isSplitView ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
                 onClick={() => { setViewMode('list'); setIsSplitView(false); }}
-                title="Lista"
+                title={t('pdfs.list')}
               >
                 <FiList />
               </button>
@@ -434,13 +380,13 @@ const ViewPDFPage = () => {
               <button
                 className={`p-2 rounded md:px-3 transition-colors ${isSplitView ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
                 onClick={() => setIsSplitView(!isSplitView)}
-                title="Visualização Dividida"
+                title={t('pdfs.splitView')}
               >
                 <FiColumns />
               </button>
             </div>
 
-            <button className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-500 hover:text-indigo-600 hover:border-indigo-500 px-3 py-2.5 rounded-lg transition-all" onClick={() => fetchDocuments()} title="Atualizar">
+            <button className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-500 hover:text-indigo-600 hover:border-indigo-500 p-2 md:px-3 md:py-2.5 rounded-lg transition-all" onClick={() => fetchDocuments()} title={t('common.update')}>
               <FiRefreshCw />
             </button>
           </div>
@@ -457,26 +403,32 @@ const ViewPDFPage = () => {
               {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
             </div>
           ) : filteredDocuments.length === 0 ? (
-            <EmptyState isSearch={!!searchQuery} onUploadClick={() => showAlert('Info', 'Vá para a página de upload', 'info')} />
+            <EmptyState
+              title={searchQuery ? t('pdfs.noDocFound') : t('pdfs.empty')}
+              description={searchQuery ? t('pdfs.searchNoResults') : t('pdfs.emptyDescription')}
+              icon="document"
+              actionLabel={!searchQuery ? t('pdfs.uploadNow') : undefined}
+              onAction={!searchQuery ? () => showAlert('Info', t('pdfs.goToUpload'), 'info') : undefined}
+              showAction={!searchQuery}
+            />
           ) : (
             <div className={viewMode === 'grid' && !isSplitView ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-10' : 'w-full pb-10'}>
               {viewMode === 'grid' && !isSplitView ? (
                 filteredDocuments.map(doc => (
-                  <DocumentCard key={doc.id} doc={doc} onView={handleDocumentClick} onDownload={downloadDocument} onDelete={deleteDocument} onRemoveWatermark={removeWatermark} />
+                  <DocumentCard key={doc.id} doc={doc} onView={handleDocumentClick} onDownload={downloadDocument} onDelete={deleteDocument} onRemoveWatermark={removeWatermark} t={t} />
                 ))
               ) : (
 
                 <div className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-visible shadow-sm ${isSplitView ? 'border-none shadow-none bg-transparent dark:bg-transparent' : ''}`}>
 
-                  {/* Header da Tabela (Esconder se estiver em Split View) */}
                   {!isSplitView && (
                     <div className="grid grid-cols-[48px_2fr_140px_110px_130px_160px] px-5 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 text-xs font-bold text-gray-500 uppercase tracking-wider">
                       <div className="text-center">#</div>
-                      <div>Nome</div>
-                      <div>Data</div>
-                      <div>Tamanho</div>
-                      <div>Status</div>
-                      <div className="text-right">Ações</div>
+                      <div>{t('pdfs.name')}</div>
+                      <div>{t('pdfs.date')}</div>
+                      <div>{t('pdfs.size')}</div>
+                      <div>{t('pdfs.status')}</div>
+                      <div className="text-right">{t('pdfs.actions')}</div>
                     </div>
                   )}
 
@@ -485,11 +437,12 @@ const ViewPDFPage = () => {
                       key={doc.id}
                       doc={doc}
                       isActive={isSplitView && selectedDoc?.id === doc.id}
-                      isCompact={isSplitView} // <--- AQUI ESTÁ O SEGREDO
+                      isCompact={isSplitView}
                       onView={handleDocumentClick}
                       onDownload={downloadDocument}
                       onDelete={deleteDocument}
                       onRemoveWatermark={removeWatermark}
+                      t={t}
                     />
                   ))}
                 </div>
@@ -508,20 +461,20 @@ const ViewPDFPage = () => {
                   <button onClick={() => setSelectedDoc(null)} className="text-gray-400 hover:text-red-500"><FiX size={20} /></button>
                 </div>
                 <div className="flex-1 bg-gray-100 dark:bg-gray-900 overflow-hidden relative">
-                  <PDFPanel doc={selectedDoc} />
+                  <PDFPanel doc={selectedDoc} t={t} />
                 </div>
               </>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-gray-400">
                 <FiColumns size={48} className="mb-4 opacity-50" />
-                <p>Selecione um documento para visualizar</p>
+                <p>{t('pdfs.selectDocToView')}</p>
               </div>
             )}
           </div>
         )}
       </div>
 
-      {!isSplitView && selectedDoc && <PDFViewerModal doc={selectedDoc} onClose={handleCloseModal} />}
+      {!isSplitView && selectedDoc && <PDFViewerModal doc={selectedDoc} onClose={handleCloseModal} locale={locale} />}
     </div>
   );
 };

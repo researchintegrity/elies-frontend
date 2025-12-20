@@ -34,43 +34,50 @@ export const useWatermarkRemoval = (onSuccess) => {
         setError(null);
 
         try {
-
-
             await api.post(`/documents/${document.id}/remove-watermark`, {
                 aggressiveness_mode: aggressivenessLevel
             });
 
+            // Status inicial
+            showAlert('Sucesso', 'Remoção de marca d\'água iniciada. Aguarde...', 'success');
 
-            // MOCK temporário - simula delay de API
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Polling function
+            const checkStatus = async () => {
+                try {
+                    const statusData = await api.getWatermarkRemovalStatus(document.id);
+                    console.log('Watermark Status:', statusData.status);
 
-            // Mensagens contextuais por nível
-            const messages = {
-                0: 'Documento mantido original.',
-                1: 'Remoção leve iniciada com sucesso.',
-                2: 'Remoção média iniciada com sucesso.',
-                3: 'Remoção agressiva iniciada com sucesso.'
+                    if (statusData.status === 'completed') {
+                        setIsRemoving(false);
+                        showAlert('Concluído', `Marca d'água removida! Novo arquivo: ${statusData.output_filename}`, 'success');
+
+                        if (onSuccess && typeof onSuccess === 'function') {
+                            onSuccess(document, aggressivenessLevel);
+                        }
+                    } else if (statusData.status === 'failed') {
+                        setIsRemoving(false);
+                        const errorMsg = statusData.error || statusData.message || 'Erro desconhecido.';
+                        setError(errorMsg);
+                        showAlert('Erro', `Falha na remoção: ${errorMsg}`, 'error');
+                    } else {
+                        // Continua polling (queued ou processing)
+                        setTimeout(checkStatus, 2000);
+                    }
+                } catch (pollErr) {
+                    console.error('Polling error:', pollErr);
+                    setIsRemoving(false);
+                    setError('Erro ao verificar status.');
+                }
             };
 
-            showAlert(
-                'Sucesso',
-                `${messages[aggressivenessLevel]} (${document.filename})`,
-                'success'
-            );
+            // Inicia o polling
+            setTimeout(checkStatus, 1000);
 
-            // Callback de sucesso (ex: atualizar lista de documentos)
-            if (onSuccess && typeof onSuccess === 'function') {
-                onSuccess(document, aggressivenessLevel);
-            }
-
-            return true;
         } catch (err) {
+            setIsRemoving(false);
             const errorMessage = err.response?.data?.message || err.message || 'Falha ao processar solicitação.';
             setError(errorMessage);
-            showAlert('Erro', `Não foi possível remover watermark: ${errorMessage}`, 'error');
-            return false;
-        } finally {
-            setIsRemoving(false);
+            showAlert('Erro', `Não foi possível iniciar: ${errorMessage}`, 'error');
         }
     }, [onSuccess]);
 

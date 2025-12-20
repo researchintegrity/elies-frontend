@@ -2,17 +2,19 @@
 import React, { useState } from 'react';
 import { FiUser, FiMail, FiCalendar, FiHardDrive, FiSave, FiTrash2, FiLoader, FiAlertTriangle } from 'react-icons/fi';
 import { useProfile } from '../hooks/useProfile';
+import { useLanguage } from '../context/LanguageContext';
 import { showAlert } from '../utils/alert';
 
 const ProfilePage = () => {
     const { user, loading, error, updating, updateProfile, deleteAccount } = useProfile();
+    const { t, locale } = useLanguage();
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState({
         full_name: '',
         email: ''
     });
 
-    // Preencher formulário quando user carregar
+    // Fill form when user loads
     React.useEffect(() => {
         if (user) {
             setFormData({
@@ -32,13 +34,13 @@ const ProfilePage = () => {
 
     const handleDeleteAccount = () => {
         const confirmText = prompt(
-            'ATENÇÃO: Esta ação é IRREVERSÍVEL!\\n\\nTodos os seus documentos e dados serão PERMANENTEMENTE deletados.\\n\\nDigite seu nome de usuário para confirmar:'
+            `${t('profile.deleteConfirmTitle')}\n\n${t('profile.deleteConfirmMessage')}\n\n${t('profile.deleteConfirmPrompt')}`
         );
 
         if (confirmText === user?.username) {
             deleteAccount();
         } else if (confirmText !== null) {
-            showAlert('Cancelado', 'Nome de usuário incorreto. Ação cancelada.', 'info');
+            showAlert(t('common.cancel'), t('profile.deleteCancelled'), 'info');
         }
     };
 
@@ -64,7 +66,7 @@ const ProfilePage = () => {
         return (
             <div className="flex flex-col items-center justify-center h-full text-red-500">
                 <FiAlertTriangle className="text-5xl mb-4" />
-                <h3 className="text-xl font-semibold">Erro ao carregar perfil</h3>
+                <h3 className="text-xl font-semibold">{t('profile.errorLoading')}</h3>
                 <p className="text-sm text-gray-500">{error}</p>
             </div>
         );
@@ -75,19 +77,21 @@ const ProfilePage = () => {
             <div className="max-w-4xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Meu Perfil</h1>
-                    <p className="text-gray-600 dark:text-gray-400">Gerencie suas informações pessoais e configurações</p>
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{t('profile.title')}</h1>
+                    <p className="text-gray-600 dark:text-gray-400">{t('profile.subtitle')}</p>
                 </div>
 
                 {/* Profile Card */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
 
-                    {/* Avatar & Username Section - SEM GRADIENTE */}
-                    <div className="bg-gray-100 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 px-8 py-12 text-center">
-                        <div className="w-24 h-24 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-gray-300 dark:border-gray-500">
-                            <FiUser className="text-5xl text-gray-600 dark:text-gray-300" />
+                    {/* Avatar & Username Section */}
+                    <div className="bg-gradient-to-r from-primary-500/10 to-accent-500/10 dark:from-primary-500/20 dark:to-accent-500/20 border-b border-gray-200 dark:border-gray-700 px-8 py-12 text-center">
+                        <div className="w-24 h-24 bg-gradient-to-br from-primary-400 to-accent-500 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white dark:border-gray-800 shadow-lg">
+                            <span className="text-3xl font-bold text-white">
+                                {user?.username?.[0]?.toUpperCase() || 'U'}
+                            </span>
                         </div>
-                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{user?.full_name || 'Usuário'}</h2>
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{user?.full_name || t('common.user')}</h2>
                         <p className="text-gray-600 dark:text-gray-400">@{user?.username}</p>
                     </div>
 
@@ -97,7 +101,7 @@ const ProfilePage = () => {
                             {/* Full Name */}
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                    Nome Completo
+                                    {t('profile.fullName')}
                                 </label>
                                 <div className="relative">
                                     <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -106,8 +110,8 @@ const ProfilePage = () => {
                                         value={formData.full_name}
                                         onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                                         disabled={!isEditing}
-                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:opacity-60 disabled:cursor-not-allowed text-gray-900 dark:text-white transition-colors"
-                                        placeholder="Seu nome completo"
+                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-60 disabled:cursor-not-allowed text-gray-900 dark:text-white transition-colors"
+                                        placeholder={t('profile.fullNamePlaceholder')}
                                     />
                                 </div>
                             </div>
@@ -115,7 +119,7 @@ const ProfilePage = () => {
                             {/* Email */}
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                    Email
+                                    {t('profile.email')}
                                 </label>
                                 <div className="relative">
                                     <FiMail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -124,8 +128,8 @@ const ProfilePage = () => {
                                         value={formData.email}
                                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                         disabled={!isEditing}
-                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:opacity-60 disabled:cursor-not-allowed text-gray-900 dark:text-white transition-colors"
-                                        placeholder="seu@email.com"
+                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-60 disabled:cursor-not-allowed text-gray-900 dark:text-white transition-colors"
+                                        placeholder={t('auth.emailPlaceholder')}
                                     />
                                 </div>
                             </div>
@@ -136,19 +140,19 @@ const ProfilePage = () => {
                                     <button
                                         type="button"
                                         onClick={() => setIsEditing(true)}
-                                        className="flex-1 px-6 py-3 bg-gray-700 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-500 text-white rounded-lg font-medium transition-colors"
+                                        className="flex-1 px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-medium transition-colors"
                                     >
-                                        Editar Perfil
+                                        {t('profile.editProfile')}
                                     </button>
                                 ) : (
                                     <>
                                         <button
                                             type="submit"
                                             disabled={updating}
-                                            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors dark:bg-gray-600 dark:hover:bg-gray-500"
+                                            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600 disabled:bg-primary-300 text-white rounded-lg font-medium transition-colors"
                                         >
                                             {updating ? <FiLoader className="animate-spin" /> : <FiSave />}
-                                            {updating ? 'Salvando...' : 'Salvar Alterações'}
+                                            {updating ? t('profile.saving') : t('profile.saveChanges')}
                                         </button>
                                         <button
                                             type="button"
@@ -158,7 +162,7 @@ const ProfilePage = () => {
                                             }}
                                             className="px-6 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg font-medium transition-colors"
                                         >
-                                            Cancelar
+                                            {t('common.cancel')}
                                         </button>
                                     </>
                                 )}
@@ -171,13 +175,13 @@ const ProfilePage = () => {
                 <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
                     <div className="flex items-center gap-3 mb-4">
                         <FiHardDrive className="text-2xl text-gray-600 dark:text-gray-400" />
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Armazenamento</h3>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">{t('profile.storage')}</h3>
                     </div>
 
                     <div className="space-y-3">
                         <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                            <span>{formatBytes(user?.storage_used_bytes || 0)} usado</span>
-                            <span>{formatBytes(user?.storage_limit_bytes || 0)} total</span>
+                            <span>{formatBytes(user?.storage_used_bytes || 0)} {t('profile.used')}</span>
+                            <span>{formatBytes(user?.storage_limit_bytes || 0)} {t('profile.total')}</span>
                         </div>
 
                         {/* Progress Bar */}
@@ -185,29 +189,29 @@ const ProfilePage = () => {
                             <div
                                 className={`h-full rounded-full transition-all duration-500 ${storagePercentage > 90 ? 'bg-red-500' :
                                     storagePercentage > 70 ? 'bg-amber-500' :
-                                        'bg-gray-600 dark:bg-gray-400'
+                                        'bg-primary-500'
                                     }`}
                                 style={{ width: `${Math.min(storagePercentage, 100)}%` }}
                             />
                         </div>
 
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {storagePercentage.toFixed(1)}% do espaço utilizado
+                            {storagePercentage.toFixed(1)}% {t('profile.spaceUsed')}
                         </p>
                     </div>
                 </div>
 
                 {/* Account Info */}
                 <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Informações da Conta</h3>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">{t('profile.accountInfo')}</h3>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
                             <FiCalendar className="text-xl" />
                             <div>
-                                <p className="text-xs text-gray-500 dark:text-gray-500">Criada em</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-500">{t('profile.createdAt')}</p>
                                 <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                    {user?.created_at ? new Date(user.created_at).toLocaleDateString('pt-BR', {
+                                    {user?.created_at ? new Date(user.created_at).toLocaleDateString(locale, {
                                         year: 'numeric', month: 'long', day: 'numeric'
                                     }) : '-'}
                                 </p>
@@ -217,9 +221,9 @@ const ProfilePage = () => {
                         <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
                             <FiCalendar className="text-xl" />
                             <div>
-                                <p className="text-xs text-gray-500 dark:text-gray-500">Última atualização</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-500">{t('profile.lastUpdate')}</p>
                                 <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                    {user?.updated_at ? new Date(user.updated_at).toLocaleDateString('pt-BR', {
+                                    {user?.updated_at ? new Date(user.updated_at).toLocaleDateString(locale, {
                                         year: 'numeric', month: 'long', day: 'numeric'
                                     }) : '-'}
                                 </p>
@@ -230,16 +234,16 @@ const ProfilePage = () => {
 
                 {/* Danger Zone */}
                 <div className="mt-6 bg-red-50 dark:bg-red-900/10 border-2 border-red-200 dark:border-red-900/50 rounded-xl p-8">
-                    <h3 className="text-xl font-bold text-red-600 dark:text-red-400 mb-2">Zona de Perigo</h3>
+                    <h3 className="text-xl font-bold text-red-600 dark:text-red-400 mb-2">{t('profile.dangerZone')}</h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                        A exclusão da conta é permanente e não pode ser desfeita. Todos os seus documentos serão deletados.
+                        {t('profile.dangerDescription')}
                     </p>
                     <button
                         onClick={handleDeleteAccount}
                         className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
                     >
                         <FiTrash2 />
-                        Deletar Conta Permanentemente
+                        {t('profile.deleteAccount')}
                     </button>
                 </div>
             </div>

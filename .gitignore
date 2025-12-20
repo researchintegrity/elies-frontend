@@ -31,3 +31,5 @@ dist-ssr
 # Workspace files
 *.code-workspace
 workspace/
+.agent/
+package-lock.json
