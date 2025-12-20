@@ -360,30 +360,30 @@ const ViewPDFPage = () => {
     <div className="w-full h-full flex flex-col p-6 md:p-8 overflow-hidden relative text-gray-900 dark:text-gray-100 transition-colors duration-300">
 
       {/* Header & Toolbar */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6 pb-6 border-b border-gray-200 dark:border-gray-800">
+      <header className="flex flex-wrap justify-between items-center mb-6 md:mb-8 gap-4 pb-4 md:pb-6 border-b border-gray-200 dark:border-gray-800">
         <div>
-          <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-1">{t('pdfs.title')}</h2>
-          <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-1">{t('pdfs.title')}</h2>
+          <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium">
             {loading ? t('common.loading') : `${filteredDocuments.length} ${t('pdfs.documentsFound')}`}
           </span>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+        <div className="flex flex-wrap gap-2 sm:gap-3 flex-1 justify-end">
           {/* Search */}
-          <div className="relative flex-1 md:w-72 group">
+          <div className="relative flex-1 min-w-[120px] max-w-xs group">
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
             <input
               type="text"
-              className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg pl-10 pr-4 py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-gray-400"
+              className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg pl-10 pr-4 py-2 md:py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-gray-400 text-sm"
               placeholder={t('pdfs.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <select
-              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-4 py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-3 py-2 md:py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 cursor-pointer text-sm"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
             >
@@ -419,7 +419,7 @@ const ViewPDFPage = () => {
               </button>
             </div>
 
-            <button className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-500 hover:text-indigo-600 hover:border-indigo-500 px-3 py-2.5 rounded-lg transition-all" onClick={() => fetchDocuments()} title={t('common.update')}>
+            <button className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-500 hover:text-indigo-600 hover:border-indigo-500 p-2 md:px-3 md:py-2.5 rounded-lg transition-all" onClick={() => fetchDocuments()} title={t('common.update')}>
               <FiRefreshCw />
             </button>
           </div>
