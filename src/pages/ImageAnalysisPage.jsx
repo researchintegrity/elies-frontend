@@ -262,12 +262,22 @@ const ImageAnalysisPage = () => {
             e.preventDefault();
             e.stopPropagation();
             const delta = e.deltaY > 0 ? -0.1 : 0.1;
-            setZoomLevel(z => Math.min(4, Math.max(0.25, z + delta)));
+            setZoomLevel(prevZoom => Math.min(4, Math.max(0.25, prevZoom + delta)));
         };
 
         container.addEventListener('wheel', handleWheel, { passive: false });
         return () => container.removeEventListener('wheel', handleWheel);
     }, [resultCanvas, originalCanvas]);
+
+    // Reset scroll position when zoom returns to 1x to ensure centering
+    useEffect(() => {
+        const container = zoomContainerRef.current;
+        if (zoomLevel <= 1 && container) {
+            // Reset scroll to top-left (content is centered via flexbox)
+            container.scrollTop = 0;
+            container.scrollLeft = 0;
+        }
+    }, [zoomLevel]);
 
     // Load image URLs
     useEffect(() => {
@@ -451,13 +461,13 @@ const ImageAnalysisPage = () => {
 
     // Draw result to visible canvas
     useEffect(() => {
-        if (resultCanvas && resultCanvasRef.current) {
+        if (resultCanvas && resultCanvasRef.current && !showOriginal) {
             const ctx = resultCanvasRef.current.getContext('2d');
             resultCanvasRef.current.width = resultCanvas.width;
             resultCanvasRef.current.height = resultCanvas.height;
             ctx.drawImage(resultCanvas, 0, 0);
         }
-    }, [resultCanvas]);
+    }, [resultCanvas, showOriginal]);
 
     const totalGalleryPages = Math.ceil(totalImages / IMAGES_PER_PAGE);
     const toolList = Object.values(ANALYSIS_TOOLS);
@@ -774,7 +784,7 @@ const ImageAnalysisPage = () => {
                 {/* Center: Image Display */}
                 <div className="flex-1 flex flex-col bg-gray-100 dark:bg-gray-900 min-w-0">
                     {/* Image Container */}
-                    <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
+                    <div className="flex-1 flex items-center justify-center p-4 overflow-hidden min-h-0">
                         {!selectedImage ? (
                             <div className="text-center text-gray-400">
                                 <FiSearch size={48} className="mx-auto mb-3 opacity-50" />
@@ -788,16 +798,18 @@ const ImageAnalysisPage = () => {
                         ) : ANALYSIS_TOOLS[selectedTool]?.hasCanvas ? (
                             <div
                                 ref={zoomContainerRef}
-                                className="w-full h-full flex items-center justify-center overflow-auto"
+                                className={`w-full h-full flex items-center justify-center ${zoomLevel > 1 ? 'overflow-auto' : 'overflow-hidden'
+                                    }`}
                                 style={{
-                                    cursor: zoomLevel > 1 ? 'grab' : 'zoom-in'
+                                    cursor: zoomLevel > 1 ? 'grab' : 'default'
                                 }}
+                                onDoubleClick={() => setZoomLevel(1)}
                             >
                                 <div
                                     style={{
                                         transform: `scale(${zoomLevel})`,
                                         transformOrigin: 'center center',
-                                        transition: 'transform 0.1s ease-out',
+                                        transition: 'transform 0.15s ease-out',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center'
