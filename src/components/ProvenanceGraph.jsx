@@ -21,6 +21,7 @@ const ProvenanceGraph = ({
     onNodeClick,
     width = 800,
     height = 500,
+    gravity = 0.05,
 }) => {
     const svgRef = useRef(null);
     const containerRef = useRef(null);
@@ -147,6 +148,8 @@ const ProvenanceGraph = ({
                 .strength(0.5))
             .force('charge', d3.forceManyBody().strength(-300))
             .force('center', d3.forceCenter(w / 2, h / 2))
+            .force('x', d3.forceX(w / 2).strength(gravity))
+            .force('y', d3.forceY(h / 2).strength(gravity))
             .force('collision', d3.forceCollide().radius(40));
 
         // Create edges (links)
@@ -279,7 +282,7 @@ const ProvenanceGraph = ({
         return () => {
             simulation.stop();
         };
-    }, [graphData, dimensions, getImageUrl, onNodeClick]);
+    }, [graphData, dimensions, getImageUrl, onNodeClick, gravity]);
 
     // Zoom controls
     const handleZoomIn = () => {
