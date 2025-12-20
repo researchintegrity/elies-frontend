@@ -274,6 +274,13 @@ const translations = {
         'pdfs.status': 'Status',
         'pdfs.actions': 'Ações',
         'pdfs.goToUpload': 'Vá para a página de upload',
+        'document.confirmDeleteTitle': 'Tem certeza?',
+        'document.confirmDeleteMessage': 'Deseja realmente excluir o documento "{filename}"? Esta ação não pode ser desfeita.',
+        'document.deleteSuccess': 'Documento deletado com sucesso!',
+        'document.downloadStarted': 'Download iniciado!',
+        'document.downloadError': 'Erro ao baixar',
+        'document.deleteError': 'Erro ao deletar',
+        'document.fetchError': 'Erro ao buscar documentos',
 
         // CBIR Search Page
         'cbir.title': 'Buscar Imagens Similares',
@@ -322,6 +329,9 @@ const translations = {
         'annotation.arrow': 'Seta',
         'annotation.text': 'Texto',
         'annotation.saveAnnotation': 'Salvar Anotação',
+        'annotation.listTitle': 'Anotações',
+        'annotation.placeholder': 'Digite sua anotação aqui...',
+        'annotation.noAnnotations': 'Nenhuma anotação.',
     },
     en: {
         // Auth Page
@@ -593,6 +603,13 @@ const translations = {
         'pdfs.status': 'Status',
         'pdfs.actions': 'Actions',
         'pdfs.goToUpload': 'Go to the upload page',
+        'document.confirmDeleteTitle': 'Are you sure?',
+        'document.confirmDeleteMessage': 'Do you really want to delete the document "{filename}"? This action cannot be undone.',
+        'document.deleteSuccess': 'Document deleted successfully!',
+        'document.downloadStarted': 'Download started!',
+        'document.downloadError': 'Error downloading',
+        'document.deleteError': 'Error deleting',
+        'document.fetchError': 'Error fetching documents',
 
         // CBIR Search Page
         'cbir.title': 'Find Similar Images',
@@ -641,6 +658,9 @@ const translations = {
         'annotation.arrow': 'Arrow',
         'annotation.text': 'Text',
         'annotation.saveAnnotation': 'Save Annotation',
+        'annotation.listTitle': 'Annotations',
+        'annotation.placeholder': 'Type your annotation here...',
+        'annotation.noAnnotations': 'No annotations yet.',
     }
 };
 

@@ -2,15 +2,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactCrop from 'react-image-crop';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { API_BASE_URL } from '../config/api';
-import { FiLoader, FiTrash2, FiSave, FiX } from 'react-icons/fi';
+import { FiLoader, FiTrash2, FiSave, FiX, FiAlertTriangle } from 'react-icons/fi';
+import { useImageLoader } from '../components/common/ImageThumbnail';
 import 'react-image-crop/dist/ReactCrop.css';
 
 const AnnotationModal = ({ image, onClose }) => {
   const { token } = useAuth();
+  const { t } = useLanguage();
   const [annotations, setAnnotations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [loadingAnnotations, setLoadingAnnotations] = useState(true);
+  const [errorAnnotations, setErrorAnnotations] = useState(null);
+
+  // Load image blob
+  const { imageUrl, loading: loadingImage, error: errorImage } = useImageLoader(image?.id);
 
   const imgRef = useRef(null);
   const [selection, setSelection] = useState(null);
@@ -19,8 +25,8 @@ const AnnotationModal = ({ image, onClose }) => {
   useEffect(() => {
     const fetchAnnotations = async () => {
       if (!image) return;
-      setLoading(true);
-      setError(null);
+      setLoadingAnnotations(true);
+      setErrorAnnotations(null);
 
       try {
         const response = await fetch(
@@ -37,10 +43,10 @@ const AnnotationModal = ({ image, onClose }) => {
         const data = await response.json();
         setAnnotations(data);
       } catch (err) {
-        setError(err.message);
+        setErrorAnnotations(err.message);
         console.error('Error fetching annotations:', err);
       } finally {
-        setLoading(false);
+        setLoadingAnnotations(false);
       }
     };
 
@@ -66,8 +72,6 @@ const AnnotationModal = ({ image, onClose }) => {
       coords: cleanCoords,
     };
 
-    console.log('Saving annotation:', newAnnotation);
-
     try {
       const response = await fetch(`${API_BASE_URL}/annotations`, {
         method: 'POST',
@@ -79,20 +83,16 @@ const AnnotationModal = ({ image, onClose }) => {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to save annotation: ${response.status} - ${errorText}`);
+        throw new Error(`Failed to save annotation`);
       }
 
       const savedData = await response.json();
-      console.log('Saved annotation response:', savedData);
 
       setNewAnnotationText('');
       setSelection(null);
       setAnnotations([...annotations, savedData]);
-      console.log('Annotations list updated:', [...annotations, savedData]);
 
     } catch (err) {
-      alert(`Error: ${err.message}`);
       console.error('Error saving annotation:', err);
     }
   };
@@ -111,7 +111,6 @@ const AnnotationModal = ({ image, onClose }) => {
       setAnnotations(annotations.filter(a => a._id !== annotationId));
 
     } catch (err) {
-      alert(`Error: ${err.message}`);
       console.error('Error deleting annotation:', err);
     }
   };
@@ -131,84 +130,97 @@ const AnnotationModal = ({ image, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[1000] backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-bg-card dark:bg-dark-card border border-primary-accent rounded-2xl w-[90%] max-w-[1400px] h-[85vh] p-8 shadow-[0_10px_30px_rgba(0,0,0,0.3)] relative flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <button className="absolute top-6 right-6 bg-transparent border-none text-text-secondary text-3xl cursor-pointer z-[1010] hover:text-text-primary dark:hover:text-white" onClick={onClose}>
-          <FiX />
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[1000] backdrop-blur-sm animate-fade-in" onClick={onClose}>
+      <div className="bg-white dark:bg-dark-deep border border-gray-200 dark:border-gray-700 rounded-2xl w-[95%] max-w-[1400px] h-[90vh] p-6 shadow-2xl relative flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <button className="absolute top-4 right-4 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors" onClick={onClose}>
+          <FiX size={24} />
         </button>
 
-        <div className="grid grid-cols-[2fr_1fr] gap-8 h-full overflow-hidden">
-          <div className="bg-deep-dark dark:bg-dark-deep rounded-[10px] overflow-auto relative flex items-center justify-center p-4">
-            <div className="relative max-w-full max-h-full">
-              <ReactCrop
-                crop={selection}
-                onChange={(c, pc) => setSelection(pc)}
-                className="[&_.ReactCrop__crop-selection]:!border-2 [&_.ReactCrop__crop-selection]:!border-dashed [&_.ReactCrop__crop-selection]:!border-toggle-accent [&_.ReactCrop__crop-selection]:!bg-[rgba(138,99,210,0.2)]"
-              >
-                <img
-                  ref={imgRef}
-                  src={image.url}
-                  alt={image.title}
-                  onLoad={onImageLoad}
-                  className="max-w-full max-h-[calc(85vh-6rem)] object-contain block"
-                />
-              </ReactCrop>
-
-              <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-                {annotations.map(anno => {
-                  const x = Number.isFinite(anno.coords?.x) ? anno.coords.x : 0;
-                  const y = Number.isFinite(anno.coords?.y) ? anno.coords.y : 0;
-                  const width = Number.isFinite(anno.coords?.width) ? anno.coords.width : 0;
-                  const height = Number.isFinite(anno.coords?.height) ? anno.coords.height : 0;
-
-                  return (
-                    <div
-                      key={anno._id}
-                      className="absolute border-2 border-[#FF6B6B] bg-[rgba(255,107,107,0.2)] pointer-events-auto cursor-pointer transition-colors hover:bg-[rgba(255,107,107,0.4)]"
-                      style={{
-                        left: `${x}%`,
-                        top: `${y}%`,
-                        width: `${width}%`,
-                        height: `${height}%`,
-                      }}
-                      onClick={() => handleAnnotationClick(anno)}
-                    />
-                  );
-                })}
+        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 h-full overflow-hidden mt-4">
+          <div className="bg-gray-100 dark:bg-black/30 rounded-xl overflow-auto relative flex items-center justify-center p-4 border border-gray-200 dark:border-gray-800">
+            {loadingImage ? (
+              <div className="flex flex-col items-center gap-3">
+                <FiLoader className="w-8 h-8 animate-spin text-primary-500" />
+                <span className="text-sm text-gray-500">{t('common.loading')}</span>
               </div>
-            </div>
+            ) : errorImage ? (
+              <div className="flex flex-col items-center gap-3 text-red-500">
+                <FiAlertTriangle className="w-8 h-8" />
+                <span className="text-sm">{t('image.error')}</span>
+              </div>
+            ) : imageUrl ? (
+              <div className="relative max-w-full max-h-full">
+                <ReactCrop
+                  crop={selection}
+                  onChange={(c, pc) => setSelection(pc)}
+                  className="max-h-[75vh]"
+                >
+                  <img
+                    ref={imgRef}
+                    src={imageUrl}
+                    alt={image.filename}
+                    onLoad={onImageLoad}
+                    className="max-w-full max-h-[75vh] object-contain block"
+                  />
+                </ReactCrop>
+
+                <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+                  {annotations.map(anno => {
+                    const x = Number.isFinite(anno.coords?.x) ? anno.coords.x : 0;
+                    const y = Number.isFinite(anno.coords?.y) ? anno.coords.y : 0;
+                    const width = Number.isFinite(anno.coords?.width) ? anno.coords.width : 0;
+                    const height = Number.isFinite(anno.coords?.height) ? anno.coords.height : 0;
+
+                    return (
+                      <div
+                        key={anno._id}
+                        className="absolute border-2 border-red-500 bg-red-500/20 pointer-events-auto cursor-pointer transition-colors hover:bg-red-500/40"
+                        style={{
+                          left: `${x}%`,
+                          top: `${y}%`,
+                          width: `${width}%`,
+                          height: `${height}%`,
+                        }}
+                        onClick={() => handleAnnotationClick(anno)}
+                        title={anno.text}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="flex flex-col h-full overflow-hidden">
-            <h3 className="text-text-primary dark:text-white text-2xl mb-6 pb-2 border-b border-primary-accent">
-              Anotações
+            <h3 className="text-gray-900 dark:text-white text-2xl mb-6 pb-2 border-b border-gray-200 dark:border-gray-700">
+              {t('annotation.listTitle')}
             </h3>
 
             <div className="mb-6">
               <textarea
-                placeholder="Digite sua anotação aqui..."
+                placeholder={t('annotation.placeholder')}
                 value={newAnnotationText}
                 onChange={(e) => setNewAnnotationText(e.target.value)}
-                className="w-full h-[100px] bg-deep-dark dark:bg-dark-deep border border-primary-accent rounded-lg px-3 py-3 text-text-primary dark:text-white text-base resize-y mb-4 focus:outline-none focus:border-toggle-accent"
+                className="w-full h-[100px] bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-3 text-gray-900 dark:text-white text-base resize-y mb-4 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all"
               />
               <button
                 onClick={handleSaveAnnotation}
                 disabled={!selection || !newAnnotationText}
-                className="w-full px-3 py-3 bg-toggle-accent text-white border-none rounded-lg text-base font-semibold cursor-pointer flex items-center justify-center gap-2 transition-colors hover:bg-[#7a52c3] disabled:bg-primary-accent disabled:cursor-not-allowed disabled:opacity-70"
+                className="w-full px-3 py-3 bg-primary-600 text-white border-none rounded-lg text-base font-semibold cursor-pointer flex items-center justify-center gap-2 transition-colors hover:bg-primary-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                <FiSave /> Salvar Anotação
+                <FiSave /> {t('annotation.saveAnnotation')}
               </button>
             </div>
 
             <div className="flex-grow overflow-y-auto pr-2.5 scrollbar-custom">
-              {loading ? (
+              {loadingAnnotations ? (
                 <div className="text-center text-text-secondary py-8">
                   <FiLoader className="text-3xl text-toggle-accent animate-spin inline-block" />
                 </div>
-              ) : error ? (
-                <div className="text-center text-[#ff6b6b] py-8">{error}</div>
+              ) : errorAnnotations ? (
+                <div className="text-center text-[#ff6b6b] py-8">{errorAnnotations}</div>
               ) : annotations.length === 0 ? (
-                <div className="text-center text-text-secondary py-8">Nenhuma anotação.</div>
+                <div className="text-center text-gray-500 dark:text-gray-400 py-8">{t('annotation.noAnnotations')}</div>
               ) : (
                 annotations.map(anno => (
                   <div key={anno._id} className="flex justify-between items-center bg-deep-dark dark:bg-dark-deep px-4 py-3 rounded-lg mb-3 border border-transparent transition-colors hover:border-toggle-accent">

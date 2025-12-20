@@ -28,7 +28,10 @@ const PAGES = {
 
 function AppLayout() {
   const [activePage, setActivePage] = useState(PAGES.VIEW_IMAGES);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { t } = useLanguage();
+
+  const toggleSidebar = () => setSidebarCollapsed(!sidebarCollapsed);
 
   const renderActivePage = () => {
     switch (activePage) {
@@ -54,12 +57,15 @@ function AppLayout() {
   };
 
   return (
-    <div className="grid grid-cols-[280px_1fr] min-h-screen bg-gray-50 dark:bg-dark-deep">
+    <div className={`grid min-h-screen bg-gray-50 dark:bg-dark-deep transition-all duration-300 ${sidebarCollapsed ? 'grid-cols-[72px_1fr]' : 'grid-cols-[280px_1fr]'
+      }`}>
       {/* Sidebar */}
       <Sidebar
         activePage={activePage}
         onNavigate={setActivePage}
         pages={PAGES}
+        isCollapsed={sidebarCollapsed}
+        onToggle={toggleSidebar}
       />
 
       {/* Main Content Area */}
@@ -81,4 +87,3 @@ function AppLayout() {
 }
 
 export default AppLayout;
-

@@ -1,8 +1,11 @@
+// src/hooks/useDocuments.js
 import { useState, useCallback } from 'react';
 import { api } from '../services/api';
 import { showAlert, showToast, showConfirm } from '../utils/alert';
+import { useLanguage } from '../context/LanguageContext';
 
 export const useDocuments = () => {
+    const { t } = useLanguage();
     const [documents, setDocuments] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -26,16 +29,16 @@ export const useDocuments = () => {
                 }));
                 setDocuments(transformedDocs);
             } else {
-                throw new Error('Formato de resposta inválido da API');
+                throw new Error('Invalid API response format');
             }
         } catch (err) {
             console.error('Error fetching documents:', err);
             setError(err.message);
-            // Optional: showToast('Erro ao carregar documentos', 'error');
+            // Optional: showToast(t('document.fetchError'), 'error');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [t]);
 
     const uploadDocument = useCallback(async (file) => {
         try {
@@ -52,8 +55,8 @@ export const useDocuments = () => {
 
     const deleteDocument = useCallback(async (doc) => {
         const confirmed = await showConfirm(
-            'Tem certeza?',
-            `Deseja realmente excluir o documento "${doc.filename}"? Esta ação não pode ser desfeita.`
+            t('document.confirmDeleteTitle'),
+            t('document.confirmDeleteMessage').replace('{filename}', doc.filename)
         );
 
         if (!confirmed) return false;
@@ -61,13 +64,13 @@ export const useDocuments = () => {
         try {
             await api.delete(`/documents/${doc.id}`);
             setDocuments(prev => prev.filter(d => d.id !== doc.id));
-            showToast('Documento deletado com sucesso!', 'success');
+            showToast(t('document.deleteSuccess'), 'success');
             return true;
         } catch (err) {
-            showAlert('Erro', `Erro ao deletar: ${err.message}`, 'error');
+            showAlert(t('common.error'), `${t('document.deleteError')}: ${err.message}`, 'error');
             return false;
         }
-    }, []);
+    }, [t]);
 
     const downloadDocument = useCallback(async (doc) => {
         try {
@@ -80,13 +83,13 @@ export const useDocuments = () => {
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
-            showToast('Download iniciado!', 'success');
+            showToast(t('document.downloadStarted'), 'success');
             return true;
         } catch (err) {
-            showAlert('Erro', `Erro ao baixar: ${err.message}`, 'error');
+            showAlert(t('common.error'), `${t('document.downloadError')}: ${err.message}`, 'error');
             return false;
         }
-    }, []);
+    }, [t]);
 
     return {
         documents,
