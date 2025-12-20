@@ -69,8 +69,8 @@ const SourceImageCard = ({ image, isSelected, onClick, imageUrl, loading, error 
   <div
     onClick={onClick}
     className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-200 border-2 ${isSelected
-        ? 'border-indigo-500 ring-2 ring-indigo-500/30 shadow-lg scale-[1.02]'
-        : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
+      ? 'border-indigo-500 ring-2 ring-indigo-500/30 shadow-lg scale-[1.02]'
+      : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
       }`}
   >
     <div className="aspect-square bg-gray-100 dark:bg-gray-800 overflow-hidden">
@@ -544,14 +544,14 @@ const CBIRSearchPage = () => {
   return (
     <div className="flex flex-col h-full bg-bg-main dark:bg-bg-main overflow-hidden">
       {/* Header */}
-      <header className="flex-none px-8 py-6 border-b border-gray-200 dark:border-gray-800 bg-bg-main dark:bg-bg-main z-30">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+      <header className="flex-none px-4 sm:px-6 lg:px-8 py-4 sm:py-6 border-b border-gray-200 dark:border-gray-800 bg-bg-main dark:bg-bg-main z-30">
+        <div className="flex flex-wrap justify-between items-center gap-4">
           <div>
-            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight flex items-center gap-2 sm:gap-3">
               <FiSearch className="text-indigo-600" />
               {t('cbir.title')}
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1 hidden sm:block">
               {t('cbir.subtitle')}
             </p>
           </div>
@@ -559,7 +559,7 @@ const CBIRSearchPage = () => {
           {searchResults && (
             <button
               onClick={handleClearSearch}
-              className="inline-flex items-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
             >
               <FiX /> {t('cbir.clearSearch')}
             </button>
@@ -569,10 +569,10 @@ const CBIRSearchPage = () => {
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="p-8 space-y-8">
+        <div className="p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
           {/* Step 1: Select Source Image */}
           <section className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="p-5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div className="p-3 sm:p-5 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-sm">
                   1
@@ -596,8 +596,8 @@ const CBIRSearchPage = () => {
                   >
                     <FiChevronLeft />
                   </button>
-                  <span className="text-sm text-gray-500 dark:text-gray-400 min-w-[100px] text-center">
-                    {galleryPage} / {totalGalleryPages} ({totalImages} {t('gallery.images')})
+                  <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 min-w-[60px] sm:min-w-[100px] text-center">
+                    {galleryPage}/{totalGalleryPages} <span className="hidden sm:inline">({totalImages})</span>
                   </span>
                   <button
                     onClick={() => handlePageChange(galleryPage + 1)}
@@ -610,7 +610,7 @@ const CBIRSearchPage = () => {
               )}
             </div>
 
-            <div className="p-5">
+            <div className="p-3 sm:p-5">
               {loadingImages ? (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
                   {[...Array(IMAGES_PER_PAGE)].map((_, i) => <SkeletonCard key={i} />)}
