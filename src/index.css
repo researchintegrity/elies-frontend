@@ -55,39 +55,20 @@
 
   /* Modern button styles */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 
-           bg-gradient-to-r from-primary-500 to-primary-600 
-           hover:from-primary-600 hover:to-primary-700
-           text-white font-semibold rounded-xl
-           shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/30
-           transition-all duration-300 hover:-translate-y-0.5
-           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0;
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-semibold rounded-xl shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/30 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3
-           bg-gray-100 dark:bg-dark-card hover:bg-gray-200 dark:hover:bg-dark-accent
-           text-gray-700 dark:text-gray-200 font-medium rounded-xl
-           border border-gray-200 dark:border-gray-700
-           transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 dark:bg-dark-card hover:bg-gray-200 dark:hover:bg-dark-accent text-gray-700 dark:text-gray-200 font-medium rounded-xl border border-gray-200 dark:border-gray-700 transition-all duration-200;
   }
 
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2
-           bg-transparent hover:bg-gray-100 dark:hover:bg-white/5
-           text-gray-600 dark:text-gray-300 font-medium rounded-lg
-           transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 bg-transparent hover:bg-gray-100 dark:hover:bg-white/5 text-gray-600 dark:text-gray-300 font-medium rounded-lg transition-all duration-200;
   }
 
   /* Input styles */
   .input-modern {
-    @apply w-full px-4 py-3 rounded-xl
-           bg-gray-50 dark:bg-dark-card
-           border border-gray-200 dark:border-gray-700
-           text-text-primary dark:text-white
-           placeholder:text-gray-400 dark:placeholder:text-gray-500
-           focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20
-           transition-all duration-200;
+    @apply w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-dark-card border border-gray-200 dark:border-gray-700 text-text-primary dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all duration-200;
   }
 
   /* Custom scrollbar */
@@ -126,9 +107,17 @@
   }
 
   @keyframes gradientShift {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+    0% {
+      background-position: 0% 50%;
+    }
+
+    50% {
+      background-position: 100% 50%;
+    }
+
+    100% {
+      background-position: 0% 50%;
+    }
   }
 
   /* Hover glow effect */
@@ -158,8 +147,13 @@
   }
 
   @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+    0% {
+      background-position: 200% 0;
+    }
+
+    100% {
+      background-position: -200% 0;
+    }
   }
 
   /* Floating animation for decorative elements */
@@ -172,13 +166,27 @@
   }
 
   @keyframes floatSlow {
-    0%, 100% { transform: translateY(0) rotate(0deg); }
-    50% { transform: translateY(-15px) rotate(2deg); }
+
+    0%,
+    100% {
+      transform: translateY(0) rotate(0deg);
+    }
+
+    50% {
+      transform: translateY(-15px) rotate(2deg);
+    }
   }
 
   @keyframes floatMedium {
-    0%, 100% { transform: translateY(0) rotate(0deg); }
-    50% { transform: translateY(-10px) rotate(-1deg); }
+
+    0%,
+    100% {
+      transform: translateY(0) rotate(0deg);
+    }
+
+    50% {
+      transform: translateY(-10px) rotate(-1deg);
+    }
   }
 
   /* CSS variable support */
@@ -196,11 +204,45 @@
 
 /* Animation delay utilities */
 @layer utilities {
-  .animation-delay-100 { animation-delay: 100ms; }
-  .animation-delay-200 { animation-delay: 200ms; }
-  .animation-delay-300 { animation-delay: 300ms; }
-  .animation-delay-400 { animation-delay: 400ms; }
-  .animation-delay-500 { animation-delay: 500ms; }
-  .animation-delay-700 { animation-delay: 700ms; }
-  .animation-delay-1000 { animation-delay: 1000ms; }
+  .animation-delay-100 {
+    animation-delay: 100ms;
+  }
+
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animation-delay-300 {
+    animation-delay: 300ms;
+  }
+
+  .animation-delay-400 {
+    animation-delay: 400ms;
+  }
+
+  .animation-delay-500 {
+    animation-delay: 500ms;
+  }
+
+  .animation-delay-700 {
+    animation-delay: 700ms;
+  }
+
+  .animation-delay-1000 {
+    animation-delay: 1000ms;
+  }
+}
+
+/* ReactCrop customization - hide default selection to use custom overlay */
+.ReactCrop__crop-selection {
+  background-color: transparent !important;
+  border: 1px dashed rgba(255, 255, 255, 0.4) !important;
+}
+
+/* Keep drag handles visible */
+.ReactCrop__drag-handle {
+  background-color: white !important;
+  border: 2px solid #6366f1 !important;
+  width: 10px !important;
+  height: 10px !important;
 }

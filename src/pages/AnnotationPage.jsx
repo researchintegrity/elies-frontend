@@ -65,14 +65,14 @@ const AnnotationPage = () => {
           <input
             type="text"
             className="w-full bg-white dark:bg-dark-card border border-gray-200 dark:border-gray-700/50 rounded-xl py-3 pl-10 pr-4 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
-            placeholder={t('common.searchPlaceholder')}
+            placeholder={t('gallery.searchPlaceholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <button className="flex items-center justify-center gap-2 px-6 py-3 bg-white dark:bg-dark-card border border-gray-200 dark:border-gray-700 rounded-xl text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-dark-card/80 transition-colors cursor-pointer">
           <FiFilter />
-          <span>{t('image.sortRecent')}</span>
+          <span>{t('gallery.sortNewest')}</span>
         </button>
       </div>
 
