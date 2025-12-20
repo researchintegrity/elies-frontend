@@ -2,12 +2,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   FiSearch,
-  FiImage,
   FiX,
   FiRefreshCw,
   FiAlertTriangle,
   FiCheck,
-  FiFilter,
   FiChevronLeft,
   FiChevronRight,
   FiZap,
@@ -583,7 +581,7 @@ const CBIRSearchPage = () => {
                     {t('common.tryAgain')}
                   </button>
                 </div>
-              ) : images.length === 0 && !loadingImages ? (
+              ) : images.length === 0 ? (
                 <EmptyState
                   title={t('cbir.noImages')}
                   description={t('cbir.noImagesDescription')}

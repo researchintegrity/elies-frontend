@@ -1,7 +1,7 @@
 // src/components/common/__tests__/SkeletonCard.test.jsx
 // Tests for SkeletonCard component
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render} from '@testing-library/react';
 import SkeletonCard, { SkeletonGrid } from '../SkeletonCard';
 
 describe('SkeletonCard', () => {

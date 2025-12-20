@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { FiX, FiPlus, FiTag } from 'react-icons/fi';
 import { useLanguage } from '../context/LanguageContext';
 
