@@ -165,5 +165,44 @@ export const api = {
      */
     getPanelsFromImage: async (imageId) => {
         return api.get(`/images/${imageId}/panels`);
+    },
+
+    // --- Provenance Analysis ---
+
+    /**
+     * Check provenance service health status
+     * @returns {Promise<{service: string, healthy: boolean, message: string}>}
+     */
+    checkProvenanceHealth: async () => {
+        return api.get('/provenance/health');
+    },
+
+    /**
+     * Start provenance analysis for a query image
+     * @param {string} imageId - Query image ID
+     * @param {Object} params - Analysis parameters
+     * @param {number} params.k - Top-K candidates from CBIR (default: 10)
+     * @param {number} params.q - Top-Q for expansion (default: 5)
+     * @param {number} params.max_depth - Max expansion depth (default: 3)
+     * @param {string} params.descriptor_type - Descriptor type (default: 'cv_rsift')
+     * @returns {Promise<{message: string, analysis_id: string, query_image_id: string}>}
+     */
+    startProvenanceAnalysis: async (imageId, params = {}) => {
+        return api.post('/provenance/analyze', {
+            image_id: imageId,
+            k: params.k || 10,
+            q: params.q || 5,
+            max_depth: params.max_depth || 3,
+            descriptor_type: params.descriptor_type || 'cv_rsift'
+        });
+    },
+
+    /**
+     * Get analysis details by ID (works for all analysis types including provenance)
+     * @param {string} analysisId - Analysis ID
+     * @returns {Promise<Object>} Analysis details including status and results
+     */
+    getAnalysisById: async (analysisId) => {
+        return api.get(`/analyses/${analysisId}`);
     }
 };

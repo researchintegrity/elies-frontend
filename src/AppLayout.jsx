@@ -14,6 +14,7 @@ const AnnotationPage = lazy(() => import('./pages/AnnotationPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const CBIRSearchPage = lazy(() => import('./pages/CBIRSearchPage'));
 const ImageAnalysisPage = lazy(() => import('./pages/ImageAnalysisPage'));
+const ProvenancePage = lazy(() => import('./pages/ProvenancePage'));
 
 // Page keys
 const PAGES = {
@@ -26,6 +27,7 @@ const PAGES = {
   SEARCH: 'search',
   CBIR_SEARCH: 'cbirSearch',
   IMAGE_ANALYSIS: 'imageAnalysis',
+  PROVENANCE: 'provenance',
 };
 
 function AppLayout() {
@@ -55,6 +57,8 @@ function AppLayout() {
         return <CBIRSearchPage />;
       case PAGES.IMAGE_ANALYSIS:
         return <ImageAnalysisPage />;
+      case PAGES.PROVENANCE:
+        return <ProvenancePage />;
       default:
         return <ViewImagesPage />;
     }
