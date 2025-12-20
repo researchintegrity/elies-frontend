@@ -693,17 +693,6 @@ const ImageAnalysisPage = () => {
                             ))}
                         </div>
                     </div>
-
-                    {/* Attribution */}
-                    <a
-                        href="https://29a.ch/photo-forensics/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-xs text-gray-400 hover:text-indigo-500 transition-colors whitespace-nowrap"
-                    >
-                        <span>Forensically</span>
-                        <FiExternalLink size={10} />
-                    </a>
                 </div>
             </header>
 
