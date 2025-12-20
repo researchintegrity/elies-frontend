@@ -132,6 +132,7 @@ const translations = {
         'filters.dateTo': 'Até',
         'filters.tags': 'Tags',
         'filters.clearFilters': 'Limpar Filtros',
+        'filters.noTagsAvailable': 'Nenhuma tag encontrada nas imagens',
 
 
         // Lightbox Modal
@@ -427,6 +428,7 @@ const translations = {
         'filters.dateTo': 'To',
         'filters.tags': 'Tags',
         'filters.clearFilters': 'Clear Filters',
+        'filters.noTagsAvailable': 'No tags found in images',
 
         // Lightbox Modal
         'lightbox.tagsClassification': 'Tags & Classification',

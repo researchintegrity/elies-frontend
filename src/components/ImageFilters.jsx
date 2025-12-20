@@ -1,8 +1,8 @@
 import React from 'react';
-import { FiX, FiFilter, FiCalendar, FiImage, FiDatabase } from 'react-icons/fi';
+import { FiX, FiFilter, FiCalendar, FiTag, FiDatabase } from 'react-icons/fi';
 import { useLanguage } from '../context/LanguageContext';
 
-const ImageFilters = ({ isOpen, onClose, filters, onFilterChange }) => {
+const ImageFilters = ({ isOpen, onClose, filters, availableTags = [], onFilterChange }) => {
     const { t } = useLanguage();
 
     if (!isOpen) return null;
@@ -12,6 +12,11 @@ const ImageFilters = ({ isOpen, onClose, filters, onFilterChange }) => {
         { id: 'uploaded', label: t('filters.originUploaded') },
         { id: 'extracted', label: t('filters.originExtracted') }
     ];
+
+    // Use available tags from images, fallback to default tags if none available
+    const tagsToShow = availableTags.length > 0
+        ? availableTags
+        : ['figure', 'table', 'equation', 'diagram', 'plot'];
 
     return (
         <div className="fixed inset-y-0 right-0 w-80 bg-white dark:bg-gray-900 shadow-2xl border-l border-gray-200 dark:border-gray-800 z-40 transform transition-transform duration-300 ease-in-out flex flex-col">
@@ -85,28 +90,40 @@ const ImageFilters = ({ isOpen, onClose, filters, onFilterChange }) => {
                 {/* Tags */}
                 <section>
                     <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white mb-4">
-                        <FiImage className="text-gray-400" /> {t('filters.tags')}
+                        <FiTag className="text-gray-400" /> {t('filters.tags')}
+                        {(filters.tags || []).length > 0 && (
+                            <span className="ml-auto text-xs text-indigo-600 dark:text-indigo-400 font-medium">
+                                {(filters.tags || []).length} {t('common.selected')}
+                            </span>
+                        )}
                     </h4>
-                    <div className="flex flex-wrap gap-2">
-                        {['figure', 'table', 'equation', 'diagram', 'plot'].map(tag => (
-                            <button
-                                key={tag}
-                                onClick={() => {
-                                    const currentTags = filters.tags || [];
-                                    const newTags = currentTags.includes(tag)
-                                        ? currentTags.filter(t => t !== tag)
-                                        : [...currentTags, tag];
-                                    onFilterChange('tags', newTags);
-                                }}
-                                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${(filters.tags || []).includes(tag)
-                                    ? 'bg-indigo-100 border-indigo-200 text-indigo-700 dark:bg-indigo-900/40 dark:border-indigo-500/30 dark:text-indigo-300'
-                                    : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
-                                    }`}
-                            >
-                                #{tag}
-                            </button>
-                        ))}
-                    </div>
+
+                    {tagsToShow.length > 0 ? (
+                        <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
+                            {tagsToShow.map(tag => (
+                                <button
+                                    key={tag}
+                                    onClick={() => {
+                                        const currentTags = filters.tags || [];
+                                        const newTags = currentTags.includes(tag)
+                                            ? currentTags.filter(t => t !== tag)
+                                            : [...currentTags, tag];
+                                        onFilterChange('tags', newTags);
+                                    }}
+                                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${(filters.tags || []).includes(tag)
+                                        ? 'bg-indigo-100 border-indigo-200 text-indigo-700 dark:bg-indigo-900/40 dark:border-indigo-500/30 dark:text-indigo-300'
+                                        : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
+                                        }`}
+                                >
+                                    #{tag}
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-gray-400 dark:text-gray-500 italic">
+                            {t('filters.noTagsAvailable')}
+                        </p>
+                    )}
                 </section>
 
             </div>

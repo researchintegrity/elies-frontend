@@ -736,6 +736,7 @@ const ViewImagesPage = () => {
         isOpen={isFilterPanelOpen}
         onClose={() => setIsFilterPanelOpen(false)}
         filters={filters}
+        availableTags={availableCategoriesForSimilarity}
         onFilterChange={(key, value) => {
           if (key === 'reset') handleResetFilters();
           else setFilters(prev => ({ ...prev, [key]: value }));
