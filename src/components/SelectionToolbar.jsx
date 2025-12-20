@@ -1,8 +1,8 @@
 import React from 'react';
-import { FiX, FiTrash2, FiTag, FiBarChart2, FiTarget } from 'react-icons/fi';
+import { FiX, FiTrash2, FiTag, FiBarChart2, FiTarget, FiInfo } from 'react-icons/fi';
 import { useLanguage } from '../context/LanguageContext';
 
-const SelectionToolbar = ({ selectedCount, onClearSelection, onDelete, onTag, onAnalyze, onFindSimilar }) => {
+const SelectionToolbar = ({ selectedCount, onClearSelection, onDelete, onTag, onAnalyze, onFindSimilar, onViewMetadata }) => {
     const { t } = useLanguage();
 
     if (selectedCount === 0) return null;
@@ -23,6 +23,18 @@ const SelectionToolbar = ({ selectedCount, onClearSelection, onDelete, onTag, on
             </div>
 
             <div className="flex items-center gap-2">
+                {/* View Metadata - Only shown when exactly 1 image is selected */}
+                {selectedCount === 1 && onViewMetadata && (
+                    <button
+                        onClick={onViewMetadata}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium transition-colors"
+                        title={t('selection.viewMetadataTitle')}
+                    >
+                        <FiInfo className="text-lg" />
+                        <span>{t('selection.viewMetadata')}</span>
+                    </button>
+                )}
+
                 {/* Find Similar - Only shown when exactly 1 image is selected */}
                 {selectedCount === 1 && onFindSimilar && (
                     <button

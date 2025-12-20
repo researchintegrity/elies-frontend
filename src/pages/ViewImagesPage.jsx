@@ -251,14 +251,9 @@ const ImageCard = ({ image, onClick, onSelect, isSelected, isSelectionMode, simi
           ? 'ring-2 ring-indigo-500 border-indigo-500 shadow-lg scale-[1.02] z-10'
           : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-md'
         }`}
-      onClick={(e) => {
-        // Se estiver em modo de seleção ou segurando Ctrl/Cmd, faz toggle da seleção
-        if (isSelectionMode || e.ctrlKey || e.metaKey) {
-          e.stopPropagation();
-          onSelect(image.id);
-        } else {
-          onClick(image, imageUrl);
-        }
+      onClick={() => {
+        // Always toggle selection when clicking anywhere on the card
+        onSelect(image.id);
       }}
     >
       {/* Checkbox Overlay (Visible on Hover or Selected) */}
@@ -668,6 +663,25 @@ const ViewImagesPage = () => {
     }
   }, [selectedImages, handleSimilaritySearch]);
 
+  // View metadata handler - opens lightbox for selected image
+  const handleViewMetadata = useCallback(async () => {
+    if (selectedImages.size !== 1) return;
+
+    const selectedImage = Array.from(selectedImages.values())[0];
+    if (!selectedImage) return;
+
+    // Load the image URL for the lightbox
+    try {
+      const blob = await api.download(`/images/${selectedImage.imageId || selectedImage.id}/download`);
+      const url = URL.createObjectURL(blob);
+      setLightboxImage(selectedImage);
+      setLightboxUrl(url);
+    } catch (err) {
+      console.error('Error loading image for metadata view:', err);
+      showToast(t('image.loadError'), 'error');
+    }
+  }, [selectedImages, t]);
+
   const handleResetFilters = () => {
     setFilters({ sourceType: 'all', dateFrom: '', dateTo: '', tags: [] });
   };
@@ -695,6 +709,7 @@ const ViewImagesPage = () => {
         onTag={handleTagSelected}
         onAnalyze={handleAnalyzeSelected}
         onFindSimilar={!similarityMode ? handleFindSimilar : undefined}
+        onViewMetadata={handleViewMetadata}
       />
 
       {/* Filter Sidebar */}

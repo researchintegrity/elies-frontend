@@ -147,6 +147,8 @@ const translations = {
         'selection.clearSelection': 'Limpar seleção',
         'selection.findSimilar': 'Buscar Similares',
         'selection.findSimilarTitle': 'Buscar imagens similares',
+        'selection.viewMetadata': 'Metadados',
+        'selection.viewMetadataTitle': 'Ver detalhes da imagem',
         'selection.classify': 'Classificar',
         'selection.analyze': 'Analisar',
         'selection.delete': 'Excluir',
@@ -168,6 +170,7 @@ const translations = {
 
         // Image display
         'image.error': 'Erro',
+        'image.loadError': 'Erro ao carregar imagem',
         'image.noTags': 'Sem tags',
         'image.uploaded': 'Upload',
         'image.extracted': 'Extraída',
@@ -332,6 +335,11 @@ const translations = {
         'annotation.listTitle': 'Anotações',
         'annotation.placeholder': 'Digite sua anotação aqui...',
         'annotation.noAnnotations': 'Nenhuma anotação.',
+        'annotation.type': 'Tipo',
+        'annotation.manipulation': 'Manipulação',
+        'annotation.copyMove': 'Cópia-Mover',
+        'annotation.groupId': 'ID do Grupo',
+        'annotation.group': 'Grupo',
     },
     en: {
         // Auth Page
@@ -476,6 +484,8 @@ const translations = {
         'selection.clearSelection': 'Clear selection',
         'selection.findSimilar': 'Find Similar',
         'selection.findSimilarTitle': 'Find similar images',
+        'selection.viewMetadata': 'Metadata',
+        'selection.viewMetadataTitle': 'View image details',
         'selection.classify': 'Classify',
         'selection.analyze': 'Analyze',
         'selection.delete': 'Delete',
@@ -497,6 +507,7 @@ const translations = {
 
         // Image display
         'image.error': 'Error',
+        'image.loadError': 'Error loading image',
         'image.noTags': 'No tags',
         'image.uploaded': 'Uploaded',
         'image.extracted': 'Extracted',
@@ -661,6 +672,11 @@ const translations = {
         'annotation.listTitle': 'Annotations',
         'annotation.placeholder': 'Type your annotation here...',
         'annotation.noAnnotations': 'No annotations yet.',
+        'annotation.type': 'Type',
+        'annotation.manipulation': 'Manipulation',
+        'annotation.copyMove': 'Copy-Move',
+        'annotation.groupId': 'Group ID',
+        'annotation.group': 'Group',
     }
 };
 
