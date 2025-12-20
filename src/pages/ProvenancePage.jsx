@@ -271,7 +271,7 @@ const ProvenancePage = () => {
     const [galleryPage, setGalleryPage] = useState(1);
     const [totalImages, setTotalImages] = useState(0);
     const [pairsPage, setPairsPage] = useState(1); // For matched pairs pagination
-    const [gravity, setGravity] = useState(0.05);
+    const [gravity, setGravity] = useState(0.02);
 
     // Polling ref
     const pollIntervalRef = useRef(null);

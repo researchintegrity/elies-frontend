@@ -462,6 +462,11 @@ const translations = {
         'provenance.nodes': 'nós',
         'provenance.edges': 'arestas',
         'provenance.selectImageFirst': 'Selecione uma imagem primeiro.',
+        'provenance.imageDetails': 'Detalhes da Imagem',
+        'provenance.filename': 'Nome do Arquivo',
+        'provenance.imageId': 'ID da Imagem',
+        'provenance.referenceImage': 'Imagem de Referência',
+        'provenance.noPreview': 'Sem Prévia',
     },
     en: {
         // Auth Page
@@ -921,6 +926,11 @@ const translations = {
         'provenance.nodes': 'nodes',
         'provenance.edges': 'edges',
         'provenance.selectImageFirst': 'Please select an image first.',
+        'provenance.imageDetails': 'Image Details',
+        'provenance.filename': 'Filename',
+        'provenance.imageId': 'Image ID',
+        'provenance.referenceImage': 'Reference Image',
+        'provenance.noPreview': 'No Preview',
     }
 };
 

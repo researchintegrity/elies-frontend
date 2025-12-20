@@ -1,7 +1,7 @@
-// src/components/ProvenanceGraph.jsx
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import * as d3 from 'd3';
 import { FiZoomIn, FiZoomOut, FiMaximize2 } from 'react-icons/fi';
+import { useLanguage } from '../context/LanguageContext';
 
 /**
  * ProvenanceGraph - D3.js Force-Directed Graph Visualization
@@ -21,8 +21,9 @@ const ProvenanceGraph = ({
     onNodeClick,
     width = 800,
     height = 500,
-    gravity = 0.05,
+    gravity = 0.02,
 }) => {
+    const { t } = useLanguage();
     const svgRef = useRef(null);
     const containerRef = useRef(null);
     const [dimensions, setDimensions] = useState({ width, height });
@@ -354,31 +355,71 @@ const ProvenanceGraph = ({
             <div className="absolute bottom-4 left-4 flex items-center gap-4 bg-white/90 dark:bg-gray-800/90 px-3 py-2 rounded-lg shadow-md text-xs">
                 <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded-full bg-emerald-500 border-2 border-white" />
-                    <span className="text-gray-600 dark:text-gray-300">Query Image</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-full bg-indigo-500 border-2 border-white" />
-                    <span className="text-gray-600 dark:text-gray-300">Related Image</span>
+                    <span className="text-gray-600 dark:text-gray-300">{t('provenance.queryImage')}</span>
                 </div>
             </div>
 
             {/* Selected Node Info */}
             {selectedNode && (
-                <div className="absolute top-4 left-4 bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg max-w-[200px] z-10">
-                    <p className="font-medium text-sm text-gray-900 dark:text-white truncate">
-                        {selectedNode.label || selectedNode.id}
-                    </p>
-                    {selectedNode.isQuery && (
-                        <span className="inline-block mt-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full">
-                            Query Image
-                        </span>
-                    )}
-                    <button
-                        onClick={() => setSelectedNode(null)}
-                        className="mt-2 text-xs text-gray-500 hover:text-gray-700"
-                    >
-                        Close
-                    </button>
+                <div className="absolute top-4 left-4 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 max-w-[280px] z-20 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95 transition-all animate-in fade-in slide-in-from-left-4">
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                        <h3 className="font-semibold text-gray-900 dark:text-white text-sm leading-tight">
+                            {t('provenance.imageDetails')}
+                        </h3>
+                        <button
+                            onClick={() => setSelectedNode(null)}
+                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div className="space-y-3">
+                        {/* Thumbnail */}
+                        <div className="w-full h-32 bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 relative group">
+                            {(() => {
+                                const url = getImageUrl ? getImageUrl(selectedNode.id) : null;
+                                return url ? (
+                                    <img src={url} alt={selectedNode.label} className="w-full h-full object-contain" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                        <span className="text-xs">{t('provenance.noPreview')}</span>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+
+                        {/* Metadata */}
+                        <div className="space-y-2 text-xs">
+                            <div>
+                                <span className="text-gray-500 dark:text-gray-400 block mb-0.5">{t('provenance.filename')}</span>
+                                <span className="font-medium text-gray-900 dark:text-gray-100 break-words">
+                                    {selectedNode.label || 'N/A'}
+                                </span>
+                            </div>
+
+                            <div>
+                                <span className="text-gray-500 dark:text-gray-400 block mb-0.5">{t('provenance.imageId')}</span>
+                                <code className="bg-gray-100 dark:bg-gray-900 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300 font-mono text-[10px] block truncate">
+                                    {selectedNode.id}
+                                </code>
+                            </div>
+
+                            <div className="flex gap-2 pt-1">
+                                {selectedNode.isQuery ? (
+                                    <span className="px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-md font-medium">
+                                        {t('provenance.queryImage')}
+                                    </span>
+                                ) : (
+                                    <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-md font-medium">
+                                        {t('provenance.referenceImage')}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
