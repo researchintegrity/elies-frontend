@@ -416,8 +416,17 @@ const ViewImagesPage = () => {
   }, [allCategories]);
 
   useEffect(() => {
-    fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE });
-  }, [fetchImages, currentPage]);
+    // Pass all filters to the backend - server handles filtering and pagination
+    fetchImages({
+      page: currentPage,
+      per_page: IMAGES_PER_PAGE,
+      imageType: filters.tags,
+      dateFrom: filters.dateFrom,
+      dateTo: filters.dateTo,
+      search: searchQuery,
+      sourceType: filters.sourceType
+    });
+  }, [fetchImages, currentPage, filters, searchQuery]);
 
   // Handle page change
   const handlePageChange = useCallback((newPage) => {
@@ -495,7 +504,25 @@ const ViewImagesPage = () => {
     setSimilarityLabelFilter('all'); // Reset label filter
   }, []);
 
+  // Track previous filter/search values to detect changes and reset pagination
+  const prevFiltersRef = React.useRef({ filters, searchQuery });
+  useEffect(() => {
+    const prev = prevFiltersRef.current;
+    // Check if filters or search changed (not just page)
+    const filtersChanged =
+      JSON.stringify(prev.filters) !== JSON.stringify(filters) ||
+      prev.searchQuery !== searchQuery;
+
+    if (filtersChanged && currentPage !== 1) {
+      setCurrentPage(1);
+    }
+    prevFiltersRef.current = { filters, searchQuery };
+  }, [filters, searchQuery, currentPage]);
+
   // Derived State: Filtered Images (or similarity results)
+  // Note: All filtering is now done server-side. This useMemo only handles:
+  // 1. Similarity mode - mapping results to expected format
+  // 2. Client-side sorting - for immediate UX feedback without API call
   const filteredImages = useMemo(() => {
     // In similarity mode, only show similarity results (or empty if none)
     if (similarityMode) {
@@ -511,40 +538,10 @@ const ViewImagesPage = () => {
       }));
     }
 
+    // Server handles all filtering now, just apply local sorting for UX
     let result = [...images];
 
-    // 1. Search Query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(img =>
-        img.filename.toLowerCase().includes(query)
-      );
-    }
-
-    // 2. Filters
-    if (filters.sourceType !== 'all') {
-      result = result.filter(img => img.sourceType === filters.sourceType);
-    }
-
-    if (filters.dateFrom) {
-      const fromDate = new Date(filters.dateFrom);
-      result = result.filter(img => new Date(img.uploadedDate) >= fromDate);
-    }
-
-    if (filters.dateTo) {
-      const toDate = new Date(filters.dateTo);
-      // Ajustar para fim do dia
-      toDate.setHours(23, 59, 59, 999);
-      result = result.filter(img => new Date(img.uploadedDate) <= toDate);
-    }
-
-    if (filters.tags && filters.tags.length > 0) {
-      result = result.filter(img =>
-        filters.tags.some(tag => (img.imageType || []).includes(tag))
-      );
-    }
-
-    // 3. Sorting
+    // Client-side sorting for immediate feedback
     result.sort((a, b) => {
       switch (sortBy) {
         case 'newest': return new Date(b.uploadedDate) - new Date(a.uploadedDate);
@@ -557,7 +554,7 @@ const ViewImagesPage = () => {
     });
 
     return result;
-  }, [images, searchQuery, sortBy, filters, similarityMode, similarityResults]);
+  }, [images, sortBy, similarityMode, similarityResults]);
 
   // Handlers
 
@@ -697,7 +694,7 @@ const ViewImagesPage = () => {
     // After a successful extraction, refresh the gallery
     if (result.success && !result.pending) {
       // Extraction completed synchronously (edge case)
-      fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE });
+      fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE, imageType: filters.tags, dateFrom: filters.dateFrom, dateTo: filters.dateTo, search: searchQuery, sourceType: filters.sourceType });
       handleClearSelection();
     } else if (result.success && result.pending) {
       // Extraction started, clear selection but don't refresh yet
@@ -709,7 +706,7 @@ const ViewImagesPage = () => {
   // Refresh gallery when extraction completes
   useEffect(() => {
     if (extractionStatus === 'completed') {
-      fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE });
+      fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE, imageType: filters.tags, dateFrom: filters.dateFrom, dateTo: filters.dateTo, search: searchQuery, sourceType: filters.sourceType });
     }
   }, [extractionStatus, fetchImages, currentPage, IMAGES_PER_PAGE]);
 
@@ -938,7 +935,7 @@ const ViewImagesPage = () => {
 
                 <button
                   className="flex-shrink-0 p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-indigo-600 hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 transition-all shadow-sm"
-                  onClick={() => fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE })}
+                  onClick={() => fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE, imageType: filters.tags, dateFrom: filters.dateFrom, dateTo: filters.dateTo, search: searchQuery, sourceType: filters.sourceType })}
                   title={t('common.update')}
                 >
                   <FiRefreshCw />
@@ -977,7 +974,7 @@ const ViewImagesPage = () => {
             <FiAlertTriangle className="text-5xl text-red-400 mb-4" />
             <h3 className="text-xl font-bold text-gray-900 dark:text-white">{t('gallery.errorLoading')}</h3>
             <p className="text-gray-500 mb-6">{error}</p>
-            <button onClick={() => fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE })} className="px-6 py-2 bg-indigo-600 text-white rounded-lg">{t('common.tryAgain')}</button>
+            <button onClick={() => fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE, imageType: filters.tags, dateFrom: filters.dateFrom, dateTo: filters.dateTo, search: searchQuery, sourceType: filters.sourceType })} className="px-6 py-2 bg-indigo-600 text-white rounded-lg">{t('common.tryAgain')}</button>
           </div>
         ) : filteredImages.length === 0 ? (
           <EmptyState

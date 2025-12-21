@@ -297,6 +297,13 @@ const CBIRSearchPage = () => {
   const [loadingUrls, setLoadingUrls] = useState({});
   const [errorImages, setErrorImages] = useState(null);
 
+  // Gallery Filters (for selecting source images)
+  const [galleryFilters, setGalleryFilters] = useState({
+    sourceType: 'all',
+    imageType: [],
+    search: ''
+  });
+
   // Selection State
   const [selectedImage, setSelectedImage] = useState(null);
 
@@ -319,9 +326,20 @@ const CBIRSearchPage = () => {
   const [galleryPage, setGalleryPage] = useState(1);
   const [totalImages, setTotalImages] = useState(0);
 
+  // Fetch images when page or gallery filters change
   useEffect(() => {
-    fetchImages(galleryPage);
-  }, [galleryPage]);
+    fetchImages(galleryPage, galleryFilters);
+  }, [galleryPage, galleryFilters]);
+
+  // Reset to page 1 when gallery filters change
+  const prevGalleryFiltersRef = React.useRef(galleryFilters);
+  useEffect(() => {
+    const prev = prevGalleryFiltersRef.current;
+    if (JSON.stringify(prev) !== JSON.stringify(galleryFilters) && galleryPage !== 1) {
+      setGalleryPage(1);
+    }
+    prevGalleryFiltersRef.current = galleryFilters;
+  }, [galleryFilters, galleryPage]);
 
   useEffect(() => {
     const loadImageUrls = async () => {
@@ -377,11 +395,23 @@ const CBIRSearchPage = () => {
     }
   }, [selectedImage]);
 
-  const fetchImages = useCallback(async (page = 1) => {
+  const fetchImages = useCallback(async (page = 1, filters = {}) => {
     setLoadingImages(true);
     setErrorImages(null);
     try {
-      const data = await api.get('/images', { page, per_page: IMAGES_PER_PAGE });
+      // Build query params with filters
+      const queryParams = { page, per_page: IMAGES_PER_PAGE };
+      if (filters.imageType && filters.imageType.length > 0) {
+        queryParams.image_type = filters.imageType.join(',');
+      }
+      if (filters.sourceType && filters.sourceType !== 'all') {
+        queryParams.source_type = filters.sourceType;
+      }
+      if (filters.search) {
+        queryParams.search = filters.search;
+      }
+
+      const data = await api.get('/images', queryParams);
 
       let imageList = [];
       let total = 0;
@@ -527,22 +557,24 @@ const CBIRSearchPage = () => {
         <div className="p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
           {/* Step 1: Select Source Image */}
           <section className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="p-3 sm:p-5 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-sm">
-                  1
+            <div className="p-3 sm:p-5 border-b border-gray-200 dark:border-gray-700">
+              {/* Header row */}
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-sm">
+                    1
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">
+                      {t('cbir.selectSource')}
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {t('cbir.selectSourceDescription')}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">
-                    {t('cbir.selectSource')}
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {t('cbir.selectSourceDescription')}
-                  </p>
-                </div>
-              </div>
 
-              {totalImages > IMAGES_PER_PAGE && (
+                {/* Pagination controls */}
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handlePageChange(galleryPage - 1)}
@@ -552,7 +584,7 @@ const CBIRSearchPage = () => {
                     <FiChevronLeft />
                   </button>
                   <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 min-w-[60px] sm:min-w-[100px] text-center">
-                    {galleryPage}/{totalGalleryPages} <span className="hidden sm:inline">({totalImages})</span>
+                    {galleryPage}/{totalGalleryPages || 1} <span className="hidden sm:inline">({totalImages})</span>
                   </span>
                   <button
                     onClick={() => handlePageChange(galleryPage + 1)}
@@ -562,7 +594,56 @@ const CBIRSearchPage = () => {
                     <FiChevronRight />
                   </button>
                 </div>
-              )}
+              </div>
+
+              {/* Filter row */}
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Search input */}
+                <div className="relative flex-1 min-w-[200px] max-w-md">
+                  <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder={t('gallery.searchPlaceholder') || 'Search images...'}
+                    value={galleryFilters.search}
+                    onChange={(e) => setGalleryFilters(f => ({ ...f, search: e.target.value }))}
+                    className="w-full pl-10 pr-8 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                  />
+                  {galleryFilters.search && (
+                    <button
+                      onClick={() => setGalleryFilters(f => ({ ...f, search: '' }))}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <FiX size={16} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Tag filter dropdown */}
+                <select
+                  value={galleryFilters.imageType.length > 0 ? galleryFilters.imageType[0] : 'all'}
+                  onChange={(e) => setGalleryFilters(f => ({
+                    ...f,
+                    imageType: e.target.value === 'all' ? [] : [e.target.value]
+                  }))}
+                  className="px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all cursor-pointer"
+                >
+                  <option value="all">{t('cbir.allTypes') || 'All Types'}</option>
+                  {availableCategories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+
+                {/* Clear filters button */}
+                {(galleryFilters.search || galleryFilters.imageType.length > 0) && (
+                  <button
+                    onClick={() => setGalleryFilters({ sourceType: 'all', imageType: [], search: '' })}
+                    className="flex items-center gap-1 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                  >
+                    <FiX size={14} />
+                    {t('filters.clearFilters')}
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="p-3 sm:p-5">
@@ -575,7 +656,7 @@ const CBIRSearchPage = () => {
                   <FiAlertTriangle className="text-4xl text-red-400 mx-auto mb-3" />
                   <p className="text-gray-600 dark:text-gray-400">{errorImages}</p>
                   <button
-                    onClick={() => fetchImages(galleryPage)}
+                    onClick={() => fetchImages(galleryPage, galleryFilters)}
                     className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
                   >
                     {t('common.tryAgain')}
@@ -587,7 +668,7 @@ const CBIRSearchPage = () => {
                   description={t('cbir.noImagesDescription')}
                   icon="image"
                   actionLabel={t('common.update')}
-                  onAction={() => fetchImages(1)}
+                  onAction={() => fetchImages(1, galleryFilters)}
                   showAction={true}
                 />
               ) : (
