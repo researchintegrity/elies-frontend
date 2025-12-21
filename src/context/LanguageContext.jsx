@@ -491,6 +491,8 @@ const translations = {
         'provenance.similarityNotSearchedHint': 'Clique em "Buscar Similares" acima para encontrar imagens semelhantes à sua consulta.',
         'provenance.queryLabel': 'Consulta:',
         'provenance.foundSimilarImages': 'Encontradas {{count}} imagens similares',
+        'provenance.allImagesPrefix': 'Todas as',
+        'provenance.allImagesSuffix': 'imagens da galeria serão consideradas na análise',
     },
     en: {
         // Auth Page
@@ -979,6 +981,8 @@ const translations = {
         'provenance.similarityNotSearchedHint': 'Click "Find Similar" above to find images similar to your query.',
         'provenance.queryLabel': 'Query:',
         'provenance.foundSimilarImages': 'Found {{count}} similar images',
+        'provenance.allImagesPrefix': 'All',
+        'provenance.allImagesSuffix': 'images from the gallery will be considered in the analysis',
     }
 };
 
