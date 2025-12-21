@@ -278,8 +278,12 @@ const ProvenancePage = () => {
     const [pairsPage, setPairsPage] = useState(1); // For matched pairs pagination
     const [gravity, setGravity] = useState(0.02);
 
+    // Query Gallery Filter (for finding query image quickly)
+    const [querySearch, setQuerySearch] = useState('');
+    const [queryTagFilter, setQueryTagFilter] = useState([]);
+
     // Filter State
-    const [filterMode, setFilterMode] = useState('all'); // 'all' | 'tags' | 'date' | 'manual'
+    const [filterMode, setFilterMode] = useState('all'); // 'all' | 'tags' | 'date' | 'manual' | 'similarity'
     const [filterTags, setFilterTags] = useState([]);
     const [filterDateFrom, setFilterDateFrom] = useState('');
     const [filterDateTo, setFilterDateTo] = useState('');
@@ -287,6 +291,12 @@ const ProvenancePage = () => {
     const [filterSearch, setFilterSearch] = useState('');
     const [filterGridPage, setFilterGridPage] = useState(1);
     const FILTER_GRID_PAGE_SIZE = 36; // 6x6 grid
+
+    // Similarity filter state
+    const [similarityTopK, setSimilarityTopK] = useState(24);
+    const [similarityThreshold, setSimilarityThreshold] = useState(0.5);
+    const [similarityResults, setSimilarityResults] = useState([]);
+    const [loadingSimilarity, setLoadingSimilarity] = useState(false);
 
     // All images for filtering (fetched separately from paginated gallery)
     const [allImages, setAllImages] = useState([]);
@@ -700,6 +710,48 @@ const ProvenancePage = () => {
                             )
                         }
                     >
+                        {/* Query Gallery Filters */}
+                        <div className="mb-4 space-y-3">
+                            {/* Search input */}
+                            <div className="relative max-w-md">
+                                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                <input
+                                    type="text"
+                                    value={querySearch}
+                                    onChange={(e) => setQuerySearch(e.target.value)}
+                                    placeholder={t('gallery.searchPlaceholder')}
+                                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                                />
+                            </div>
+                            {/* Tag chips */}
+                            {images.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                    {[...new Set(images.flatMap(img => img.imageType || []))].map(tag => (
+                                        <button
+                                            key={tag}
+                                            onClick={() => setQueryTagFilter(prev =>
+                                                prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                                            )}
+                                            className={`px-2 py-1 text-xs rounded-full border transition-colors ${queryTagFilter.includes(tag)
+                                                ? 'bg-emerald-100 border-emerald-300 text-emerald-700 dark:bg-emerald-900/40 dark:border-emerald-500/30 dark:text-emerald-300'
+                                                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300'
+                                                }`}
+                                        >
+                                            #{tag}
+                                        </button>
+                                    ))}
+                                    {queryTagFilter.length > 0 && (
+                                        <button
+                                            onClick={() => setQueryTagFilter([])}
+                                            className="px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:underline"
+                                        >
+                                            {t('selection.clearSelection')}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
                         {loadingImages ? (
                             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
                                 {[...Array(IMAGES_PER_PAGE)].map((_, i) => <SkeletonCard key={i} />)}
@@ -724,21 +776,51 @@ const ProvenancePage = () => {
                                 onAction={() => fetchImages(1)}
                                 showAction={true}
                             />
-                        ) : (
-                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-                                {images.map((img) => (
-                                    <SourceImageCard
-                                        key={img.id}
-                                        image={img}
-                                        isSelected={selectedImage?.id === img.id}
-                                        onClick={() => setSelectedImage(img)}
-                                        imageUrl={imageUrls[img.id]}
-                                        loading={loadingUrls[img.id]}
-                                        error={!imageUrls[img.id] && !loadingUrls[img.id]}
-                                    />
-                                ))}
-                            </div>
-                        )}
+                        ) : (() => {
+                            // Apply query filters
+                            let filteredImages = images;
+                            if (querySearch) {
+                                const searchLower = querySearch.toLowerCase();
+                                filteredImages = filteredImages.filter(img =>
+                                    img.filename?.toLowerCase().includes(searchLower)
+                                );
+                            }
+                            if (queryTagFilter.length > 0) {
+                                filteredImages = filteredImages.filter(img =>
+                                    img.imageType?.some(tag => queryTagFilter.includes(tag))
+                                );
+                            }
+
+                            if (filteredImages.length === 0) {
+                                return (
+                                    <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+                                        <p className="text-sm">{t('common.noResults')}</p>
+                                        <button
+                                            onClick={() => { setQuerySearch(''); setQueryTagFilter([]); }}
+                                            className="mt-2 text-xs text-emerald-600 hover:underline"
+                                        >
+                                            {t('selection.clearSelection')}
+                                        </button>
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+                                    {filteredImages.map((img) => (
+                                        <SourceImageCard
+                                            key={img.id}
+                                            image={img}
+                                            isSelected={selectedImage?.id === img.id}
+                                            onClick={() => setSelectedImage(img)}
+                                            imageUrl={imageUrls[img.id]}
+                                            loading={loadingUrls[img.id]}
+                                            error={!imageUrls[img.id] && !loadingUrls[img.id]}
+                                        />
+                                    ))}
+                                </div>
+                            );
+                        })()}
                     </CollapsibleSection>
 
                     {/* Step 1.5: Filter Gallery (Optional) */}
@@ -751,14 +833,20 @@ const ProvenancePage = () => {
                         {/* Filter Mode Tabs */}
                         <div className="flex flex-wrap gap-2 mb-6">
                             {[
-                                { mode: 'all', icon: FiGrid, label: t('provenance.filterAll') },
+                                { mode: 'similarity', icon: FiTarget, label: t('provenance.filterBySimilarity') },
                                 { mode: 'tags', icon: FiTag, label: t('provenance.filterByTag') },
                                 { mode: 'date', icon: FiCalendar, label: t('provenance.filterByDate') },
                                 { mode: 'manual', icon: FiCheck, label: t('provenance.filterManual') },
+                                { mode: 'all', icon: FiGrid, label: t('provenance.filterAll') },
                             ].map(({ mode, icon: Icon, label }) => (
                                 <button
                                     key={mode}
                                     onClick={() => {
+                                        // Warn if no query selected (except for 'all' mode)
+                                        if (mode !== 'all' && !selectedImage) {
+                                            showAlert(t('common.warning'), t('provenance.selectQueryFirst'), 'warning');
+                                            return;
+                                        }
                                         setFilterMode(mode);
                                         // Reset manual selection when switching modes
                                         if (mode === 'all') {
@@ -766,6 +854,7 @@ const ProvenancePage = () => {
                                             setFilterTags([]);
                                             setFilterDateFrom('');
                                             setFilterDateTo('');
+                                            setSimilarityResults([]);
                                         }
                                     }}
                                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${filterMode === mode
@@ -786,6 +875,40 @@ const ProvenancePage = () => {
                             </p>
                         )}
 
+                        {/* Query Image Suggestions - always show when query image is selected */}
+                        {selectedImage && (selectedImage.imageType?.length > 0 || selectedImage.filename) && (
+                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                                        {t('provenance.queryLabel')}
+                                    </span>
+                                    {/* Query tags as filter suggestions - toggle active/inactive */}
+                                    {selectedImage.imageType?.map(tag => (
+                                        <button
+                                            key={tag}
+                                            onClick={() => {
+                                                // Only switch to tags mode if in 'all' mode
+                                                if (filterMode === 'all') setFilterMode('tags');
+                                                // Toggle tag in filterTags (works as secondary filter in any mode)
+                                                setFilterTags(prev =>
+                                                    prev.includes(tag)
+                                                        ? prev.filter(t => t !== tag)
+                                                        : [...prev, tag]
+                                                );
+                                                setFilterGridPage(1);
+                                            }}
+                                            className={`px-2 py-1 text-xs rounded transition-colors ${filterTags.includes(tag)
+                                                ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                                                : 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/60'
+                                                }`}
+                                        >
+                                            #{tag}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {filterMode !== 'all' && (
                             <div className="space-y-4">
                                 {/* Loading indicator */}
@@ -795,6 +918,8 @@ const ProvenancePage = () => {
                                         {t('common.loading')}
                                     </div>
                                 )}
+
+                                {/* Query Image Suggestions - shown outside mode check so always visible */}
 
                                 {/* Tag Selection */}
                                 {filterMode === 'tags' && (
@@ -867,6 +992,96 @@ const ProvenancePage = () => {
                                     </div>
                                 )}
 
+                                {/* Similarity Search Mode */}
+                                {filterMode === 'similarity' && (
+                                    <div className="space-y-4">
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                                            {t('provenance.filterSimilarityDesc')}
+                                        </p>
+
+                                        {/* Similarity parameters */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-xl">
+                                            {/* Top-K slider */}
+                                            <div>
+                                                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                                    {t('cbir.topK')}: {similarityTopK}
+                                                </label>
+                                                <input
+                                                    type="range"
+                                                    min="5"
+                                                    max="100"
+                                                    value={similarityTopK}
+                                                    onChange={(e) => setSimilarityTopK(parseInt(e.target.value))}
+                                                    className="w-full accent-emerald-600"
+                                                />
+                                            </div>
+                                            {/* Threshold slider */}
+                                            <div>
+                                                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                                    {t('cbir.minSimilarity')}: {Math.round(similarityThreshold * 100)}%
+                                                </label>
+                                                <input
+                                                    type="range"
+                                                    min="0"
+                                                    max="100"
+                                                    value={Math.round(similarityThreshold * 100)}
+                                                    onChange={(e) => setSimilarityThreshold(parseInt(e.target.value) / 100)}
+                                                    className="w-full accent-emerald-600"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Search button and results count in a row */}
+                                        <div className="flex items-center gap-4">
+                                            <button
+                                                onClick={async () => {
+                                                    if (!selectedImage) {
+                                                        showAlert(t('common.warning'), t('provenance.selectQueryFirst'), 'warning');
+                                                        return;
+                                                    }
+                                                    setLoadingSimilarity(true);
+                                                    setSimilarityResults([]);
+                                                    try {
+                                                        const response = await api.post('/cbir/search/sync', {
+                                                            image_id: selectedImage.id,
+                                                            top_k: similarityTopK
+                                                        });
+                                                        // Filter by threshold and exclude query image
+                                                        const filtered = (response.matches || []).filter(
+                                                            m => m.image_id !== selectedImage.id && m.similarity_score >= similarityThreshold
+                                                        );
+                                                        setSimilarityResults(filtered);
+                                                        // Don't auto-select - just show the results
+                                                        setFilterGridPage(1);
+                                                        if (filtered.length === 0) {
+                                                            showToast(t('cbir.noResultsWithCriteria'), 'info');
+                                                        } else {
+                                                            showToast(`${t('similarity.found')} ${filtered.length} ${t('similarity.similarImages')}`, 'success');
+                                                        }
+                                                    } catch (err) {
+                                                        console.error('Similarity search error:', err);
+                                                        showAlert(t('common.error'), err.message, 'error');
+                                                    } finally {
+                                                        setLoadingSimilarity(false);
+                                                    }
+                                                }}
+                                                disabled={loadingSimilarity || !selectedImage}
+                                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            >
+                                                {loadingSimilarity ? <FiRefreshCw className="animate-spin" size={16} /> : <FiTarget size={16} />}
+                                                {loadingSimilarity ? t('cbir.searching') : t('provenance.findSimilar')}
+                                            </button>
+
+                                            {/* Results count - inline with button */}
+                                            {similarityResults.length > 0 && (
+                                                <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+                                                    {t('similarity.found')} {similarityResults.length} {t('similarity.similarImages')}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Manual mode description */}
                                 {filterMode === 'manual' && (
                                     <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -874,17 +1089,19 @@ const ProvenancePage = () => {
                                     </p>
                                 )}
 
-                                {/* Search input for text filtering */}
-                                <div className="relative max-w-md">
-                                    <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                                    <input
-                                        type="text"
-                                        value={filterSearch}
-                                        onChange={(e) => { setFilterSearch(e.target.value); setFilterGridPage(1); }}
-                                        placeholder={t('gallery.searchPlaceholder')}
-                                        className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                                    />
-                                </div>
+                                {/* Search input for text filtering - hidden in similarity mode */}
+                                {filterMode !== 'similarity' && (
+                                    <div className="relative max-w-md">
+                                        <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                        <input
+                                            type="text"
+                                            value={filterSearch}
+                                            onChange={(e) => { setFilterSearch(e.target.value); setFilterGridPage(1); }}
+                                            placeholder={t('gallery.searchPlaceholder')}
+                                            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                                        />
+                                    </div>
+                                )}
 
                                 {/* Selection summary */}
                                 <div className="flex items-center justify-between text-sm">
@@ -917,8 +1134,21 @@ const ProvenancePage = () => {
                                     )}
                                 </div>
 
+                                {/* Similarity mode placeholder - show when no search has been done yet */}
+                                {filterMode === 'similarity' && similarityResults.length === 0 && (
+                                    <div className="flex flex-col items-center justify-center py-12 px-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+                                        <FiTarget size={48} className="text-gray-300 dark:text-gray-600 mb-4" />
+                                        <p className="text-gray-500 dark:text-gray-400 text-center mb-2 font-medium">
+                                            {t('provenance.similarityNotSearched')}
+                                        </p>
+                                        <p className="text-gray-400 dark:text-gray-500 text-sm text-center">
+                                            {t('provenance.similarityNotSearchedHint')}
+                                        </p>
+                                    </div>
+                                )}
+
                                 {/* Refinement Grid with pagination */}
-                                {(() => {
+                                {filterMode !== 'similarity' || similarityResults.length > 0 ? (() => {
                                     // Compute filtered images based on mode
                                     let filtered = allImages;
                                     if (filterMode === 'tags' && filterTags.length > 0) {
@@ -930,7 +1160,17 @@ const ProvenancePage = () => {
                                             const toOk = !filterDateTo || imgDate <= new Date(filterDateTo + 'T23:59:59');
                                             return fromOk && toOk;
                                         });
+                                    } else if (filterMode === 'similarity' && similarityResults.length > 0) {
+                                        // Filter to only show similar images from CBIR results
+                                        const simIds = new Set(similarityResults.map(r => r.image_id));
+                                        filtered = allImages.filter(img => simIds.has(img.id));
                                     }
+
+                                    // Apply tag filtering on any mode (secondary filter from query suggestions)
+                                    if (filterTags.length > 0 && filterMode !== 'tags') {
+                                        filtered = filtered.filter(img => img.imageType?.some(tag => filterTags.includes(tag)));
+                                    }
+
                                     // Apply text search
                                     if (filterSearch) {
                                         const searchLower = filterSearch.toLowerCase();
@@ -1014,14 +1254,20 @@ const ProvenancePage = () => {
                                                     >
                                                         {t('provenance.selectPage')}
                                                     </button>
+                                                    <button
+                                                        onClick={() => setManuallySelectedIds([])}
+                                                        className="px-3 py-1 text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
+                                                    >
+                                                        {t('selection.clearSelection')}
+                                                    </button>
                                                 </div>
                                             )}
                                         </>
                                     );
-                                })()}
+                                })() : null}
 
                                 {/* Quick selection buttons */}
-                                {(filterMode === 'tags' && filterTags.length > 0) || (filterMode === 'date' && (filterDateFrom || filterDateTo)) ? (
+                                {(filterMode === 'tags' && filterTags.length > 0) || (filterMode === 'date' && (filterDateFrom || filterDateTo)) || (filterMode === 'similarity' && similarityResults.length > 0) ? (
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => {
@@ -1036,6 +1282,13 @@ const ProvenancePage = () => {
                                                         const toOk = !filterDateTo || imgDate <= new Date(filterDateTo + 'T23:59:59');
                                                         return fromOk && toOk;
                                                     });
+                                                } else if (filterMode === 'similarity' && similarityResults.length > 0) {
+                                                    const simIds = new Set(similarityResults.map(r => r.image_id));
+                                                    filtered = allImages.filter(img => simIds.has(img.id));
+                                                }
+                                                // Apply tag filter on top (secondary filter)
+                                                if (filterTags.length > 0 && filterMode !== 'tags') {
+                                                    filtered = filtered.filter(img => img.imageType?.some(tag => filterTags.includes(tag)));
                                                 }
                                                 if (filterSearch) {
                                                     const searchLower = filterSearch.toLowerCase();
@@ -1049,7 +1302,7 @@ const ProvenancePage = () => {
                                         </button>
                                         <button
                                             onClick={() => setManuallySelectedIds([])}
-                                            className="px-3 py-1.5 text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                            className="px-3 py-1.5 text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
                                         >
                                             {t('selection.clearSelection')}
                                         </button>

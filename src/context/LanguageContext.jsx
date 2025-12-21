@@ -481,6 +481,16 @@ const translations = {
         'provenance.imagesAvailable': 'imagens disponíveis',
         'provenance.selectAllFiltered': 'Selecionar Todas Filtradas',
         'provenance.selectPage': 'Selec. Página',
+        'provenance.queryImageSuggestions': 'Sugestões da imagem de consulta:',
+        'provenance.searchByFilename': 'Buscar por nome do arquivo',
+        'provenance.filterBySimilarity': 'Por Similaridade',
+        'provenance.filterSimilarityDesc': 'Buscar imagens semelhantes à imagem de consulta usando CBIR.',
+        'provenance.findSimilar': 'Buscar Similares',
+        'provenance.selectQueryFirst': 'Selecione uma imagem de consulta primeiro.',
+        'provenance.similarityNotSearched': 'Nenhuma busca de similaridade foi realizada ainda',
+        'provenance.similarityNotSearchedHint': 'Clique em "Buscar Similares" acima para encontrar imagens semelhantes à sua consulta.',
+        'provenance.queryLabel': 'Consulta:',
+        'provenance.foundSimilarImages': 'Encontradas {{count}} imagens similares',
     },
     en: {
         // Auth Page
@@ -959,6 +969,16 @@ const translations = {
         'provenance.imagesAvailable': 'images available',
         'provenance.selectAllFiltered': 'Select All Filtered',
         'provenance.selectPage': 'Select Page',
+        'provenance.queryImageSuggestions': 'Query image suggestions:',
+        'provenance.searchByFilename': 'Search by filename',
+        'provenance.filterBySimilarity': 'By Similarity',
+        'provenance.filterSimilarityDesc': 'Find images similar to the query image using CBIR.',
+        'provenance.findSimilar': 'Find Similar',
+        'provenance.selectQueryFirst': 'Select a query image first.',
+        'provenance.similarityNotSearched': 'No similarity search performed yet',
+        'provenance.similarityNotSearchedHint': 'Click "Find Similar" above to find images similar to your query.',
+        'provenance.queryLabel': 'Query:',
+        'provenance.foundSimilarImages': 'Found {{count}} similar images',
     }
 };
 
