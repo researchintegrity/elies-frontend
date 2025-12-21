@@ -190,6 +190,7 @@ export const api = {
     startProvenanceAnalysis: async (imageId, params = {}) => {
         return api.post('/provenance/analyze', {
             image_id: imageId,
+            search_image_ids: params.search_image_ids || null,
             k: params.k || 10,
             q: params.q || 5,
             max_depth: params.max_depth || 3,

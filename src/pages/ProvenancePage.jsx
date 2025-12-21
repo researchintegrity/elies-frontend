@@ -15,6 +15,11 @@ import {
     FiLayers,
     FiZap,
     FiInfo,
+    FiFilter,
+    FiTag,
+    FiCalendar,
+    FiGrid,
+    FiSearch,
 } from 'react-icons/fi';
 import { api } from '../services/api';
 import { showAlert, showToast } from '../utils/alert';
@@ -273,6 +278,21 @@ const ProvenancePage = () => {
     const [pairsPage, setPairsPage] = useState(1); // For matched pairs pagination
     const [gravity, setGravity] = useState(0.02);
 
+    // Filter State
+    const [filterMode, setFilterMode] = useState('all'); // 'all' | 'tags' | 'date' | 'manual'
+    const [filterTags, setFilterTags] = useState([]);
+    const [filterDateFrom, setFilterDateFrom] = useState('');
+    const [filterDateTo, setFilterDateTo] = useState('');
+    const [manuallySelectedIds, setManuallySelectedIds] = useState([]);
+    const [filterSearch, setFilterSearch] = useState('');
+    const [filterGridPage, setFilterGridPage] = useState(1);
+    const FILTER_GRID_PAGE_SIZE = 36; // 6x6 grid
+
+    // All images for filtering (fetched separately from paginated gallery)
+    const [allImages, setAllImages] = useState([]);
+    const [allImageUrls, setAllImageUrls] = useState({});
+    const [loadingAllImages, setLoadingAllImages] = useState(false);
+
     // Polling ref
     const pollIntervalRef = useRef(null);
 
@@ -424,6 +444,97 @@ const ProvenancePage = () => {
         }
     }, []);
 
+    // Fetch all images for filtering (when entering filter modes)
+    const fetchAllImages = useCallback(async () => {
+        if (loadingAllImages) return; // Already loading
+
+        setLoadingAllImages(true);
+        try {
+            // Paginate through all images (API max per_page is 100)
+            let allFetched = [];
+            let currentPage = 1;
+            let hasMore = true;
+
+            while (hasMore) {
+                const data = await api.get('/images', { page: currentPage, per_page: 100 });
+
+                let imageList = [];
+                let total = 0;
+
+                if (Array.isArray(data)) {
+                    imageList = data;
+                    total = data.length;
+                } else if (data && typeof data === 'object') {
+                    imageList = data.items || data.images || [];
+                    total = data.total || imageList.length;
+                }
+
+                allFetched = [...allFetched, ...imageList];
+
+                // Check if there are more pages
+                hasMore = imageList.length === 100 && allFetched.length < total;
+                currentPage++;
+
+                // Safety limit - max 10 pages (1000 images)
+                if (currentPage > 10) break;
+            }
+
+            const transformed = allFetched.map(img => ({
+                id: img._id,
+                imageId: img._id,
+                filename: img.filename,
+                uploadedDate: img.uploaded_date,
+                fileSize: img.file_size,
+                sourceType: img.source_type,
+                imageType: img.image_type || []
+            }));
+
+            setAllImages(transformed);
+
+            // Load thumbnails in parallel batches of 20
+            const loadBatch = async (batch) => {
+                const results = await Promise.allSettled(
+                    batch.map(async (img) => {
+                        try {
+                            const blob = await api.download(`/images/${img.id}/download`);
+                            return { id: img.id, url: URL.createObjectURL(blob) };
+                        } catch {
+                            return null;
+                        }
+                    })
+                );
+                const urls = {};
+                results.forEach(r => {
+                    if (r.status === 'fulfilled' && r.value) {
+                        urls[r.value.id] = r.value.url;
+                    }
+                });
+                if (Object.keys(urls).length > 0) {
+                    setAllImageUrls(prev => ({ ...prev, ...urls }));
+                }
+            };
+
+            // Load all thumbnails in batches of 20
+            const BATCH_SIZE = 20;
+            for (let i = 0; i < transformed.length; i += BATCH_SIZE) {
+                const batch = transformed.slice(i, i + BATCH_SIZE);
+                await loadBatch(batch);
+            }
+
+        } catch (err) {
+            console.error('Error fetching all images:', err);
+        } finally {
+            setLoadingAllImages(false);
+        }
+    }, [loadingAllImages]);
+
+    // Load all images when filter mode requires it
+    useEffect(() => {
+        if (filterMode !== 'all' && allImages.length === 0 && !loadingAllImages) {
+            fetchAllImages();
+        }
+    }, [filterMode, allImages.length, loadingAllImages, fetchAllImages]);
+
     const handleAnalyze = async () => {
         if (!selectedImage) {
             showAlert(t('common.warning'), t('provenance.selectImageFirst'), 'warning');
@@ -436,11 +547,37 @@ const ProvenancePage = () => {
         setPairsPage(1); // Reset pairs pagination
 
         try {
+            // Compute search_image_ids based on filter mode
+            // - If user made manual selections (manuallySelectedIds), use those directly
+            // - Otherwise, fall back to tag/date filter logic using allImages
+            let searchImageIds = null;
+
+            if (filterMode !== 'all') {
+                if (manuallySelectedIds.length > 0) {
+                    // User made explicit selections - use them
+                    searchImageIds = manuallySelectedIds;
+                } else if (filterMode === 'tags' && filterTags.length > 0) {
+                    // No manual selection but has tag filter - auto-select all matching
+                    searchImageIds = allImages
+                        .filter(img => img.imageType?.some(tag => filterTags.includes(tag)))
+                        .map(img => img.id);
+                } else if (filterMode === 'date' && (filterDateFrom || filterDateTo)) {
+                    // No manual selection but has date filter - auto-select all matching
+                    searchImageIds = allImages.filter(img => {
+                        const imgDate = new Date(img.uploadedDate);
+                        const fromOk = !filterDateFrom || imgDate >= new Date(filterDateFrom);
+                        const toOk = !filterDateTo || imgDate <= new Date(filterDateTo + 'T23:59:59');
+                        return fromOk && toOk;
+                    }).map(img => img.id);
+                }
+            }
+
             const response = await api.startProvenanceAnalysis(selectedImage.id, {
                 k: topK,
                 q: topQ,
                 max_depth: maxDepth,
-                descriptor_type: descriptorType
+                descriptor_type: descriptorType,
+                search_image_ids: searchImageIds
             });
 
             setAnalysisId(response.analysis_id);
@@ -600,6 +737,324 @@ const ProvenancePage = () => {
                                         error={!imageUrls[img.id] && !loadingUrls[img.id]}
                                     />
                                 ))}
+                            </div>
+                        )}
+                    </CollapsibleSection>
+
+                    {/* Step 1.5: Filter Gallery (Optional) */}
+                    <CollapsibleSection
+                        title={t('provenance.filterGallery')}
+                        description={t('provenance.filterGalleryDesc')}
+                        stepNumber="⚙"
+                        defaultOpen={false}
+                    >
+                        {/* Filter Mode Tabs */}
+                        <div className="flex flex-wrap gap-2 mb-6">
+                            {[
+                                { mode: 'all', icon: FiGrid, label: t('provenance.filterAll') },
+                                { mode: 'tags', icon: FiTag, label: t('provenance.filterByTag') },
+                                { mode: 'date', icon: FiCalendar, label: t('provenance.filterByDate') },
+                                { mode: 'manual', icon: FiCheck, label: t('provenance.filterManual') },
+                            ].map(({ mode, icon: Icon, label }) => (
+                                <button
+                                    key={mode}
+                                    onClick={() => {
+                                        setFilterMode(mode);
+                                        // Reset manual selection when switching modes
+                                        if (mode === 'all') {
+                                            setManuallySelectedIds([]);
+                                            setFilterTags([]);
+                                            setFilterDateFrom('');
+                                            setFilterDateTo('');
+                                        }
+                                    }}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${filterMode === mode
+                                        ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30'
+                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                        }`}
+                                >
+                                    <Icon size={16} />
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Filter Content based on mode */}
+                        {filterMode === 'all' && (
+                            <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                                {t('provenance.filterAllDesc')}
+                            </p>
+                        )}
+
+                        {filterMode !== 'all' && (
+                            <div className="space-y-4">
+                                {/* Loading indicator */}
+                                {loadingAllImages && (
+                                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                                        <FiRefreshCw className="animate-spin" />
+                                        {t('common.loading')}
+                                    </div>
+                                )}
+
+                                {/* Tag Selection */}
+                                {filterMode === 'tags' && (
+                                    <div className="space-y-3">
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                                            {t('provenance.filterTagsDesc')}
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {[...new Set(allImages.flatMap(img => img.imageType || []))].map(tag => {
+                                                const tagImageCount = allImages.filter(img => img.imageType?.includes(tag)).length;
+                                                const isSelected = filterTags.includes(tag);
+                                                return (
+                                                    <button
+                                                        key={tag}
+                                                        onClick={() => {
+                                                            // Toggle tag in filterTags
+                                                            setFilterTags(prev =>
+                                                                isSelected
+                                                                    ? prev.filter(t => t !== tag)
+                                                                    : [...prev, tag]
+                                                            );
+                                                            setFilterGridPage(1);
+                                                        }}
+                                                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors flex items-center gap-1.5 ${isSelected
+                                                            ? 'bg-emerald-100 border-emerald-300 text-emerald-700 dark:bg-emerald-900/40 dark:border-emerald-500/30 dark:text-emerald-300'
+                                                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300'
+                                                            }`}
+                                                    >
+                                                        #{tag}
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-emerald-200 dark:bg-emerald-800' : 'bg-gray-100 dark:bg-gray-700'}`}>
+                                                            {tagImageCount}
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Date Range Selection */}
+                                {filterMode === 'date' && (
+                                    <div className="space-y-3">
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                                            {t('provenance.filterDateDesc')}
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-4 max-w-md">
+                                            <div>
+                                                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                                    {t('filters.dateFrom')}
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    value={filterDateFrom}
+                                                    onChange={(e) => setFilterDateFrom(e.target.value)}
+                                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                                    {t('filters.dateTo')}
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    value={filterDateTo}
+                                                    onChange={(e) => setFilterDateTo(e.target.value)}
+                                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Manual mode description */}
+                                {filterMode === 'manual' && (
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                        {t('provenance.filterManualDesc')}
+                                    </p>
+                                )}
+
+                                {/* Search input for text filtering */}
+                                <div className="relative max-w-md">
+                                    <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                    <input
+                                        type="text"
+                                        value={filterSearch}
+                                        onChange={(e) => { setFilterSearch(e.target.value); setFilterGridPage(1); }}
+                                        placeholder={t('gallery.searchPlaceholder')}
+                                        className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                                    />
+                                </div>
+
+                                {/* Selection summary */}
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-gray-500 dark:text-gray-400">
+                                        {(() => {
+                                            // Compute filtered images based on mode
+                                            let filtered = allImages;
+                                            if (filterMode === 'tags' && filterTags.length > 0) {
+                                                filtered = allImages.filter(img => img.imageType?.some(tag => filterTags.includes(tag)));
+                                            } else if (filterMode === 'date' && (filterDateFrom || filterDateTo)) {
+                                                filtered = allImages.filter(img => {
+                                                    const imgDate = new Date(img.uploadedDate);
+                                                    const fromOk = !filterDateFrom || imgDate >= new Date(filterDateFrom);
+                                                    const toOk = !filterDateTo || imgDate <= new Date(filterDateTo + 'T23:59:59');
+                                                    return fromOk && toOk;
+                                                });
+                                            }
+                                            // Apply text search
+                                            if (filterSearch) {
+                                                const searchLower = filterSearch.toLowerCase();
+                                                filtered = filtered.filter(img => img.filename?.toLowerCase().includes(searchLower));
+                                            }
+                                            return `${filtered.length} ${t('provenance.imagesAvailable')}`;
+                                        })()}
+                                    </span>
+                                    {manuallySelectedIds.length > 0 && (
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                                            {manuallySelectedIds.length} {t('provenance.imagesSelected')}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Refinement Grid with pagination */}
+                                {(() => {
+                                    // Compute filtered images based on mode
+                                    let filtered = allImages;
+                                    if (filterMode === 'tags' && filterTags.length > 0) {
+                                        filtered = allImages.filter(img => img.imageType?.some(tag => filterTags.includes(tag)));
+                                    } else if (filterMode === 'date' && (filterDateFrom || filterDateTo)) {
+                                        filtered = allImages.filter(img => {
+                                            const imgDate = new Date(img.uploadedDate);
+                                            const fromOk = !filterDateFrom || imgDate >= new Date(filterDateFrom);
+                                            const toOk = !filterDateTo || imgDate <= new Date(filterDateTo + 'T23:59:59');
+                                            return fromOk && toOk;
+                                        });
+                                    }
+                                    // Apply text search
+                                    if (filterSearch) {
+                                        const searchLower = filterSearch.toLowerCase();
+                                        filtered = filtered.filter(img => img.filename?.toLowerCase().includes(searchLower));
+                                    }
+
+                                    // Calculate pagination
+                                    const totalFilteredPages = Math.ceil(filtered.length / FILTER_GRID_PAGE_SIZE);
+                                    const startIdx = (filterGridPage - 1) * FILTER_GRID_PAGE_SIZE;
+                                    const pageImages = filtered.slice(startIdx, startIdx + FILTER_GRID_PAGE_SIZE);
+
+                                    return (
+                                        <>
+                                            {/* Grid */}
+                                            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-9 lg:grid-cols-12 gap-2 p-1">
+                                                {pageImages.map((img) => (
+                                                    <div
+                                                        key={img.id}
+                                                        onClick={() => {
+                                                            setManuallySelectedIds(prev =>
+                                                                prev.includes(img.id)
+                                                                    ? prev.filter(id => id !== img.id)
+                                                                    : [...prev, img.id]
+                                                            );
+                                                        }}
+                                                        title={img.filename}
+                                                        className={`relative aspect-square rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${manuallySelectedIds.includes(img.id)
+                                                            ? 'border-emerald-500 ring-2 ring-emerald-500/30'
+                                                            : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
+                                                            }`}
+                                                    >
+                                                        {(allImageUrls[img.id] || imageUrls[img.id]) ? (
+                                                            <img
+                                                                src={allImageUrls[img.id] || imageUrls[img.id]}
+                                                                alt={img.filename}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs text-gray-400 animate-pulse" />
+                                                        )}
+                                                        {manuallySelectedIds.includes(img.id) && (
+                                                            <div className="absolute top-1 right-1 bg-emerald-600 text-white p-0.5 rounded-full">
+                                                                <FiCheck size={10} />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {/* Pagination Controls */}
+                                            {totalFilteredPages > 1 && (
+                                                <div className="flex items-center justify-center gap-2 pt-2">
+                                                    <button
+                                                        onClick={() => setFilterGridPage(p => Math.max(1, p - 1))}
+                                                        disabled={filterGridPage === 1}
+                                                        className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                    >
+                                                        <FiChevronLeft size={16} />
+                                                    </button>
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400 min-w-[80px] text-center">
+                                                        {filterGridPage} / {totalFilteredPages}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => setFilterGridPage(p => Math.min(totalFilteredPages, p + 1))}
+                                                        disabled={filterGridPage === totalFilteredPages}
+                                                        className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                    >
+                                                        <FiChevronRight size={16} />
+                                                    </button>
+                                                    <span className="mx-2 text-gray-300 dark:text-gray-600">|</span>
+                                                    <button
+                                                        onClick={() => {
+                                                            const pageIds = pageImages.map(img => img.id);
+                                                            setManuallySelectedIds(prev => {
+                                                                const newSet = new Set(prev);
+                                                                pageIds.forEach(id => newSet.add(id));
+                                                                return [...newSet];
+                                                            });
+                                                        }}
+                                                        className="px-3 py-1 text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors"
+                                                    >
+                                                        {t('provenance.selectPage')}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
+
+                                {/* Quick selection buttons */}
+                                {(filterMode === 'tags' && filterTags.length > 0) || (filterMode === 'date' && (filterDateFrom || filterDateTo)) ? (
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => {
+                                                // Select all filtered images
+                                                let filtered = allImages;
+                                                if (filterMode === 'tags' && filterTags.length > 0) {
+                                                    filtered = allImages.filter(img => img.imageType?.some(tag => filterTags.includes(tag)));
+                                                } else if (filterMode === 'date' && (filterDateFrom || filterDateTo)) {
+                                                    filtered = allImages.filter(img => {
+                                                        const imgDate = new Date(img.uploadedDate);
+                                                        const fromOk = !filterDateFrom || imgDate >= new Date(filterDateFrom);
+                                                        const toOk = !filterDateTo || imgDate <= new Date(filterDateTo + 'T23:59:59');
+                                                        return fromOk && toOk;
+                                                    });
+                                                }
+                                                if (filterSearch) {
+                                                    const searchLower = filterSearch.toLowerCase();
+                                                    filtered = filtered.filter(img => img.filename?.toLowerCase().includes(searchLower));
+                                                }
+                                                setManuallySelectedIds(filtered.map(img => img.id));
+                                            }}
+                                            className="px-3 py-1.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors"
+                                        >
+                                            {t('provenance.selectAllFiltered')}
+                                        </button>
+                                        <button
+                                            onClick={() => setManuallySelectedIds([])}
+                                            className="px-3 py-1.5 text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                        >
+                                            {t('selection.clearSelection')}
+                                        </button>
+                                    </div>
+                                ) : null}
                             </div>
                         )}
                     </CollapsibleSection>
