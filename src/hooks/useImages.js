@@ -23,12 +23,29 @@ export const useImages = () => {
     });
 
     const fetchImages = useCallback(async (params = {}) => {
-        const { page = 1, per_page = DEFAULT_PER_PAGE, ...otherParams } = params;
+        const {
+            page = 1,
+            per_page = DEFAULT_PER_PAGE,
+            imageType = [],
+            dateFrom = null,
+            dateTo = null,
+            search = '',
+            sourceType = null,
+            ...otherParams
+        } = params;
+
+        // Build query params - only include non-empty values
+        const queryParams = { page, per_page, ...otherParams };
+        if (imageType && imageType.length > 0) queryParams.image_type = imageType.join(',');
+        if (dateFrom) queryParams.date_from = dateFrom;
+        if (dateTo) queryParams.date_to = dateTo;
+        if (search) queryParams.search = search;
+        if (sourceType && sourceType !== 'all') queryParams.source_type = sourceType;
 
         setLoading(true);
         setError(null);
         try {
-            const data = await api.get('/images', { page, per_page, ...otherParams });
+            const data = await api.get('/images', queryParams);
 
             // Handle both array response (legacy) and paginated response object
             let imageList = [];

@@ -28,7 +28,11 @@ import {
     FiEyeOff,
     FiSearch,
     FiZoomIn,
-    FiZoomOut
+    FiZoomOut,
+    FiCalendar,
+    FiTag,
+    FiX,
+    FiFilter
 } from 'react-icons/fi';
 import { api } from '../services/api';
 import { showToast } from '../utils/alert';
@@ -243,15 +247,46 @@ const ImageAnalysisPage = () => {
     const [totalImages, setTotalImages] = useState(0);
     const [zoomLevel, setZoomLevel] = useState(1); // 1 = fit to container
 
+    // Filter State
+    const [filterSearch, setFilterSearch] = useState('');
+    const [filterDateFrom, setFilterDateFrom] = useState('');
+    const [filterDateTo, setFilterDateTo] = useState('');
+    const [filterImageType, setFilterImageType] = useState('');
+    const [availableCategories, setAvailableCategories] = useState([]);
+    const [showFilters, setShowFilters] = useState(false);
+
     // Refs
     const resultCanvasRef = useRef(null);
     const analysisTimeoutRef = useRef(null);
     const zoomContainerRef = useRef(null);
 
-    // Fetch images
+    // Fetch images when page or filters change
     useEffect(() => {
         fetchImages(galleryPage);
-    }, [galleryPage]);
+    }, [galleryPage, filterSearch, filterDateFrom, filterDateTo, filterImageType]);
+
+    // Fetch available categories on mount
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                // Fetch a batch of images and extract unique types (same as Provenance page)
+                const data = await api.get('/images', { page: 1, per_page: 100 });
+                const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
+                console.log('ImageAnalysis: Fetched images for categories:', imageList.length);
+                const categories = new Set();
+                imageList.forEach(img => {
+                    const types = img.image_type || [];
+                    types.forEach(type => categories.add(type));
+                });
+                const sortedCategories = Array.from(categories).sort();
+                console.log('ImageAnalysis: Available categories:', sortedCategories);
+                setAvailableCategories(sortedCategories);
+            } catch (err) {
+                console.error('Error fetching categories:', err);
+            }
+        };
+        fetchCategories();
+    }, []);
 
     // Handle wheel zoom with non-passive listener to prevent scroll
     useEffect(() => {
@@ -328,7 +363,14 @@ const ImageAnalysisPage = () => {
     const fetchImages = useCallback(async (page = 1) => {
         setLoadingImages(true);
         try {
-            const data = await api.get('/images', { page, per_page: IMAGES_PER_PAGE });
+            // Build query params with filters
+            const queryParams = { page, per_page: IMAGES_PER_PAGE };
+            if (filterSearch) queryParams.search = filterSearch;
+            if (filterDateFrom) queryParams.date_from = filterDateFrom;
+            if (filterDateTo) queryParams.date_to = filterDateTo;
+            if (filterImageType) queryParams.image_type = filterImageType;
+
+            const data = await api.get('/images', queryParams);
 
             let imageList = [];
             let total = 0;
@@ -358,7 +400,7 @@ const ImageAnalysisPage = () => {
         } finally {
             setLoadingImages(false);
         }
-    }, []);
+    }, [filterSearch, filterDateFrom, filterDateTo, filterImageType]);
 
     // Run analysis
     const runAnalysis = async () => {
@@ -709,13 +751,105 @@ const ImageAnalysisPage = () => {
                                     {t('analysis.selectImage') || 'Select Image'}
                                 </span>
                             )}
-                            <button
-                                onClick={() => setGalleryCollapsed(!galleryCollapsed)}
-                                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
-                            >
-                                {galleryCollapsed ? <FiMaximize2 size={14} /> : <FiMinimize2 size={14} />}
-                            </button>
+                            <div className="flex items-center gap-1">
+                                {!galleryCollapsed && (
+                                    <button
+                                        onClick={() => setShowFilters(!showFilters)}
+                                        className={`p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 ${(filterSearch || filterDateFrom || filterDateTo || filterImageType)
+                                            ? 'text-indigo-500'
+                                            : 'text-gray-500'
+                                            }`}
+                                        title={t('filters.toggle', 'Toggle filters')}
+                                    >
+                                        <FiFilter size={14} />
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => setGalleryCollapsed(!galleryCollapsed)}
+                                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                                >
+                                    {galleryCollapsed ? <FiMaximize2 size={14} /> : <FiMinimize2 size={14} />}
+                                </button>
+                            </div>
                         </div>
+
+                        {/* Filter Panel */}
+                        {!galleryCollapsed && showFilters && (
+                            <div className="flex-none p-2 border-b border-gray-100 dark:border-gray-700 space-y-2">
+                                {/* Search Input */}
+                                <div className="relative">
+                                    <FiSearch className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={12} />
+                                    <input
+                                        type="text"
+                                        value={filterSearch}
+                                        onChange={(e) => { setFilterSearch(e.target.value); setGalleryPage(1); }}
+                                        placeholder={t('gallery.searchPlaceholder', 'Search...')}
+                                        className="w-full pl-7 pr-2 py-1.5 text-xs rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                    />
+                                </div>
+
+                                {/* Image Type Dropdown */}
+                                <div className="relative">
+                                    <FiTag className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={12} />
+                                    <select
+                                        value={filterImageType}
+                                        onChange={(e) => { setFilterImageType(e.target.value); setGalleryPage(1); }}
+                                        className="w-full pl-7 pr-2 py-1.5 text-xs rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white appearance-none"
+                                    >
+                                        <option value="">{t('cbir.allTypes', 'All Types')}</option>
+                                        {availableCategories.map(cat => (
+                                            <option key={cat} value={cat}>{cat}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Date Range */}
+                                <div className="grid grid-cols-2 gap-1">
+                                    <div className="relative">
+                                        <FiCalendar className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={10} />
+                                        <input
+                                            type="date"
+                                            value={filterDateFrom}
+                                            onChange={(e) => { setFilterDateFrom(e.target.value); setGalleryPage(1); }}
+                                            className="w-full pl-6 pr-1 py-1.5 text-xs rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                            title={t('filters.dateFrom', 'From date')}
+                                        />
+                                    </div>
+                                    <div className="relative">
+                                        <FiCalendar className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={10} />
+                                        <input
+                                            type="date"
+                                            value={filterDateTo}
+                                            onChange={(e) => { setFilterDateTo(e.target.value); setGalleryPage(1); }}
+                                            className="w-full pl-6 pr-1 py-1.5 text-xs rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                            title={t('filters.dateTo', 'To date')}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Clear Filters */}
+                                {(filterSearch || filterDateFrom || filterDateTo || filterImageType) && (
+                                    <button
+                                        onClick={() => {
+                                            setFilterSearch('');
+                                            setFilterDateFrom('');
+                                            setFilterDateTo('');
+                                            setFilterImageType('');
+                                            setGalleryPage(1);
+                                        }}
+                                        className="w-full flex items-center justify-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                                    >
+                                        <FiX size={12} />
+                                        {t('filters.clearFilters', 'Clear filters')}
+                                    </button>
+                                )}
+
+                                {/* Results count */}
+                                <div className="text-center text-xs text-gray-400">
+                                    {totalImages} {t('gallery.images', 'images')}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Gallery Content */}
                         {!galleryCollapsed && (
