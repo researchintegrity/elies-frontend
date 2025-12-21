@@ -386,12 +386,8 @@ const CBIRSearchPage = () => {
 
   useEffect(() => {
     if (selectedImage) {
-      const imageTypes = selectedImage.imageType || [];
-      if (imageTypes.length > 0) {
-        setCategoryFilter(imageTypes[0]);
-      } else {
-        setCategoryFilter('all');
-      }
+      // Always default to 'all' types - user can manually filter if needed
+      setCategoryFilter('all');
     }
   }, [selectedImage]);
 

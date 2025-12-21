@@ -272,14 +272,12 @@ const ImageAnalysisPage = () => {
                 // Fetch a batch of images and extract unique types (same as Provenance page)
                 const data = await api.get('/images', { page: 1, per_page: 100 });
                 const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
-                console.log('ImageAnalysis: Fetched images for categories:', imageList.length);
                 const categories = new Set();
                 imageList.forEach(img => {
                     const types = img.image_type || [];
                     types.forEach(type => categories.add(type));
                 });
                 const sortedCategories = Array.from(categories).sort();
-                console.log('ImageAnalysis: Available categories:', sortedCategories);
                 setAvailableCategories(sortedCategories);
             } catch (err) {
                 console.error('Error fetching categories:', err);
