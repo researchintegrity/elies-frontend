@@ -1310,13 +1310,16 @@ const ProvenancePage = () => {
                                                         }}
                                                         className="px-3 py-1 text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors"
                                                     >
-                                                        {t('provenance.selectPage')}
+                                                        {t('provenance.selectAllOnPage')}
                                                     </button>
                                                     <button
-                                                        onClick={() => setManuallySelectedIds([])}
+                                                        onClick={() => {
+                                                            const pageIds = new Set(pageImages.map(img => img.id));
+                                                            setManuallySelectedIds(prev => prev.filter(id => !pageIds.has(id)));
+                                                        }}
                                                         className="px-3 py-1 text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
                                                     >
-                                                        {t('selection.clearSelection')}
+                                                        {t('provenance.clearPageSelection')}
                                                     </button>
                                                 </div>
                                             )}
@@ -1328,9 +1331,8 @@ const ProvenancePage = () => {
                                 {(filterMode === 'tags' && filterTags.length > 0) || (filterMode === 'date' && (filterDateFrom || filterDateTo)) || (filterMode === 'similarity' && similarityResults.length > 0) ? (
                                     <div className="flex gap-2">
                                         <button
-                                            onClick={() => {
+                                            onClick={async () => {
                                                 // For similarity mode, select all CBIR results (optionally filtered by tags)
-                                                // For other modes, select current page (server-side filtered)
                                                 if (filterMode === 'similarity' && similarityResults.length > 0) {
                                                     let toSelect = similarityResults;
                                                     if (filterTags.length > 0) {
@@ -1339,8 +1341,40 @@ const ProvenancePage = () => {
                                                         );
                                                     }
                                                     setManuallySelectedIds(toSelect.map(r => r.image_id));
+                                                } else if (filterMode === 'tags' && filterTags.length > 0) {
+                                                    // For tags mode, fetch ALL images matching the tags (paginated) and select them
+                                                    try {
+                                                        let allMatchingIds = [];
+                                                        let page = 1;
+                                                        const perPage = 100;
+                                                        let hasMore = true;
+
+                                                        while (hasMore) {
+                                                            const queryParams = { page, per_page: perPage, image_type: filterTags.join(',') };
+                                                            const data = await api.get('/images', queryParams);
+                                                            const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
+                                                            const pageIds = imageList.map(img => img._id);
+                                                            allMatchingIds = [...allMatchingIds, ...pageIds];
+
+                                                            // Check if we got fewer than perPage, meaning no more pages
+                                                            hasMore = imageList.length >= perPage;
+                                                            page++;
+
+                                                            // Safety limit to avoid infinite loops
+                                                            if (page > 20) break;
+                                                        }
+
+                                                        setManuallySelectedIds(prev => {
+                                                            const combined = new Set([...prev, ...allMatchingIds]);
+                                                            return Array.from(combined);
+                                                        });
+                                                        showToast(`${allMatchingIds.length} ${t('provenance.imagesSelected')}`, 'success');
+                                                    } catch (err) {
+                                                        console.error('Error fetching all tagged images:', err);
+                                                        showToast(t('common.error') || 'Error', 'error');
+                                                    }
                                                 } else {
-                                                    // Select all on current page
+                                                    // For date mode, select current page
                                                     setManuallySelectedIds(prev => {
                                                         const currentPageIds = filterGalleryImages.map(img => img.id);
                                                         const combined = new Set([...prev, ...currentPageIds]);
@@ -1350,13 +1384,45 @@ const ProvenancePage = () => {
                                             }}
                                             className="px-3 py-1.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors"
                                         >
-                                            {filterMode === 'similarity' ? t('provenance.selectAllFiltered') : t('provenance.selectPage')}
+                                            {filterMode === 'similarity' ? t('provenance.selectAllFiltered') : filterMode === 'tags' ? t('provenance.selectAllWithTags') : t('provenance.selectAllOnPage')}
                                         </button>
                                         <button
-                                            onClick={() => setManuallySelectedIds([])}
+                                            onClick={async () => {
+                                                if (filterMode === 'tags' && filterTags.length > 0) {
+                                                    // For tags mode, fetch ALL images matching the tags (paginated) and remove them from selection
+                                                    try {
+                                                        let allMatchingIds = [];
+                                                        let page = 1;
+                                                        const perPage = 100;
+                                                        let hasMore = true;
+
+                                                        while (hasMore) {
+                                                            const queryParams = { page, per_page: perPage, image_type: filterTags.join(',') };
+                                                            const data = await api.get('/images', queryParams);
+                                                            const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
+                                                            const pageIds = imageList.map(img => img._id);
+                                                            allMatchingIds = [...allMatchingIds, ...pageIds];
+
+                                                            hasMore = imageList.length >= perPage;
+                                                            page++;
+                                                            if (page > 20) break;
+                                                        }
+
+                                                        const idsToRemove = new Set(allMatchingIds);
+                                                        setManuallySelectedIds(prev => prev.filter(id => !idsToRemove.has(id)));
+                                                    } catch (err) {
+                                                        console.error('Error fetching all tagged images:', err);
+                                                        showToast(t('common.error') || 'Error', 'error');
+                                                    }
+                                                } else {
+                                                    // For other modes, clear current page selection
+                                                    const currentPageIds = new Set(filterGalleryImages.map(img => img.id));
+                                                    setManuallySelectedIds(prev => prev.filter(id => !currentPageIds.has(id)));
+                                                }
+                                            }}
                                             className="px-3 py-1.5 text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
                                         >
-                                            {t('selection.clearSelection')}
+                                            {filterMode === 'tags' ? t('provenance.clearTagSelection') : t('provenance.clearPageSelection')}
                                         </button>
                                     </div>
                                 ) : null}
@@ -1605,8 +1671,8 @@ const ProvenancePage = () => {
                         </CollapsibleSection>
                     )}
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
 
