@@ -150,8 +150,8 @@ const QueryImageThumbnail = ({ image, isSelected, onSelect, isSelectionMode }) =
 
   if (!image) return null;
 
-  const handleClick = () => {
-    if (onSelect) onSelect(image.id);
+  const handleClick = (e) => {
+    if (onSelect) onSelect(image.id, e);
   };
 
   return (
@@ -166,7 +166,7 @@ const QueryImageThumbnail = ({ image, isSelected, onSelect, isSelectionMode }) =
         {/* Selection Checkbox - inside the thumbnail */}
         <div
           className={`absolute top-1 left-1 z-10 transition-opacity duration-200 ${isSelected || isSelectionMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-          onClick={(e) => { e.stopPropagation(); handleClick(); }}
+          onClick={(e) => { e.stopPropagation(); handleClick(e); }}
         >
           <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors shadow-sm ${isSelected
             ? 'bg-indigo-600 border-indigo-600 text-white'
@@ -247,15 +247,15 @@ const ImageCard = ({ image, onClick, onSelect, isSelected, isSelectionMode, simi
           ? 'ring-2 ring-indigo-500 border-indigo-500 shadow-lg scale-[1.02] z-10'
           : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-md'
         }`}
-      onClick={() => {
+      onClick={(e) => {
         // Always toggle selection when clicking anywhere on the card
-        onSelect(image.id);
+        onSelect(image.id, e);
       }}
     >
       {/* Checkbox Overlay (Visible on Hover or Selected) */}
       <div
         className={`absolute top-3 left-3 z-20 transition-opacity duration-200 ${isSelected || isSelectionMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-        onClick={(e) => { e.stopPropagation(); onSelect(image.id); }}
+        onClick={(e) => { e.stopPropagation(); onSelect(image.id, e); }}
       >
         <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected
           ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
@@ -380,6 +380,8 @@ const ViewImagesPage = () => {
   const [selectedImages, setSelectedImages] = useState(new Map());
   const selectedIds = useMemo(() => new Set(selectedImages.keys()), [selectedImages]);
   const [isBatchTagModalOpen, setIsBatchTagModalOpen] = useState(false);
+  const [lastClickedId, setLastClickedId] = useState(null); // For shift-click range selection
+  const [lastActionWasSelect, setLastActionWasSelect] = useState(true); // Tracks if last action was select or deselect
 
   // Lightbox
   const [lightboxImage, setLightboxImage] = useState(null);
@@ -573,11 +575,47 @@ const ViewImagesPage = () => {
 
   // Handlers
 
-  const handleSelect = useCallback((id) => {
+  const handleSelect = useCallback((id, event) => {
+    // Determine the current image list for range selection
+    const currentImageList = similarityMode ? allSimilarityImages : filteredImages;
+
     // Find the image data from current page images or similarity results
     const imageData = images.find(img => img.id === id) ||
-      filteredImages.find(img => img.id === id);
+      currentImageList.find(img => img.id === id);
 
+    // Shift-click range selection/deselection
+    if (event?.shiftKey && lastClickedId && lastClickedId !== id) {
+      // Use the current page/view images for range selection
+      const visibleImages = similarityMode ? allSimilarityImages : filteredImages;
+      const lastIndex = visibleImages.findIndex(img => img.id === lastClickedId);
+      const currentIndex = visibleImages.findIndex(img => img.id === id);
+
+      if (lastIndex !== -1 && currentIndex !== -1) {
+        const startIndex = Math.min(lastIndex, currentIndex);
+        const endIndex = Math.max(lastIndex, currentIndex);
+        const rangeImages = visibleImages.slice(startIndex, endIndex + 1);
+
+        // Use the last action type to determine select or deselect
+        setSelectedImages(prev => {
+          const newMap = new Map(prev);
+          if (lastActionWasSelect) {
+            // Select the range
+            rangeImages.forEach(img => newMap.set(img.id, img));
+          } else {
+            // Deselect the range
+            rangeImages.forEach(img => newMap.delete(img.id));
+          }
+          return newMap;
+        });
+
+        // Toggle action for next shift-click (so it does the opposite)
+        setLastActionWasSelect(!lastActionWasSelect);
+        return;
+      }
+    }
+
+    // Regular click - toggle selection
+    const wasSelected = selectedIds.has(id);
     setSelectedImages(prev => {
       const newMap = new Map(prev);
       if (newMap.has(id)) {
@@ -587,7 +625,11 @@ const ViewImagesPage = () => {
       }
       return newMap;
     });
-  }, [images, filteredImages]);
+
+    // Update anchor and action type for next shift-click
+    setLastClickedId(id);
+    setLastActionWasSelect(!wasSelected);
+  }, [images, filteredImages, similarityMode, allSimilarityImages, lastClickedId, selectedIds, lastActionWasSelect]);
 
   const handleClearSelection = () => setSelectedImages(new Map());
 
