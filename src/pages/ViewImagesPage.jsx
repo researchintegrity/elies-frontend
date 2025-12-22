@@ -393,6 +393,8 @@ const ViewImagesPage = () => {
   const [similarityTopK, setSimilarityTopK] = useState(20);
   const [similarityThreshold, setSimilarityThreshold] = useState(0.5);
   const [similarityLabelFilter, setSimilarityLabelFilter] = useState('all');
+  const [similarityPage, setSimilarityPage] = useState(1);
+  const SIMILARITY_PER_PAGE = 12;
 
   // Accumulated categories from all visited pages (persisted state)
   const [allCategories, setAllCategories] = useState(new Set());
@@ -472,6 +474,7 @@ const ViewImagesPage = () => {
         .slice(0, similarityTopK);
 
       setSimilarityResults(filteredMatches);
+      setSimilarityPage(1); // Reset to first page on new search
 
       if (filteredMatches.length === 0) {
         showToast(t('similarity.noResults'), 'info');
@@ -521,21 +524,33 @@ const ViewImagesPage = () => {
 
   // Derived State: Filtered Images (or similarity results)
   // Note: All filtering is now done server-side. This useMemo only handles:
-  // 1. Similarity mode - mapping results to expected format
+  // 1. Similarity mode - mapping results to expected format + pagination
   // 2. Client-side sorting - for immediate UX feedback without API call
+
+  // All similarity images (for selection purposes)
+  const allSimilarityImages = useMemo(() => {
+    if (!similarityMode) return [];
+    return similarityResults.map(result => ({
+      id: result.image_id,
+      imageId: result.image_id,
+      filename: result.filename || t('image.noName'),
+      uploadedDate: result.uploaded_date || new Date().toISOString(),
+      fileSize: result.file_size || 0,
+      sourceType: result.source_type || 'unknown',
+      imageType: result.image_type || [],
+      similarityScore: result.similarity_score
+    }));
+  }, [similarityMode, similarityResults, t]);
+
+  // Similarity pagination info
+  const similarityTotalPages = Math.ceil(allSimilarityImages.length / SIMILARITY_PER_PAGE);
+
   const filteredImages = useMemo(() => {
-    // In similarity mode, only show similarity results (or empty if none)
+    // In similarity mode, show paginated similarity results
     if (similarityMode) {
-      return similarityResults.map(result => ({
-        id: result.image_id,
-        imageId: result.image_id,
-        filename: result.filename || t('image.noName'),
-        uploadedDate: result.uploaded_date || new Date().toISOString(),
-        fileSize: result.file_size || 0,
-        sourceType: result.source_type || 'unknown',
-        imageType: result.image_type || [],
-        similarityScore: result.similarity_score
-      }));
+      const startIndex = (similarityPage - 1) * SIMILARITY_PER_PAGE;
+      const endIndex = startIndex + SIMILARITY_PER_PAGE;
+      return allSimilarityImages.slice(startIndex, endIndex);
     }
 
     // Server handles all filtering now, just apply local sorting for UX
@@ -554,7 +569,7 @@ const ViewImagesPage = () => {
     });
 
     return result;
-  }, [images, sortBy, similarityMode, similarityResults]);
+  }, [images, sortBy, similarityMode, allSimilarityImages, similarityPage, SIMILARITY_PER_PAGE]);
 
   // Handlers
 
@@ -783,7 +798,7 @@ const ViewImagesPage = () => {
                   {similarityLoading && <FiRefreshCw className="animate-spin text-sm text-gray-400" />}
                 </h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {!similarityLoading && `${filteredImages.length} ${t('similarity.resultsFound')}`}
+                  {!similarityLoading && `${allSimilarityImages.length} ${t('similarity.resultsFound')}`}
                   {similarityLoading && t('similarity.searching')}
                 </p>
               </div>
@@ -847,6 +862,102 @@ const ViewImagesPage = () => {
               </button>
             </div>
           </div>
+
+          {/* Selection Buttons and Pagination for Similarity Mode */}
+          {allSimilarityImages.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-4 mt-4 pt-4 border-t border-amber-200 dark:border-amber-800/50">
+              {/* Selection Buttons */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => {
+                    setSelectedImages(prev => {
+                      const newMap = new Map(prev);
+                      filteredImages.forEach(img => newMap.set(img.id, img));
+                      return newMap;
+                    });
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors"
+                >
+                  {t('provenance.selectAllOnPage')}
+                </button>
+                <button
+                  onClick={() => {
+                    const pageIds = new Set(filteredImages.map(img => img.id));
+                    setSelectedImages(prev => {
+                      const newMap = new Map(prev);
+                      pageIds.forEach(id => newMap.delete(id));
+                      return newMap;
+                    });
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
+                >
+                  {t('provenance.clearPageSelection')}
+                </button>
+                <span className="mx-2 text-gray-300 dark:text-gray-600">|</span>
+                <button
+                  onClick={() => {
+                    setSelectedImages(prev => {
+                      const newMap = new Map(prev);
+                      allSimilarityImages.forEach(img => newMap.set(img.id, img));
+                      return newMap;
+                    });
+                    showToast(`${allSimilarityImages.length} ${t('provenance.imagesSelected')}`, 'success');
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-900/60 transition-colors"
+                >
+                  {t('similarity.selectAllResults')}
+                </button>
+                <button
+                  onClick={() => setSelectedImages(new Map())}
+                  className="px-3 py-1.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  {t('gallery.clearAllSelection')}
+                </button>
+                {selectedIds.size > 0 && (
+                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                    ({selectedIds.size} {t('common.selected')})
+                  </span>
+                )}
+              </div>
+
+              {/* Pagination Controls */}
+              {similarityTotalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSimilarityPage(1)}
+                    disabled={similarityPage === 1}
+                    className="px-2 py-1 text-xs rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    {t('gallery.first')}
+                  </button>
+                  <button
+                    onClick={() => setSimilarityPage(prev => Math.max(1, prev - 1))}
+                    disabled={similarityPage === 1}
+                    className="p-1 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <FiChevronLeft size={16} />
+                  </button>
+                  <span className="text-xs text-gray-600 dark:text-gray-300 min-w-[80px] text-center">
+                    {similarityPage}/{similarityTotalPages} ({allSimilarityImages.length})
+                  </span>
+                  <button
+                    onClick={() => setSimilarityPage(prev => Math.min(similarityTotalPages, prev + 1))}
+                    disabled={similarityPage === similarityTotalPages}
+                    className="p-1 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <FiChevronRight size={16} />
+                  </button>
+                  <button
+                    onClick={() => setSimilarityPage(similarityTotalPages)}
+                    disabled={similarityPage === similarityTotalPages}
+                    className="px-2 py-1 text-xs rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    {t('gallery.last')}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -1122,7 +1233,7 @@ const ViewImagesPage = () => {
                   isSelected={selectedIds.has(image.id)}
                   isSelectionMode={selectedIds.size > 0}
                   similarityScore={image.similarityScore !== undefined ? image.similarityScore : null}
-                  rank={image.similarityScore !== undefined ? index + 1 : null}
+                  rank={image.similarityScore !== undefined ? (similarityMode ? (similarityPage - 1) * SIMILARITY_PER_PAGE + index + 1 : index + 1) : null}
                 />
               ))}
             </div>
