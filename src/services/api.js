@@ -211,14 +211,17 @@ export const api = {
 
     /**
      * Start single-image copy-move detection analysis
+     * Note: Single-image detection only supports 'dense' method
      * @param {string} imageId - Image ID to analyze
-     * @param {number} method - Detection method (1-5, default: 2)
+     * @param {string} method - Detection method (only 'dense' supported for single-image)
+     * @param {number} denseMethod - Dense method variant (1-5)
      * @returns {Promise<{message: string, analysis_id: string}>}
      */
-    startCopyMoveAnalysis: async (imageId, method = 2) => {
+    startCopyMoveAnalysis: async (imageId, method = 'dense', denseMethod = 2) => {
         return api.post('/analyses/copy-move/single', {
             image_id: imageId,
-            method: method
+            method: 'dense',  // Single-image only supports dense
+            dense_method: denseMethod
         });
     },
 
@@ -226,14 +229,18 @@ export const api = {
      * Start cross-image copy-move detection analysis
      * @param {string} sourceImageId - Source image ID
      * @param {string} targetImageId - Target image ID
-     * @param {number} method - Detection method (1-5, default: 2)
+     * @param {string} method - Detection method ('keypoint' or 'dense', default: 'keypoint')
+     * @param {number} denseMethod - Dense method variant (1-5), only used when method='dense'
+     * @param {string} descriptor - Keypoint descriptor type, only used when method='keypoint'
      * @returns {Promise<{message: string, analysis_id: string}>}
      */
-    startCrossImageCopyMoveAnalysis: async (sourceImageId, targetImageId, method = 2) => {
+    startCrossImageCopyMoveAnalysis: async (sourceImageId, targetImageId, method = 'keypoint', denseMethod = 2, descriptor = 'cv_rsift') => {
         return api.post('/analyses/copy-move/cross', {
             source_image_id: sourceImageId,
             target_image_id: targetImageId,
-            method: method
+            method: method,
+            dense_method: denseMethod,
+            descriptor: descriptor
         });
     }
 };

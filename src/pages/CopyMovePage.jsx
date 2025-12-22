@@ -31,12 +31,26 @@ const IMAGES_PER_PAGE = 12;
 const POLL_INTERVAL = 2000; // 2 seconds
 const MAX_POLL_ATTEMPTS = 60; // Max 2 minutes of polling
 
-const DETECTION_METHODS = [
+// Method types (keypoint only available for cross-image mode)
+const METHOD_TYPES = [
+    { id: 'keypoint', name: 'Keypoint', descriptionKey: 'copyMove.keypointDesc' },
+    { id: 'dense', name: 'Dense', descriptionKey: 'copyMove.denseDesc' }
+];
+
+// Dense method variants (only used when method type is 'dense')
+const DENSE_METHODS = [
     { id: 1, name: 'ZM-cart', description: 'Zernike Moments (Cartesian)' },
     { id: 2, name: 'ZM-polar', description: 'Zernike Moments (Polar) - Default' },
     { id: 3, name: 'PCT-cart', description: 'Polar Cosine Transform (Cartesian)' },
     { id: 4, name: 'PCT-polar', description: 'Polar Cosine Transform (Polar)' },
     { id: 5, name: 'FMT', description: 'Fourier-Mellin Transform' }
+];
+
+// Keypoint descriptor types (only used when method type is 'keypoint')
+const KEYPOINT_DESCRIPTORS = [
+    { id: 'cv_rsift', name: 'RootSIFT', descriptionKey: 'copyMove.descriptorRsift' },
+    { id: 'cv_sift', name: 'SIFT', descriptionKey: 'copyMove.descriptorSift' },
+    { id: 'vlfeat_sift_heq', name: 'VLFeat SIFT HEQ', descriptionKey: 'copyMove.descriptorVlfeat' }
 ];
 
 // --- Sub-Components ---
@@ -319,8 +333,18 @@ const CopyMovePage = () => {
     const [sourceImage, setSourceImage] = useState(null);
     const [targetImage, setTargetImage] = useState(null);
 
-    // Detection method
-    const [method, setMethod] = useState(2);
+    // Detection method - now uses string type
+    // Single-image mode only supports 'dense', cross-image supports both
+    const [methodType, setMethodType] = useState('dense'); // 'keypoint' or 'dense'
+    const [denseMethod, setDenseMethod] = useState(2); // Sub-method for dense (1-5)
+    const [descriptor, setDescriptor] = useState('cv_rsift'); // Keypoint descriptor
+
+    // When mode changes, ensure valid method type is selected
+    useEffect(() => {
+        if (mode === 'single' && methodType === 'keypoint') {
+            setMethodType('dense');
+        }
+    }, [mode, methodType]);
 
     // Analysis state
     const [analysisId, setAnalysisId] = useState(null);
@@ -412,9 +436,17 @@ const CopyMovePage = () => {
         try {
             let response;
             if (mode === 'single') {
-                response = await api.startCopyMoveAnalysis(sourceImage.id, method);
+                // Single-image only uses dense method
+                response = await api.startCopyMoveAnalysis(sourceImage.id, 'dense', denseMethod);
             } else {
-                response = await api.startCrossImageCopyMoveAnalysis(sourceImage.id, targetImage.id, method);
+                // Cross-image supports both methods
+                response = await api.startCrossImageCopyMoveAnalysis(
+                    sourceImage.id,
+                    targetImage.id,
+                    methodType,
+                    denseMethod,
+                    descriptor
+                );
             }
 
             setAnalysisId(response.analysis_id);
@@ -482,20 +514,83 @@ const CopyMovePage = () => {
                         </div>
                     </div>
 
-                    {/* Method Selection */}
+                    {/* Method Type Selection */}
                     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
                         <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('copyMove.method')}</h3>
-                        <select
-                            value={method}
-                            onChange={(e) => setMethod(Number(e.target.value))}
-                            className="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border-none focus:ring-2 focus:ring-indigo-500"
-                        >
-                            {DETECTION_METHODS.map(m => (
-                                <option key={m.id} value={m.id}>
-                                    {m.name} - {m.description}
-                                </option>
-                            ))}
-                        </select>
+
+                        {/* Method Type Buttons */}
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                            {METHOD_TYPES.map(m => {
+                                const isDisabled = m.id === 'keypoint' && mode === 'single';
+                                return (
+                                    <button
+                                        key={m.id}
+                                        onClick={() => !isDisabled && setMethodType(m.id)}
+                                        disabled={isDisabled}
+                                        title={isDisabled ? t('copyMove.keypointCrossOnly') : ''}
+                                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${methodType === m.id
+                                            ? 'bg-indigo-600 text-white'
+                                            : isDisabled
+                                                ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                                                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                                            }`}
+                                    >
+                                        {m.name}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Method Description */}
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                            {methodType === 'keypoint'
+                                ? t('copyMove.keypointDesc')
+                                : t('copyMove.denseDesc')
+                            }
+                        </p>
+
+                        {/* Keypoint Descriptor Selector (only shown when keypoint is selected) */}
+                        {methodType === 'keypoint' && mode === 'cross' && (
+                            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2 block">
+                                    {t('copyMove.descriptorType')}
+                                </label>
+                                <select
+                                    value={descriptor}
+                                    onChange={(e) => setDescriptor(e.target.value)}
+                                    className="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                >
+                                    {KEYPOINT_DESCRIPTORS.map(d => (
+                                        <option key={d.id} value={d.id}>
+                                            {d.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                    {t(KEYPOINT_DESCRIPTORS.find(d => d.id === descriptor)?.descriptionKey || '')}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Dense Method Variants (only shown when dense is selected) */}
+                        {methodType === 'dense' && (
+                            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2 block">
+                                    {t('copyMove.denseVariant')}
+                                </label>
+                                <select
+                                    value={denseMethod}
+                                    onChange={(e) => setDenseMethod(Number(e.target.value))}
+                                    className="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                >
+                                    {DENSE_METHODS.map(m => (
+                                        <option key={m.id} value={m.id}>
+                                            {m.name} - {m.description}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                     </div>
 
                     {/* Selected Images */}
