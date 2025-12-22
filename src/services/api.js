@@ -205,5 +205,35 @@ export const api = {
      */
     getAnalysisById: async (analysisId) => {
         return api.get(`/analyses/${analysisId}`);
+    },
+
+    // --- Copy-Move Detection ---
+
+    /**
+     * Start single-image copy-move detection analysis
+     * @param {string} imageId - Image ID to analyze
+     * @param {number} method - Detection method (1-5, default: 2)
+     * @returns {Promise<{message: string, analysis_id: string}>}
+     */
+    startCopyMoveAnalysis: async (imageId, method = 2) => {
+        return api.post('/analyses/copy-move/single', {
+            image_id: imageId,
+            method: method
+        });
+    },
+
+    /**
+     * Start cross-image copy-move detection analysis
+     * @param {string} sourceImageId - Source image ID
+     * @param {string} targetImageId - Target image ID
+     * @param {number} method - Detection method (1-5, default: 2)
+     * @returns {Promise<{message: string, analysis_id: string}>}
+     */
+    startCrossImageCopyMoveAnalysis: async (sourceImageId, targetImageId, method = 2) => {
+        return api.post('/analyses/copy-move/cross', {
+            source_image_id: sourceImageId,
+            target_image_id: targetImageId,
+            method: method
+        });
     }
 };
