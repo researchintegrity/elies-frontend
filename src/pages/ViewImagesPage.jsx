@@ -960,6 +960,128 @@ const ViewImagesPage = () => {
               ))}
             </div>
           )}
+
+          {/* Top Selection Buttons */}
+          {!similarityMode && pagination.total > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800/50">
+              <button
+                onClick={() => {
+                  setSelectedImages(prev => {
+                    const newMap = new Map(prev);
+                    filteredImages.forEach(img => newMap.set(img.id, img));
+                    return newMap;
+                  });
+                }}
+                className="px-3 py-1.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors"
+              >
+                {t('provenance.selectAllOnPage')}
+              </button>
+              <button
+                onClick={() => {
+                  const pageIds = new Set(filteredImages.map(img => img.id));
+                  setSelectedImages(prev => {
+                    const newMap = new Map(prev);
+                    pageIds.forEach(id => newMap.delete(id));
+                    return newMap;
+                  });
+                }}
+                className="px-3 py-1.5 text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
+              >
+                {t('provenance.clearPageSelection')}
+              </button>
+              <span className="mx-2 text-gray-300 dark:text-gray-600">|</span>
+              {/* Select All Filtered - only shows when filters are active */}
+              {hasActiveFilters && (
+                <button
+                  onClick={async () => {
+                    try {
+                      let allImages = [];
+                      let page = 1;
+                      const perPage = 100;
+                      let hasMore = true;
+
+                      while (hasMore) {
+                        // Build query params matching API format
+                        const queryParams = { page, per_page: perPage };
+                        if (filters.tags.length > 0) queryParams.image_type = filters.tags.join(',');
+                        if (filters.dateFrom) queryParams.date_from = filters.dateFrom;
+                        if (filters.dateTo) queryParams.date_to = filters.dateTo;
+                        if (searchQuery) queryParams.search = searchQuery;
+                        if (filters.sourceType && filters.sourceType !== 'all') queryParams.source_type = filters.sourceType;
+                        const data = await api.get('/images', queryParams);
+                        const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
+                        allImages = [...allImages, ...imageList];
+
+                        hasMore = imageList.length >= perPage;
+                        page++;
+                        if (page > 50) break;
+                      }
+
+                      setSelectedImages(prev => {
+                        const newMap = new Map(prev);
+                        allImages.forEach(img => newMap.set(img.id || img._id, img));
+                        return newMap;
+                      });
+                      showToast(`${allImages.length} ${t('provenance.imagesSelected')}`, 'success');
+                    } catch (err) {
+                      console.error('Error fetching filtered images:', err);
+                      showToast(t('common.error') || 'Error', 'error');
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/60 transition-colors"
+                >
+                  {t('gallery.selectAllFiltered')}
+                </button>
+              )}
+              {/* Select All - always visible, selects ALL images without filters */}
+              <button
+                onClick={async () => {
+                  try {
+                    let allImages = [];
+                    let page = 1;
+                    const perPage = 100;
+                    let hasMore = true;
+
+                    while (hasMore) {
+                      // No filters applied - fetch all images
+                      const queryParams = { page, per_page: perPage };
+                      const data = await api.get('/images', queryParams);
+                      const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
+                      allImages = [...allImages, ...imageList];
+
+                      hasMore = imageList.length >= perPage;
+                      page++;
+                      if (page > 50) break;
+                    }
+
+                    setSelectedImages(prev => {
+                      const newMap = new Map(prev);
+                      allImages.forEach(img => newMap.set(img.id || img._id, img));
+                      return newMap;
+                    });
+                    showToast(`${allImages.length} ${t('provenance.imagesSelected')}`, 'success');
+                  } catch (err) {
+                    console.error('Error fetching all images:', err);
+                    showToast(t('common.error') || 'Error', 'error');
+                  }
+                }}
+                className="px-3 py-1.5 text-xs font-medium bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-900/60 transition-colors"
+              >
+                {t('gallery.selectAllImages')}
+              </button>
+              <button
+                onClick={() => setSelectedImages(new Map())}
+                className="px-3 py-1.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                {t('gallery.clearAllSelection')}
+              </button>
+              {selectedIds.size > 0 && (
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                  ({selectedIds.size} {t('common.selected')})
+                </span>
+              )}
+            </div>
+          )}
         </header>
       )}
 
@@ -1007,75 +1129,200 @@ const ViewImagesPage = () => {
 
             {/* Bottom Pagination Controls */}
             {!similarityMode && pagination.total > IMAGES_PER_PAGE && (
-              <div className="flex items-center justify-center gap-4 mt-8 pb-8">
-                <button
-                  onClick={() => handlePageChange(1)}
-                  disabled={currentPage === 1 || loading}
-                  className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  {t('gallery.first')}
-                </button>
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={!pagination.hasPrev || loading}
-                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <FiChevronLeft />
-                </button>
+              <div className="flex flex-col items-center gap-4 mt-8 pb-8">
+                {/* Selection Buttons */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => {
+                      // Select all images on current page
+                      setSelectedImages(prev => {
+                        const newMap = new Map(prev);
+                        filteredImages.forEach(img => newMap.set(img.id, img));
+                        return newMap;
+                      });
+                    }}
+                    className="px-3 py-1.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors"
+                  >
+                    {t('provenance.selectAllOnPage')}
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Clear selection of images on current page only
+                      const pageIds = new Set(filteredImages.map(img => img.id));
+                      setSelectedImages(prev => {
+                        const newMap = new Map(prev);
+                        pageIds.forEach(id => newMap.delete(id));
+                        return newMap;
+                      });
+                    }}
+                    className="px-3 py-1.5 text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
+                  >
+                    {t('provenance.clearPageSelection')}
+                  </button>
+                  <span className="mx-2 text-gray-300 dark:text-gray-600">|</span>
+                  {/* Select All Filtered - only shows when filters are active */}
+                  {hasActiveFilters && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          let allImages = [];
+                          let page = 1;
+                          const perPage = 100;
+                          let hasMore = true;
 
-                {/* Page number buttons */}
-                <div className="flex items-center gap-1">
-                  {(() => {
-                    const pages = [];
-                    const totalPages = pagination.totalPages;
-                    const current = currentPage;
+                          while (hasMore) {
+                            // Build query params matching API format
+                            const queryParams = { page, per_page: perPage };
+                            if (filters.tags.length > 0) queryParams.image_type = filters.tags.join(',');
+                            if (filters.dateFrom) queryParams.date_from = filters.dateFrom;
+                            if (filters.dateTo) queryParams.date_to = filters.dateTo;
+                            if (searchQuery) queryParams.search = searchQuery;
+                            if (filters.sourceType && filters.sourceType !== 'all') queryParams.source_type = filters.sourceType;
+                            const data = await api.get('/images', queryParams);
+                            const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
+                            allImages = [...allImages, ...imageList];
 
-                    // Show at most 5 page buttons
-                    let start = Math.max(1, current - 2);
-                    let end = Math.min(totalPages, start + 4);
+                            hasMore = imageList.length >= perPage;
+                            page++;
+                            if (page > 50) break;
+                          }
 
-                    // Adjust start if we're near the end
-                    if (end - start < 4) {
-                      start = Math.max(1, end - 4);
-                    }
+                          setSelectedImages(prev => {
+                            const newMap = new Map(prev);
+                            allImages.forEach(img => newMap.set(img.id || img._id, img));
+                            return newMap;
+                          });
+                          showToast(`${allImages.length} ${t('provenance.imagesSelected')}`, 'success');
+                        } catch (err) {
+                          console.error('Error fetching filtered images:', err);
+                          showToast(t('common.error') || 'Error', 'error');
+                        }
+                      }}
+                      className="px-3 py-1.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/60 transition-colors"
+                    >
+                      {t('gallery.selectAllFiltered')}
+                    </button>
+                  )}
+                  {/* Select All - always visible, selects ALL images without filters */}
+                  <button
+                    onClick={async () => {
+                      try {
+                        let allImages = [];
+                        let page = 1;
+                        const perPage = 100;
+                        let hasMore = true;
 
-                    for (let i = start; i <= end; i++) {
-                      pages.push(
-                        <button
-                          key={i}
-                          onClick={() => handlePageChange(i)}
-                          disabled={loading}
-                          className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${i === current
-                            ? 'bg-indigo-600 text-white'
-                            : 'border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
-                            }`}
-                        >
-                          {i}
-                        </button>
-                      );
-                    }
-                    return pages;
-                  })()}
+                        while (hasMore) {
+                          // No filters applied - fetch all images
+                          const queryParams = { page, per_page: perPage };
+                          const data = await api.get('/images', queryParams);
+                          const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
+                          allImages = [...allImages, ...imageList];
+
+                          hasMore = imageList.length >= perPage;
+                          page++;
+                          if (page > 50) break;
+                        }
+
+                        setSelectedImages(prev => {
+                          const newMap = new Map(prev);
+                          allImages.forEach(img => newMap.set(img.id || img._id, img));
+                          return newMap;
+                        });
+                        showToast(`${allImages.length} ${t('provenance.imagesSelected')}`, 'success');
+                      } catch (err) {
+                        console.error('Error fetching all images:', err);
+                        showToast(t('common.error') || 'Error', 'error');
+                      }
+                    }}
+                    className="px-3 py-1.5 text-xs font-medium bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-900/60 transition-colors"
+                  >
+                    {t('gallery.selectAllImages')}
+                  </button>
+                  <button
+                    onClick={() => setSelectedImages(new Map())}
+                    className="px-3 py-1.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    {t('gallery.clearAllSelection')}
+                  </button>
+                  {selectedIds.size > 0 && (
+                    <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                      ({selectedIds.size} {t('common.selected')})
+                    </span>
+                  )}
                 </div>
 
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={!pagination.hasNext || loading}
-                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <FiChevronRight />
-                </button>
-                <button
-                  onClick={() => handlePageChange(pagination.totalPages)}
-                  disabled={currentPage === pagination.totalPages || loading}
-                  className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  {t('gallery.last')}
-                </button>
+                {/* Pagination Buttons */}
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1 || loading}
+                    className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    {t('gallery.first')}
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={!pagination.hasPrev || loading}
+                    className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <FiChevronLeft />
+                  </button>
 
-                <span className="text-sm text-gray-500 dark:text-gray-400 ml-4">
-                  {pagination.total} {t('gallery.imagesTotal')}
-                </span>
+                  {/* Page number buttons */}
+                  <div className="flex items-center gap-1">
+                    {(() => {
+                      const pages = [];
+                      const totalPages = pagination.totalPages;
+                      const current = currentPage;
+
+                      // Show at most 5 page buttons
+                      let start = Math.max(1, current - 2);
+                      let end = Math.min(totalPages, start + 4);
+
+                      // Adjust start if we're near the end
+                      if (end - start < 4) {
+                        start = Math.max(1, end - 4);
+                      }
+
+                      for (let i = start; i <= end; i++) {
+                        pages.push(
+                          <button
+                            key={i}
+                            onClick={() => handlePageChange(i)}
+                            disabled={loading}
+                            className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${i === current
+                              ? 'bg-indigo-600 text-white'
+                              : 'border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                              }`}
+                          >
+                            {i}
+                          </button>
+                        );
+                      }
+                      return pages;
+                    })()}
+                  </div>
+
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={!pagination.hasNext || loading}
+                    className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <FiChevronRight />
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(pagination.totalPages)}
+                    disabled={currentPage === pagination.totalPages || loading}
+                    className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    {t('gallery.last')}
+                  </button>
+
+                  <span className="text-sm text-gray-500 dark:text-gray-400 ml-4">
+                    {pagination.total} {t('gallery.imagesTotal')}
+                  </span>
+                </div>
               </div>
             )}
           </>
@@ -1083,21 +1330,23 @@ const ViewImagesPage = () => {
       </div>
 
       {/* Lightbox */}
-      {lightboxImage && (
-        <LightboxModal
-          image={images.find(i => i.id === lightboxImage.id) || lightboxImage}
-          imageUrl={lightboxUrl}
-          onClose={() => {
-            setLightboxImage(null);
-            setLightboxUrl(null);
-          }}
-          onTagAdd={addImageTypes}
-          onTagRemove={removeImageType}
-          t={t}
-          locale={locale}
-        />
-      )}
-    </div>
+      {
+        lightboxImage && (
+          <LightboxModal
+            image={images.find(i => i.id === lightboxImage.id) || lightboxImage}
+            imageUrl={lightboxUrl}
+            onClose={() => {
+              setLightboxImage(null);
+              setLightboxUrl(null);
+            }}
+            onTagAdd={addImageTypes}
+            onTagRemove={removeImageType}
+            t={t}
+            locale={locale}
+          />
+        )
+      }
+    </div >
   );
 };
 

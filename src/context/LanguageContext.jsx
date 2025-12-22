@@ -74,6 +74,7 @@ const translations = {
         'common.origin': 'Origem',
         'common.update': 'Atualizar',
         'common.back': 'Voltar',
+        'common.selected': 'selecionadas',
 
         // Upload Pages
         'upload.title': 'Upload de Imagens',
@@ -116,6 +117,9 @@ const translations = {
         'gallery.sortSize': 'Tamanho',
         'gallery.errorLoading': 'Erro ao carregar imagens',
         'gallery.imagesTotal': 'imagens no total',
+        'gallery.selectAllImages': 'Selecionar Todas',
+        'gallery.selectAllFiltered': 'Selecionar Todos Filtrados',
+        'gallery.clearAllSelection': 'Limpar Tudo',
         'gallery.images': 'imagens',
         'gallery.first': 'Primeira',
         'gallery.last': 'Última',
@@ -570,6 +574,7 @@ const translations = {
         'common.origin': 'Source',
         'common.update': 'Update',
         'common.back': 'Back',
+        'common.selected': 'selected',
 
         // Upload Pages
         'upload.title': 'Upload Images',
@@ -612,6 +617,9 @@ const translations = {
         'gallery.sortSize': 'Size',
         'gallery.errorLoading': 'Error loading images',
         'gallery.imagesTotal': 'images total',
+        'gallery.selectAllImages': 'Select All',
+        'gallery.selectAllFiltered': 'Select All Filtered',
+        'gallery.clearAllSelection': 'Clear All',
         'gallery.images': 'images',
         'gallery.first': 'First',
         'gallery.last': 'Last',
