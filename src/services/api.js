@@ -242,5 +242,21 @@ export const api = {
             dense_method: denseMethod,
             descriptor: descriptor
         });
+    },
+
+    // --- Manipulation Detection (TruFor) ---
+
+    /**
+     * Start manipulation detection analysis using TruFor
+     * @param {string} imageId - Image ID to analyze
+     * @param {Object} options - Analysis options
+     * @param {boolean} options.save_noiseprint - Whether to save Noiseprint++ output (default: false)
+     * @returns {Promise<{message: string, analysis_id: string}>}
+     */
+    startManipulationAnalysis: async (imageId, options = {}) => {
+        return api.post('/analyses/trufor', {
+            image_id: imageId,
+            save_noiseprint: options.save_noiseprint || false
+        });
     }
 };

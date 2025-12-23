@@ -203,6 +203,7 @@ const Sidebar = ({ activePage, onNavigate, pages, isCollapsed = false, onToggle 
           <NavItem pageKey={pages.IMAGE_ANALYSIS} icon={FiCpu} label={t('sidebar.imageAnalysis') || 'Image Analysis'} />
           <NavItem pageKey={pages.PROVENANCE} icon={FiShare2} label={t('sidebar.provenance') || 'Provenance'} />
           <NavItem pageKey={pages.COPY_MOVE} icon={FiCopy} label={t('sidebar.copyMove') || 'Copy-Move Detection'} />
+          <NavItem pageKey={pages.MANIPULATION_DETECTION} icon={FiShield} label={t('sidebar.manipulationDetection') || 'Manipulation Detection'} />
           <DisabledItem icon={FiTag} label={t('sidebar.tags')} />
           <DisabledItem icon={FiLayers} label={t('sidebar.categories')} />
         </NavSection>
