@@ -22,10 +22,10 @@ import {
     FiSliders,
     FiLayers,
 } from 'react-icons/fi';
-import { 
-    AnnotationProvider, 
-    useAnnotation, 
-    ShapeTypes, 
+import {
+    AnnotationProvider,
+    useAnnotation,
+    ShapeTypes,
     ToolTypes,
     DefaultLabels,
 } from '../../context/AnnotationContext';
@@ -79,11 +79,11 @@ const AnnotationModalInner = ({
     const { t } = useLanguage();
     const { state, actions, computed } = useAnnotation();
     const { activeTool, isDrawing, currentShape, selectedId, annotations, activeLabel } = state;
-    
+
     // Refs
     const containerRef = useRef(null);
     const imageRef = useRef(null);
-    
+
     // State
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
@@ -93,8 +93,8 @@ const AnnotationModalInner = ({
     const [clipboard, setClipboard] = useState(null);
     const [showHotkeys, setShowHotkeys] = useState(false);
     const [showAnalysisOverlay, setShowAnalysisOverlay] = useState(false);
-    const [analysisOpacity, setAnalysisOpacity] = useState(0.5);
-    
+    const [analysisOpacity, setAnalysisOpacity] = useState(1.0); // Start at 100% opacity
+
     // Interaction state
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState(null);
@@ -102,7 +102,7 @@ const AnnotationModalInner = ({
     const [activeHandle, setActiveHandle] = useState(null);
     const [activePointIndex, setActivePointIndex] = useState(null);
     const [draggedAnnotation, setDraggedAnnotation] = useState(null);
-    
+
     // Initialize
     useEffect(() => {
         if (imageId) {
@@ -110,7 +110,7 @@ const AnnotationModalInner = ({
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [imageId]);
-    
+
     // Load existing annotations
     useEffect(() => {
         if (existingAnnotations.length > 0 && imageSize.width > 0) {
@@ -121,10 +121,10 @@ const AnnotationModalInner = ({
                     name: ann.type || 'Manipulation',
                     color: '#EF4444',
                 };
-                
+
                 // Determine shape type from saved data
                 const shapeType = ann.shape_type || ShapeTypes.RECTANGLE;
-                
+
                 // Base annotation data
                 const mappedAnn = {
                     id: ann._id || ann.id,
@@ -134,7 +134,7 @@ const AnnotationModalInner = ({
                     description: ann.text || '',
                     createdAt: ann.created_at,
                 };
-                
+
                 // Convert coordinates based on shape type
                 if (shapeType === ShapeTypes.POLYGON && ann.coords?.points) {
                     // Polygon: convert points array
@@ -154,12 +154,12 @@ const AnnotationModalInner = ({
                     mappedAnn.width = (ann.coords?.width / 100) * imageSize.width;
                     mappedAnn.height = (ann.coords?.height / 100) * imageSize.height;
                 }
-                
+
                 return mappedAnn;
             });
-            
+
             actions.setAnnotations(mappedAnnotations);
-            
+
             // Set next group ID
             const maxGroupId = existingAnnotations
                 .filter(a => a.group_id)
@@ -169,7 +169,7 @@ const AnnotationModalInner = ({
             }
         }
     }, [existingAnnotations, imageSize, actions]);
-    
+
     // Image load handler
     const handleImageLoad = useCallback((e) => {
         const { naturalWidth, naturalHeight } = e.target;
@@ -177,7 +177,7 @@ const AnnotationModalInner = ({
         setImageLoaded(true);
         actions.setImageDimensions({ width: naturalWidth, height: naturalHeight });
     }, [actions]);
-    
+
     // Get mouse position
     const getMousePosition = useCallback((e) => {
         if (!imageRef.current) return { x: 0, y: 0 };
@@ -187,17 +187,17 @@ const AnnotationModalInner = ({
             y: (e.clientY - rect.top) / zoom,
         };
     }, [zoom]);
-    
+
     // Mouse handlers
     const handleMouseDown = useCallback((e) => {
         if (e.button !== 0) return;
-        
+
         const pos = getMousePosition(e);
         setDragStart(pos);
-        
+
         if (activeTool === ToolTypes.SELECT) {
             const clickedAnnotation = findAnnotationAtPoint(pos, annotations);
-            
+
             if (clickedAnnotation) {
                 if (selectedId === clickedAnnotation.id) {
                     const handle = getHandleAtPoint(pos, clickedAnnotation);
@@ -208,7 +208,7 @@ const AnnotationModalInner = ({
                         setIsDragging(true);
                         return;
                     }
-                    
+
                     if (clickedAnnotation.type === ShapeTypes.POLYGON) {
                         const pointIdx = findClosestPolygonPoint(pos, clickedAnnotation.points, 15);
                         if (pointIdx >= 0) {
@@ -220,7 +220,7 @@ const AnnotationModalInner = ({
                         }
                     }
                 }
-                
+
                 actions.selectAnnotation(clickedAnnotation.id);
                 setDragType('move');
                 setDraggedAnnotation({ ...clickedAnnotation });
@@ -263,17 +263,17 @@ const AnnotationModalInner = ({
             }
         }
     }, [activeTool, annotations, selectedId, isDrawing, currentShape, getMousePosition, actions, zoom]);
-    
+
     const handleMouseMove = useCallback((e) => {
         const pos = getMousePosition(e);
-        
+
         if (isDrawing && activeTool === ToolTypes.POLYGON) {
             actions.updateDrawing({ previewPoint: pos });
         }
-        
+
         if (isDragging && dragStart) {
             const delta = { x: pos.x - dragStart.x, y: pos.y - dragStart.y };
-            
+
             if (dragType === 'draw') {
                 actions.updateDrawing({ width: delta.x, height: delta.y });
             } else if (dragType === 'move' && draggedAnnotation) {
@@ -287,13 +287,13 @@ const AnnotationModalInner = ({
                 actions.updateAnnotation(updated);
             }
         }
-        
+
         if (activeTool === ToolTypes.SELECT && !isDragging) {
             const hoveredAnnotation = findAnnotationAtPoint(pos, annotations);
             actions.hoverAnnotation(hoveredAnnotation?.id || null);
         }
     }, [isDragging, dragStart, dragType, draggedAnnotation, activeHandle, activePointIndex, activeTool, isDrawing, getMousePosition, annotations, actions]);
-    
+
     const handleMouseUp = useCallback(() => {
         if (dragType === 'draw' && currentShape) {
             if (isValidAnnotation(currentShape)) {
@@ -302,7 +302,7 @@ const AnnotationModalInner = ({
                 actions.cancelDrawing();
             }
         }
-        
+
         if (activeTool !== ToolTypes.POLYGON || dragType !== null) {
             setIsDragging(false);
             setDragStart(null);
@@ -312,17 +312,17 @@ const AnnotationModalInner = ({
             setDraggedAnnotation(null);
         }
     }, [dragType, currentShape, activeTool, actions]);
-    
+
     const handleDoubleClick = useCallback(() => {
         if (isDrawing && activeTool === ToolTypes.POLYGON && currentShape?.points?.length >= 3) {
             actions.finishDrawing();
         }
     }, [isDrawing, activeTool, currentShape, actions]);
-    
+
     const handleMouseLeave = useCallback(() => {
         actions.hoverAnnotation(null);
     }, [actions]);
-    
+
     // Click handlers for SVG layer
     const handleAnnotationMouseDown = useCallback((e, annotation) => {
         e.stopPropagation();
@@ -350,7 +350,7 @@ const AnnotationModalInner = ({
             setIsDragging(true);
         }
     }, [activeTool, selectedId, getMousePosition, actions]);
-    
+
     const handleHandleMouseDown = useCallback((e, annotation, handle) => {
         e.stopPropagation();
         const pos = getMousePosition(e);
@@ -360,7 +360,7 @@ const AnnotationModalInner = ({
         setDraggedAnnotation({ ...annotation });
         setIsDragging(true);
     }, [getMousePosition]);
-    
+
     const handlePolygonPointMouseDown = useCallback((e, annotation, pointIndex) => {
         e.stopPropagation();
         const pos = getMousePosition(e);
@@ -370,12 +370,12 @@ const AnnotationModalInner = ({
         setDraggedAnnotation({ ...annotation });
         setIsDragging(true);
     }, [getMousePosition]);
-    
+
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
-            
+
             if (e.key === 'Escape') {
                 if (isDrawing) {
                     actions.cancelDrawing();
@@ -385,22 +385,22 @@ const AnnotationModalInner = ({
                     onClose();
                 }
             }
-            
+
             if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId && !isDrawing) {
                 e.preventDefault();
                 actions.deleteSelected();
             }
-            
+
             if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
                 e.preventDefault();
                 actions.undo();
             }
-            
+
             if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
                 e.preventDefault();
                 actions.redo();
             }
-            
+
             // Copy selected annotation
             if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedId) {
                 e.preventDefault();
@@ -410,7 +410,7 @@ const AnnotationModalInner = ({
                     showToast('Annotation copied', 'success');
                 }
             }
-            
+
             // Paste annotation
             if ((e.ctrlKey || e.metaKey) && e.key === 'v' && clipboard) {
                 e.preventDefault();
@@ -433,19 +433,19 @@ const AnnotationModalInner = ({
                 actions.selectAnnotation(newAnnotation.id);
                 showToast('Annotation pasted', 'success');
             }
-            
+
             // Toggle hotkeys help with ?
             if (e.key === '?' || (e.shiftKey && e.key === '/')) {
                 e.preventDefault();
                 setShowHotkeys(prev => !prev);
             }
-            
+
             // Toggle analysis overlay with 'a' (only if analysis is available)
             if (!e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'a' && analysisCanvas) {
                 e.preventDefault();
                 setShowAnalysisOverlay(prev => !prev);
             }
-            
+
             if (!e.ctrlKey && !e.metaKey) {
                 switch (e.key.toLowerCase()) {
                     case 'v': actions.setTool(ToolTypes.SELECT); break;
@@ -456,16 +456,16 @@ const AnnotationModalInner = ({
                 }
             }
         };
-        
+
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isDrawing, selectedId, annotations, clipboard, analysisCanvas, actions, onClose]);
-    
+
     // Zoom
     const handleZoomIn = useCallback(() => setZoom(z => Math.min(4, z + 0.25)), []);
     const handleZoomOut = useCallback(() => setZoom(z => Math.max(0.25, z - 0.25)), []);
     const handleFitToScreen = useCallback(() => setZoom(1), []);
-    
+
     // Wheel zoom
     useEffect(() => {
         const container = containerRef.current;
@@ -480,7 +480,7 @@ const AnnotationModalInner = ({
         container.addEventListener('wheel', handleWheel, { passive: false });
         return () => container.removeEventListener('wheel', handleWheel);
     }, []);
-    
+
     // Save handler
     const handleSave = useCallback(async () => {
         setIsSaving(true);
@@ -493,7 +493,7 @@ const AnnotationModalInner = ({
                     console.warn('Error deleting old annotation:', e);
                 }
             }
-            
+
             // Save new annotations
             const savedAnnotations = [];
             for (const ann of annotations) {
@@ -504,7 +504,7 @@ const AnnotationModalInner = ({
                     width: (ann.width / imageSize.width) * 100,
                     height: (ann.height / imageSize.height) * 100,
                 };
-                
+
                 // For polygons, convert points
                 if (ann.type === ShapeTypes.POLYGON && ann.points) {
                     percentCoords.points = ann.points.map(p => ({
@@ -512,7 +512,7 @@ const AnnotationModalInner = ({
                         y: (p.y / imageSize.height) * 100,
                     }));
                 }
-                
+
                 const payload = {
                     image_id: imageId,
                     text: ann.description || '',
@@ -521,14 +521,14 @@ const AnnotationModalInner = ({
                     group_id: ann.groupId || null,
                     shape_type: ann.type,
                 };
-                
+
                 const saved = await api.createAnnotation(payload);
                 savedAnnotations.push(saved);
             }
-            
+
             actions.setModified(false);
             showToast(t('common.success'), 'success');
-            
+
             if (onSaveSuccess) {
                 onSaveSuccess(savedAnnotations);
             }
@@ -539,14 +539,14 @@ const AnnotationModalInner = ({
             setIsSaving(false);
         }
     }, [annotations, imageSize, imageId, existingAnnotations, actions, t, onSaveSuccess]);
-    
+
     // Export handler
     const handleExport = useCallback(() => {
         const exportData = exportAnnotationsToJSON(
             annotations.map(ann => toPercentCoords(ann, imageSize)),
             { id: imageId, filename: imageName, width: imageSize.width, height: imageSize.height }
         );
-        
+
         const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -555,7 +555,7 @@ const AnnotationModalInner = ({
         a.click();
         URL.revokeObjectURL(url);
     }, [annotations, imageSize, imageId, imageName]);
-    
+
     return (
         <div className="fixed inset-0 z-50 flex flex-col bg-gray-900">
             {/* Header */}
@@ -576,11 +576,10 @@ const AnnotationModalInner = ({
                         <div className="flex items-center gap-2 px-2 py-1 bg-gray-700/50 rounded-lg">
                             <button
                                 onClick={() => setShowAnalysisOverlay(!showAnalysisOverlay)}
-                                className={`p-2 rounded-lg transition-colors ${
-                                    showAnalysisOverlay 
-                                        ? 'bg-indigo-600 text-white' 
-                                        : 'hover:bg-gray-600 text-gray-400 hover:text-white'
-                                }`}
+                                className={`p-2 rounded-lg transition-colors ${showAnalysisOverlay
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'hover:bg-gray-600 text-gray-400 hover:text-white'
+                                    }`}
                                 title={showAnalysisOverlay ? 'Hide Analysis Overlay' : 'Show Analysis Overlay'}
                             >
                                 {showAnalysisOverlay ? <FiEye size={18} /> : <FiEyeOff size={18} />}
@@ -607,11 +606,11 @@ const AnnotationModalInner = ({
                             )}
                         </div>
                     )}
-                    
+
                     {clipboard && (
                         <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-400 rounded flex items-center gap-1">
                             <FiCopy size={12} />
-                            Copied
+                            {t('annotation.actions.copied') || 'Copied'}
                         </span>
                     )}
                     {state.isModified && (
@@ -622,20 +621,20 @@ const AnnotationModalInner = ({
                     <button
                         onClick={() => setShowHotkeys(true)}
                         className="p-2 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
-                        title="Keyboard Shortcuts (?)"
+                        title={t('annotation.help.shortcuts') || 'Keyboard Shortcuts'}
                     >
                         <FiHelpCircle size={20} />
                     </button>
                     <button
                         onClick={onClose}
                         className="p-2 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
-                        title="Close (Esc)"
+                        title={t('common.close') || 'Close'}
                     >
                         <FiX size={20} />
                     </button>
                 </div>
             </div>
-            
+
             {/* Toolbar */}
             <AnnotationToolbar
                 onSave={handleSave}
@@ -647,11 +646,11 @@ const AnnotationModalInner = ({
                 isSaving={isSaving}
                 hasUnsavedChanges={state.isModified}
             />
-            
+
             {/* Content */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Image Area */}
-                <div 
+                <div
                     ref={containerRef}
                     className="flex-1 overflow-auto flex items-center justify-center p-6 bg-gray-900"
                 >
@@ -675,20 +674,20 @@ const AnnotationModalInner = ({
                                 maxHeight: zoom === 1 ? 'calc(100vh - 180px)' : 'none',
                             }}
                         />
-                        
+
                         {/* Analysis Overlay */}
                         {imageLoaded && showAnalysisOverlay && analysisCanvas && (
                             <img
                                 src={analysisCanvas.toDataURL()}
                                 alt="Analysis overlay"
                                 className="absolute inset-0 w-full h-full rounded-lg pointer-events-none"
-                                style={{ 
+                                style={{
                                     opacity: analysisOpacity,
                                     mixBlendMode: 'normal',
                                 }}
                             />
                         )}
-                        
+
                         {imageLoaded && (
                             <SVGAnnotationLayer
                                 width={imageSize.width}
@@ -705,11 +704,11 @@ const AnnotationModalInner = ({
                         )}
                     </div>
                 </div>
-                
+
                 {/* Labels Panel */}
                 {showPanel && (
                     <div className="w-80 flex-none bg-gray-800">
-                        <LabelsPanel 
+                        <LabelsPanel
                             onClose={() => setShowPanel(false)}
                             analysisToolId={analysisToolId}
                             analysisToolName={analysisToolName}
@@ -723,28 +722,28 @@ const AnnotationModalInner = ({
                     </div>
                 )}
             </div>
-            
+
             {/* Polygon Drawing Instructions */}
             {isDrawing && activeTool === ToolTypes.POLYGON && (
                 <div className="flex-none px-4 py-2 bg-indigo-600 text-white text-sm text-center">
                     {t('annotation.polygonHint') || 'Click to add points. Double-click or click the first point to close. Press Esc to cancel.'}
                 </div>
             )}
-            
+
             {/* Keyboard Shortcuts Modal */}
             {showHotkeys && (
-                <div 
+                <div
                     className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"
                     onClick={() => setShowHotkeys(false)}
                 >
-                    <div 
+                    <div
                         className="bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden"
                         onClick={e => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
                             <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                                 <FiHelpCircle className="text-indigo-400" />
-                                Keyboard Shortcuts
+                                {t('annotation.help.shortcuts') || 'Keyboard Shortcuts'}
                             </h3>
                             <button
                                 onClick={() => setShowHotkeys(false)}
@@ -757,68 +756,68 @@ const AnnotationModalInner = ({
                             {/* Tools */}
                             <div>
                                 <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-2">
-                                    Tools
+                                    {t('annotation.sections.tools') || 'Tools'}
                                 </h4>
                                 <div className="space-y-2">
-                                    <HotkeyRow shortcut="V" description="Select / Move tool" />
-                                    <HotkeyRow shortcut="R" description="Rectangle tool" />
-                                    <HotkeyRow shortcut="E" description="Ellipse tool" />
-                                    <HotkeyRow shortcut="P" description="Polygon tool" />
+                                    <HotkeyRow shortcut="V" description={t('annotation.tools.select') || 'Select / Move tool'} />
+                                    <HotkeyRow shortcut="R" description={t('annotation.tools.rectangle') || 'Rectangle tool'} />
+                                    <HotkeyRow shortcut="E" description={t('annotation.tools.ellipse') || 'Ellipse tool'} />
+                                    <HotkeyRow shortcut="P" description={t('annotation.tools.polygon') || 'Polygon tool'} />
                                 </div>
                             </div>
-                            
+
                             {/* Actions */}
                             <div>
                                 <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-2">
-                                    Actions
+                                    {t('annotation.sections.actions') || 'Actions'}
                                 </h4>
                                 <div className="space-y-2">
-                                    <HotkeyRow shortcut="Ctrl + C" description="Copy selected annotation" />
-                                    <HotkeyRow shortcut="Ctrl + V" description="Paste annotation" />
-                                    <HotkeyRow shortcut="Ctrl + Z" description="Undo" />
-                                    <HotkeyRow shortcut="Ctrl + Y" description="Redo" />
-                                    <HotkeyRow shortcut="Delete" description="Delete selected annotation" />
+                                    <HotkeyRow shortcut="Ctrl + C" description={t('annotation.shortcuts.copy') || 'Copy selected annotation'} />
+                                    <HotkeyRow shortcut="Ctrl + V" description={t('annotation.shortcuts.paste') || 'Paste annotation'} />
+                                    <HotkeyRow shortcut="Ctrl + Z" description={t('annotation.actions.undo') || 'Undo'} />
+                                    <HotkeyRow shortcut="Ctrl + Y" description={t('annotation.actions.redo') || 'Redo'} />
+                                    <HotkeyRow shortcut="Delete" description={t('annotation.tools.delete') || 'Delete selected annotation'} />
                                 </div>
                             </div>
-                            
+
                             {/* Navigation */}
                             <div>
                                 <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-2">
-                                    Navigation
+                                    {t('annotation.sections.navigation') || 'Navigation'}
                                 </h4>
                                 <div className="space-y-2">
-                                    <HotkeyRow shortcut="Ctrl + Scroll" description="Zoom in/out" />
-                                    <HotkeyRow shortcut="Esc" description="Cancel drawing / Deselect / Close" />
-                                    <HotkeyRow shortcut="?" description="Show this help" />
+                                    <HotkeyRow shortcut="Ctrl + Scroll" description={t('annotation.shortcuts.zoom') || 'Zoom in/out'} />
+                                    <HotkeyRow shortcut="Esc" description={t('annotation.shortcuts.cancel') || 'Cancel drawing / Deselect / Close'} />
+                                    <HotkeyRow shortcut="?" description={t('annotation.shortcuts.help') || 'Show this help'} />
                                 </div>
                             </div>
-                            
+
                             {/* Analysis */}
                             {analysisCanvas && (
                                 <div>
                                     <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-2">
-                                        Analysis
+                                        {t('annotation.sections.analysis') || 'Analysis'}
                                     </h4>
                                     <div className="space-y-2">
-                                        <HotkeyRow shortcut="A" description="Toggle analysis overlay" />
+                                        <HotkeyRow shortcut="A" description={t('annotation.shortcuts.toggleOverlay') || 'Toggle analysis overlay'} />
                                     </div>
                                 </div>
                             )}
-                            
+
                             {/* Polygon specific */}
                             <div>
                                 <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-2">
-                                    Polygon Tool
+                                    {t('annotation.sections.polygonTool') || 'Polygon Tool'}
                                 </h4>
                                 <div className="space-y-2">
-                                    <HotkeyRow shortcut="Click" description="Add point" />
-                                    <HotkeyRow shortcut="Double-click" description="Close polygon" />
-                                    <HotkeyRow shortcut="Click first point" description="Close polygon" />
+                                    <HotkeyRow shortcut="Click" description={t('annotation.shortcuts.addPoint') || 'Add point'} />
+                                    <HotkeyRow shortcut="Double-click" description={t('annotation.shortcuts.closePolygon') || 'Close polygon'} />
+                                    <HotkeyRow shortcut="Click first point" description={t('annotation.shortcuts.closePolygonFirst') || 'Close polygon'} />
                                 </div>
                             </div>
                         </div>
                         <div className="px-6 py-3 bg-gray-900/50 text-center text-sm text-gray-500">
-                            Press <kbd className="px-2 py-0.5 bg-gray-700 rounded text-gray-300 font-mono">?</kbd> anytime to toggle this panel
+                            {t('annotation.help.togglePanel') || 'Press ? anytime to toggle this panel'}
                         </div>
                     </div>
                 </div>
@@ -830,7 +829,7 @@ const AnnotationModalInner = ({
 // Wrapper with Provider
 const AnnotationModal = ({ isOpen, ...props }) => {
     if (!isOpen) return null;
-    
+
     return (
         <AnnotationProvider>
             <AnnotationModalInner {...props} />

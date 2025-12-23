@@ -53,8 +53,8 @@ const TOOL_PARAMS_CONFIG = {
     levelSweep: {
         params: ['sweepPosition', 'sweepWidth'],
         config: {
-            sweepPosition: { min: 0, max: 255, step: 1, label: 'Position' },
-            sweepWidth: { min: 1, max: 128, step: 1, label: 'Width' }
+            sweepPosition: { min: 0, max: 1, step: 0.01, label: 'Sweep', displayMultiplier: 100, unit: '%' },
+            sweepWidth: { min: 8, max: 128, step: 1, label: 'Width' }
         }
     },
     cloneDetection: {
@@ -73,26 +73,27 @@ const TOOL_PARAMS_CONFIG = {
 // Analysis Parameters Section - shows only current tool's parameters
 const AnalysisParametersSection = ({ toolId, params, onParamsChange }) => {
     if (!toolId || !params) return null;
-    
+
+    const { t } = useLanguage();
     const toolConfig = TOOL_PARAMS_CONFIG[toolId];
     if (!toolConfig) return null;
-    
+
     const { params: paramKeys, config } = toolConfig;
     const relevantParams = paramKeys.filter(key => key in params);
-    
+
     if (relevantParams.length === 0) return null;
-    
+
     return (
         <div>
             <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                Parameters
+                {t('annotation.sections.parameters') || 'Parameters'}
             </h4>
             <div className="space-y-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                 {relevantParams.map(key => {
                     const value = params[key];
                     const paramConfig = config[key] || {};
-                    const label = paramConfig.label || key.replace(/([A-Z])/g, ' $1').trim();
-                    
+                    const label = t(`analysis.params.${key}`) || paramConfig.label || key.replace(/([A-Z])/g, ' $1').trim();
+
                     if (paramConfig.type === 'boolean' || typeof value === 'boolean') {
                         return (
                             <div key={key} className="flex items-center justify-between">
@@ -101,22 +102,27 @@ const AnalysisParametersSection = ({ toolId, params, onParamsChange }) => {
                                 </label>
                                 <button
                                     onClick={() => onParamsChange({ ...params, [key]: !value })}
-                                    className={`relative w-10 h-5 rounded-full transition-colors ${
-                                        value ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-600'
-                                    }`}
+                                    className={`relative w-10 h-5 rounded-full transition-colors ${value ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-600'
+                                        }`}
                                 >
-                                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                                        value ? 'translate-x-5' : 'translate-x-0.5'
-                                    }`} />
+                                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${value ? 'translate-x-5' : 'translate-x-0.5'
+                                        }`} />
                                 </button>
                             </div>
                         );
                     }
-                    
+
                     const min = paramConfig.min ?? 0;
                     const max = paramConfig.max ?? 100;
                     const step = paramConfig.step ?? 1;
-                    
+                    const displayMultiplier = paramConfig.displayMultiplier ?? 1;
+                    const unit = paramConfig.unit ?? '';
+
+                    // Calculate display value (for UI display only)
+                    const displayValue = typeof value === 'number'
+                        ? (value * displayMultiplier).toFixed(step < 1 && displayMultiplier === 1 ? 2 : 0)
+                        : value;
+
                     return (
                         <div key={key} className="space-y-1">
                             <div className="flex items-center justify-between">
@@ -124,7 +130,7 @@ const AnalysisParametersSection = ({ toolId, params, onParamsChange }) => {
                                     {label}
                                 </label>
                                 <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400">
-                                    {typeof value === 'number' ? value.toFixed(step < 1 ? 2 : 0) : value}
+                                    {displayValue}{unit}
                                 </span>
                             </div>
                             <input
@@ -162,19 +168,19 @@ const ShapeIcon = ({ type, size = 14 }) => {
 const AnnotationItem = ({ annotation, isSelected, onSelect, onDelete, onEditLabel, t }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(annotation.description || '');
-    
+
     const handleSaveEdit = () => {
         onEditLabel(annotation.id, { description: editText });
         setIsEditing(false);
     };
-    
+
     return (
         <div
             onClick={() => onSelect(annotation.id)}
             className={`
                 group relative p-3 rounded-lg cursor-pointer transition-all duration-150
-                ${isSelected 
-                    ? 'bg-indigo-50 dark:bg-indigo-900/30 border-2 border-indigo-400 dark:border-indigo-600 shadow-sm' 
+                ${isSelected
+                    ? 'bg-indigo-50 dark:bg-indigo-900/30 border-2 border-indigo-400 dark:border-indigo-600 shadow-sm'
                     : 'bg-gray-50 dark:bg-gray-700/50 border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-600'
                 }
             `}
@@ -182,13 +188,13 @@ const AnnotationItem = ({ annotation, isSelected, onSelect, onDelete, onEditLabe
             {/* Header */}
             <div className="flex items-center gap-2 mb-2">
                 {/* Shape Icon with Label Color */}
-                <div 
+                <div
                     className="w-7 h-7 rounded-md flex items-center justify-center text-white shadow-sm"
                     style={{ backgroundColor: annotation.label?.color || '#EF4444' }}
                 >
                     <ShapeIcon type={annotation.type} size={14} />
                 </div>
-                
+
                 {/* Label Name */}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
@@ -196,7 +202,7 @@ const AnnotationItem = ({ annotation, isSelected, onSelect, onDelete, onEditLabe
                             {annotation.label?.name || 'Unknown'}
                         </span>
                         {annotation.groupId && (
-                            <span 
+                            <span
                                 className="px-1.5 py-0.5 text-[10px] font-bold rounded-full text-white"
                                 style={{ backgroundColor: annotation.label?.color || '#3B82F6' }}
                             >
@@ -208,7 +214,7 @@ const AnnotationItem = ({ annotation, isSelected, onSelect, onDelete, onEditLabe
                         {annotation.type}
                     </span>
                 </div>
-                
+
                 {/* Actions */}
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
@@ -227,7 +233,7 @@ const AnnotationItem = ({ annotation, isSelected, onSelect, onDelete, onEditLabe
                     </button>
                 </div>
             </div>
-            
+
             {/* Description / Edit */}
             {isEditing ? (
                 <div className="mt-2" onClick={e => e.stopPropagation()}>
@@ -269,18 +275,18 @@ const LabelFilter = ({ label, isActive, count, onClick }) => (
         onClick={onClick}
         className={`
             flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all
-            ${isActive 
-                ? 'ring-2 ring-offset-1 ring-offset-white dark:ring-offset-gray-800' 
+            ${isActive
+                ? 'ring-2 ring-offset-1 ring-offset-white dark:ring-offset-gray-800'
                 : 'opacity-70 hover:opacity-100'
             }
         `}
-        style={{ 
-            backgroundColor: `${label.color}20`, 
+        style={{
+            backgroundColor: `${label.color}20`,
             color: label.color,
             ringColor: label.color,
         }}
     >
-        <div 
+        <div
             className="w-2 h-2 rounded-full"
             style={{ backgroundColor: label.color }}
         />
@@ -292,7 +298,7 @@ const LabelFilter = ({ label, isActive, count, onClick }) => (
 );
 
 // Main Panel Component
-const LabelsPanel = ({ 
+const LabelsPanel = ({
     onClose,
     // Analysis props
     analysisToolId = '',
@@ -307,51 +313,51 @@ const LabelsPanel = ({
     const { t } = useLanguage();
     const { state, actions } = useAnnotation();
     const { annotations, selectedId, availableLabels, nextGroupId, activeLabel } = state;
-    
+
     const [activeTab, setActiveTab] = useState('annotations'); // 'annotations' | 'analysis'
     const [filterLabel, setFilterLabel] = useState(null);
     const [isAddingLabel, setIsAddingLabel] = useState(false);
     const [newLabelName, setNewLabelName] = useState('');
     const [newLabelColor, setNewLabelColor] = useState('#6366F1');
-    
+
     // Filter annotations by label
-    const filteredAnnotations = filterLabel 
+    const filteredAnnotations = filterLabel
         ? annotations.filter(a => a.label?.id === filterLabel)
         : annotations;
-    
+
     // Count annotations per label
     const labelCounts = availableLabels.reduce((acc, label) => {
         acc[label.id] = annotations.filter(a => a.label?.id === label.id).length;
         return acc;
     }, {});
-    
+
     // Handle add new label
     const handleAddLabel = () => {
         if (!newLabelName.trim()) return;
-        
+
         const newLabel = {
             id: newLabelName.toLowerCase().replace(/\s+/g, '-'),
             name: newLabelName.trim(),
             color: newLabelColor,
         };
-        
+
         actions.addLabel(newLabel);
         setNewLabelName('');
         setIsAddingLabel(false);
     };
-    
+
     // Handle update annotation
     const handleUpdateAnnotation = (id, updates) => {
         actions.updateAnnotation({ id, ...updates });
     };
-    
+
     // Handle delete annotation
     const handleDeleteAnnotation = (id) => {
         if (confirm(t('common.confirm'))) {
             actions.deleteAnnotation(id);
         }
     };
-    
+
     return (
         <div className="flex flex-col h-full bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">
             {/* Header with Tabs */}
@@ -372,26 +378,24 @@ const LabelsPanel = ({
                         </button>
                     )}
                 </div>
-                
+
                 {/* Tab Navigation */}
                 <div className="flex border-b border-gray-200 dark:border-gray-600">
                     <button
                         onClick={() => setActiveTab('annotations')}
-                        className={`flex-1 px-4 py-3 text-sm font-semibold transition-all ${
-                            activeTab === 'annotations'
-                                ? 'bg-indigo-600 text-white border-b-2 border-indigo-600'
-                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                        }`}
+                        className={`flex-1 px-4 py-3 text-sm font-semibold transition-all ${activeTab === 'annotations'
+                            ? 'bg-indigo-600 text-white border-b-2 border-indigo-600'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            }`}
                     >
                         <div className="flex items-center justify-center gap-2">
                             <FiTag size={16} />
-                            <span>Annotations</span>
+                            <span>{t('annotation.tabs.annotations') || 'Annotations'}</span>
                             {annotations.length > 0 && (
-                                <span className={`px-1.5 py-0.5 text-xs rounded-full font-bold ${
-                                    activeTab === 'annotations' 
-                                        ? 'bg-white/20 text-white' 
-                                        : 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300'
-                                }`}>
+                                <span className={`px-1.5 py-0.5 text-xs rounded-full font-bold ${activeTab === 'annotations'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300'
+                                    }`}>
                                     {annotations.length}
                                 </span>
                             )}
@@ -400,21 +404,20 @@ const LabelsPanel = ({
                     {availableAnalysisTools.length > 0 && (
                         <button
                             onClick={() => setActiveTab('analysis')}
-                            className={`flex-1 px-4 py-3 text-sm font-semibold transition-all ${
-                                activeTab === 'analysis'
-                                    ? 'bg-indigo-600 text-white border-b-2 border-indigo-600'
-                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                            }`}
+                            className={`flex-1 px-4 py-3 text-sm font-semibold transition-all ${activeTab === 'analysis'
+                                ? 'bg-indigo-600 text-white border-b-2 border-indigo-600'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                                }`}
                         >
                             <div className="flex items-center justify-center gap-2">
                                 <FiEye size={16} />
-                                <span>Analysis</span>
+                                <span>{t('annotation.tabs.analysis') || 'Analysis'}</span>
                             </div>
                         </button>
                     )}
                 </div>
             </div>
-            
+
             {/* Tab Content */}
             {activeTab === 'annotations' ? (
                 <>
@@ -431,146 +434,146 @@ const LabelsPanel = ({
                                 onClick={() => setFilterLabel(null)}
                                 className={`
                             px-2 py-1 rounded-full text-xs font-medium transition-all
-                            ${!filterLabel 
-                                ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900' 
-                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
-                            }
+                            ${!filterLabel
+                                        ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'
+                                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
+                                    }
                         `}
-                    >
-                        All ({annotations.length})
-                    </button>
-                    {availableLabels.map(label => (
-                        <LabelFilter
-                            key={label.id}
-                            label={label}
-                            isActive={filterLabel === label.id}
-                            count={labelCounts[label.id] || 0}
-                            onClick={() => setFilterLabel(filterLabel === label.id ? null : label.id)}
-                        />
-                    ))}
-                </div>
-            </div>
-            
-            {/* Active Label Selector (for new annotations) */}
-            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        {t('annotation.activeLabel')}
-                    </span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <select
-                        value={activeLabel?.id || ''}
-                        onChange={(e) => {
-                            const label = availableLabels.find(l => l.id === e.target.value);
-                            if (label) actions.setActiveLabel(label);
-                        }}
-                        className="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                        {availableLabels.map(label => (
-                            <option key={label.id} value={label.id}>
-                                {label.name}
-                            </option>
-                        ))}
-                    </select>
-                    <div 
-                        className="w-8 h-8 rounded-lg border-2 border-white shadow-md"
-                        style={{ backgroundColor: activeLabel?.color || '#EF4444' }}
-                    />
-                </div>
-                
-                {/* Group ID for copy-move */}
-                {activeLabel?.id === 'copy-move' && (
-                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
-                        <div className="flex items-center gap-2">
-                            <FiCopy className="text-blue-500" size={14} />
-                            <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
-                                {t('annotation.groupId')}: {nextGroupId}
-                            </span>
-                            <button
-                                onClick={actions.incrementGroupId}
-                                className="ml-auto text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200"
                             >
-                                Next Group
+                                All ({annotations.length})
                             </button>
+                            {availableLabels.map(label => (
+                                <LabelFilter
+                                    key={label.id}
+                                    label={label}
+                                    isActive={filterLabel === label.id}
+                                    count={labelCounts[label.id] || 0}
+                                    onClick={() => setFilterLabel(filterLabel === label.id ? null : label.id)}
+                                />
+                            ))}
                         </div>
                     </div>
-                )}
-            </div>
-            
-            {/* Annotations List */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                {filteredAnnotations.length === 0 ? (
-                    <div className="text-center py-8">
-                        <FiEdit3 className="mx-auto text-gray-300 dark:text-gray-600 mb-2" size={32} />
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {t('annotation.noAnnotations')}
-                        </p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                            {t('annotation.drawRegionHint')}
-                        </p>
-                    </div>
-                ) : (
-                    filteredAnnotations.map(annotation => (
-                        <AnnotationItem
-                            key={annotation.id}
-                            annotation={annotation}
-                            isSelected={selectedId === annotation.id}
-                            onSelect={actions.selectAnnotation}
-                            onDelete={handleDeleteAnnotation}
-                            onEditLabel={handleUpdateAnnotation}
-                            t={t}
-                        />
-                    ))
-                )}
-            </div>
-            
-            {/* Add New Label */}
-            <div className="border-t border-gray-200 dark:border-gray-700 p-3">
-                {isAddingLabel ? (
-                    <div className="space-y-2">
-                        <input
-                            type="text"
-                            value={newLabelName}
-                            onChange={(e) => setNewLabelName(e.target.value)}
-                            placeholder="Label name..."
-                            className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            autoFocus
-                        />
+
+                    {/* Active Label Selector (for new annotations) */}
+                    <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                {t('annotation.activeLabel')}
+                            </span>
+                        </div>
                         <div className="flex items-center gap-2">
-                            <input
-                                type="color"
-                                value={newLabelColor}
-                                onChange={(e) => setNewLabelColor(e.target.value)}
-                                className="w-10 h-10 rounded cursor-pointer"
+                            <select
+                                value={activeLabel?.id || ''}
+                                onChange={(e) => {
+                                    const label = availableLabels.find(l => l.id === e.target.value);
+                                    if (label) actions.setActiveLabel(label);
+                                }}
+                                className="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                {availableLabels.map(label => (
+                                    <option key={label.id} value={label.id}>
+                                        {label.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <div
+                                className="w-8 h-8 rounded-lg border-2 border-white shadow-md"
+                                style={{ backgroundColor: activeLabel?.color || '#EF4444' }}
                             />
-                            <div className="flex-1 flex justify-end gap-1">
-                                <button
-                                    onClick={() => setIsAddingLabel(false)}
-                                    className="px-3 py-1.5 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
-                                >
-                                    {t('common.cancel')}
-                                </button>
-                                <button
-                                    onClick={handleAddLabel}
-                                    disabled={!newLabelName.trim()}
-                                    className="px-3 py-1.5 text-sm rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
-                                >
-                                    {t('common.add')}
-                                </button>
-                            </div>
                         </div>
+
+                        {/* Group ID for copy-move */}
+                        {activeLabel?.id === 'copy-move' && (
+                            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                                <div className="flex items-center gap-2">
+                                    <FiCopy className="text-blue-500" size={14} />
+                                    <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                                        {t('annotation.groupId')}: {nextGroupId}
+                                    </span>
+                                    <button
+                                        onClick={actions.incrementGroupId}
+                                        className="ml-auto text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200"
+                                    >
+                                        Next Group
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                ) : (
-                    <button
-                        onClick={() => setIsAddingLabel(true)}
-                        className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
-                    >
-                        <FiPlus size={16} />
-                        <span>{t('annotation.addLabel')}</span>
-                    </button>
-                )}
-            </div>
+
+                    {/* Annotations List */}
+                    <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                        {filteredAnnotations.length === 0 ? (
+                            <div className="text-center py-8">
+                                <FiEdit3 className="mx-auto text-gray-300 dark:text-gray-600 mb-2" size={32} />
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    {t('annotation.noAnnotations')}
+                                </p>
+                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                    {t('annotation.drawRegionHint')}
+                                </p>
+                            </div>
+                        ) : (
+                            filteredAnnotations.map(annotation => (
+                                <AnnotationItem
+                                    key={annotation.id}
+                                    annotation={annotation}
+                                    isSelected={selectedId === annotation.id}
+                                    onSelect={actions.selectAnnotation}
+                                    onDelete={handleDeleteAnnotation}
+                                    onEditLabel={handleUpdateAnnotation}
+                                    t={t}
+                                />
+                            ))
+                        )}
+                    </div>
+
+                    {/* Add New Label */}
+                    <div className="border-t border-gray-200 dark:border-gray-700 p-3">
+                        {isAddingLabel ? (
+                            <div className="space-y-2">
+                                <input
+                                    type="text"
+                                    value={newLabelName}
+                                    onChange={(e) => setNewLabelName(e.target.value)}
+                                    placeholder="Label name..."
+                                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    autoFocus
+                                />
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="color"
+                                        value={newLabelColor}
+                                        onChange={(e) => setNewLabelColor(e.target.value)}
+                                        className="w-10 h-10 rounded cursor-pointer"
+                                    />
+                                    <div className="flex-1 flex justify-end gap-1">
+                                        <button
+                                            onClick={() => setIsAddingLabel(false)}
+                                            className="px-3 py-1.5 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
+                                        >
+                                            {t('common.cancel')}
+                                        </button>
+                                        <button
+                                            onClick={handleAddLabel}
+                                            disabled={!newLabelName.trim()}
+                                            className="px-3 py-1.5 text-sm rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                                        >
+                                            {t('common.add')}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setIsAddingLabel(true)}
+                                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+                            >
+                                <FiPlus size={16} />
+                                <span>{t('annotation.addLabel')}</span>
+                            </button>
+                        )}
+                    </div>
                 </>
             ) : (
                 /* Analysis Tab Content */
@@ -581,29 +584,27 @@ const LabelsPanel = ({
                             <div className="flex items-center gap-2">
                                 <FiEye className="text-indigo-500" size={18} />
                                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Show Analysis Overlay
+                                    {t('analysis.showAnnotations') || 'Show Analysis Overlay'}
                                 </span>
                             </div>
                             <button
                                 onClick={onToggleAnalysisOverlay}
-                                className={`relative w-12 h-6 rounded-full transition-colors ${
-                                    showAnalysisOverlay ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-600'
-                                }`}
+                                className={`relative w-12 h-6 rounded-full transition-colors ${showAnalysisOverlay ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-600'
+                                    }`}
                             >
-                                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                                    showAnalysisOverlay ? 'translate-x-7' : 'translate-x-1'
-                                }`} />
+                                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${showAnalysisOverlay ? 'translate-x-7' : 'translate-x-1'
+                                    }`} />
                             </button>
                         </div>
                     )}
-                    
+
                     {/* Current Analysis Tool */}
                     {analysisToolName && (
                         <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg border border-indigo-200 dark:border-indigo-800">
                             <div className="flex items-center gap-2 mb-1">
                                 <FiLayers className="text-indigo-600" size={16} />
                                 <span className="text-xs font-medium text-indigo-500 dark:text-indigo-400 uppercase">
-                                    Current Analysis
+                                    {t('annotation.sections.currentAnalysis') || 'Current Analysis'}
                                 </span>
                             </div>
                             <p className="text-sm text-indigo-700 dark:text-indigo-300 font-semibold">
@@ -611,31 +612,29 @@ const LabelsPanel = ({
                             </p>
                         </div>
                     )}
-                    
+
                     {/* Analysis Tools Selection */}
                     {availableAnalysisTools.length > 0 && (
                         <div>
                             <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                                Available Analysis Tools
+                                {t('annotation.sections.availableTools') || 'Available Analysis Tools'}
                             </h4>
                             <div className="space-y-1.5">
                                 {availableAnalysisTools.map(tool => (
                                     <button
                                         key={tool.id}
                                         onClick={() => onRunAnalysis && onRunAnalysis(tool.id)}
-                                        className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-all ${
-                                            analysisToolId === tool.id
-                                                ? 'bg-indigo-100 dark:bg-indigo-900/40 border-2 border-indigo-400'
-                                                : 'bg-gray-50 dark:bg-gray-700/50 border-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600'
-                                        }`}
+                                        className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-all ${analysisToolId === tool.id
+                                            ? 'bg-indigo-100 dark:bg-indigo-900/40 border-2 border-indigo-400'
+                                            : 'bg-gray-50 dark:bg-gray-700/50 border-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600'
+                                            }`}
                                     >
                                         {tool.icon && <tool.icon size={16} className={analysisToolId === tool.id ? 'text-indigo-600' : 'text-gray-500'} />}
                                         <div className="flex-1 min-w-0">
-                                            <p className={`text-sm font-medium truncate ${
-                                                analysisToolId === tool.id 
-                                                    ? 'text-indigo-700 dark:text-indigo-300' 
-                                                    : 'text-gray-900 dark:text-white'
-                                            }`}>
+                                            <p className={`text-sm font-medium truncate ${analysisToolId === tool.id
+                                                ? 'text-indigo-700 dark:text-indigo-300'
+                                                : 'text-gray-900 dark:text-white'
+                                                }`}>
                                                 {tool.name}
                                             </p>
                                             {tool.description && (
@@ -649,7 +648,7 @@ const LabelsPanel = ({
                             </div>
                         </div>
                     )}
-                    
+
                     {/* Analysis Parameters - Show only current tool's params */}
                     {analysisToolId && analysisParams && onAnalysisParamsChange && (
                         <AnalysisParametersSection
@@ -658,12 +657,11 @@ const LabelsPanel = ({
                             onParamsChange={onAnalysisParamsChange}
                         />
                     )}
-                    
+
                     {/* Help text */}
                     <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-200 dark:border-gray-700">
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                            <strong>Tip:</strong> Use analysis results to identify manipulation regions, 
-                            then switch to the Annotations tab to mark them. Press <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-600 rounded text-xs">A</kbd> to toggle the overlay.
+                            <strong>{t('annotation.help.tip') || 'Tip:'}</strong> {t('annotation.help.tipContent') || 'Use analysis results to identify manipulation regions, then switch to the Annotations tab to mark them. Press A to toggle the overlay.'}
                         </p>
                     </div>
                 </div>

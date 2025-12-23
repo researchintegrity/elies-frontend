@@ -7,6 +7,7 @@
  */
 import React from 'react';
 import { useAnnotation, ShapeTypes, ToolTypes } from '../../context/AnnotationContext';
+import { useLanguage } from '../../context/LanguageContext';
 import {
     normalizeRect,
     getResizeHandles,
@@ -46,19 +47,20 @@ const PolygonPointHandle = ({ point, index, isSelected, onMouseDown }) => (
 );
 
 // Shape Renderer
-const AnnotationShape = ({ 
-    annotation, 
-    isSelected, 
+const AnnotationShape = ({
+    annotation,
+    isSelected,
     isHovered,
     onMouseDown,
     onHandleMouseDown,
     onPolygonPointMouseDown,
 }) => {
+    const { t } = useLanguage();
     const color = annotation.label?.color || '#EF4444';
     const fillOpacity = isSelected ? 0.25 : isHovered ? 0.2 : 0.15;
     const strokeWidth = isSelected ? 2.5 : isHovered ? 2 : 1.5;
     const strokeDasharray = isSelected ? 'none' : 'none';
-    
+
     // Common props
     const shapeProps = {
         fill: color,
@@ -69,7 +71,7 @@ const AnnotationShape = ({
         className: 'cursor-move transition-all duration-100',
         onMouseDown,
     };
-    
+
     const renderShape = () => {
         switch (annotation.type) {
             case ShapeTypes.RECTANGLE: {
@@ -85,7 +87,7 @@ const AnnotationShape = ({
                     />
                 );
             }
-            
+
             case ShapeTypes.ELLIPSE: {
                 const { x, y, width, height } = normalizeRect(annotation);
                 return (
@@ -98,7 +100,7 @@ const AnnotationShape = ({
                     />
                 );
             }
-            
+
             case ShapeTypes.POLYGON: {
                 if (!annotation.points || annotation.points.length < 3) return null;
                 const pointsStr = annotation.points.map(p => `${p.x},${p.y}`).join(' ');
@@ -109,16 +111,16 @@ const AnnotationShape = ({
                     />
                 );
             }
-            
+
             default:
                 return null;
         }
     };
-    
+
     // Render resize handles for selected shapes
     const renderHandles = () => {
         if (!isSelected) return null;
-        
+
         if (annotation.type === ShapeTypes.POLYGON) {
             // Polygon: render point handles
             return annotation.points?.map((point, idx) => (
@@ -131,7 +133,7 @@ const AnnotationShape = ({
                 />
             ));
         }
-        
+
         // Rectangle/Ellipse: render resize handles
         const handles = getResizeHandles(annotation);
         return Object.entries(handles).map(([position, { x, y }]) => (
@@ -145,13 +147,13 @@ const AnnotationShape = ({
             />
         ));
     };
-    
+
     // Render label badge
     const renderLabel = () => {
         if (!isSelected && !isHovered) return null;
-        
+
         let labelX, labelY;
-        
+
         if (annotation.type === ShapeTypes.POLYGON && annotation.points?.length > 0) {
             // Use first point
             labelX = annotation.points[0].x;
@@ -161,10 +163,10 @@ const AnnotationShape = ({
             labelX = x;
             labelY = y - 10;
         }
-        
-        const labelText = annotation.label?.name || 'Unknown';
+
+        const labelText = annotation.label?.name || t('annotation.labels.unknown') || 'Unknown';
         const groupText = annotation.groupId ? ` (G${annotation.groupId})` : '';
-        
+
         return (
             <g>
                 <rect
@@ -188,7 +190,7 @@ const AnnotationShape = ({
             </g>
         );
     };
-    
+
     return (
         <g data-annotation-id={annotation.id}>
             {renderShape()}
@@ -200,8 +202,9 @@ const AnnotationShape = ({
 
 // Current Drawing Shape (Preview)
 const DrawingPreview = ({ shape, color }) => {
+    const { t } = useLanguage();
     if (!shape) return null;
-    
+
     const shapeProps = {
         fill: color,
         fillOpacity: 0.2,
@@ -209,7 +212,7 @@ const DrawingPreview = ({ shape, color }) => {
         strokeWidth: 2,
         strokeDasharray: '5,5',
     };
-    
+
     switch (shape.type) {
         case ShapeTypes.RECTANGLE: {
             const { x, y, width, height } = normalizeRect(shape);
@@ -224,7 +227,7 @@ const DrawingPreview = ({ shape, color }) => {
                 />
             );
         }
-        
+
         case ShapeTypes.ELLIPSE: {
             const { x, y, width, height } = normalizeRect(shape);
             return (
@@ -237,13 +240,13 @@ const DrawingPreview = ({ shape, color }) => {
                 />
             );
         }
-        
+
         case ShapeTypes.POLYGON: {
             if (!shape.points || shape.points.length === 0) return null;
-            
+
             const points = shape.points;
             const lastPoint = points[points.length - 1];
-            
+
             return (
                 <g>
                     {/* Lines connecting points */}
@@ -256,7 +259,7 @@ const DrawingPreview = ({ shape, color }) => {
                             strokeDasharray="5,5"
                         />
                     )}
-                    
+
                     {/* Preview line to mouse */}
                     {shape.previewPoint && lastPoint && (
                         <line
@@ -270,7 +273,7 @@ const DrawingPreview = ({ shape, color }) => {
                             opacity={0.6}
                         />
                     )}
-                    
+
                     {/* Closing line preview */}
                     {points.length > 2 && shape.previewPoint && (
                         <line
@@ -284,7 +287,7 @@ const DrawingPreview = ({ shape, color }) => {
                             opacity={0.4}
                         />
                     )}
-                    
+
                     {/* Point markers */}
                     {points.map((point, idx) => (
                         <circle
@@ -297,7 +300,7 @@ const DrawingPreview = ({ shape, color }) => {
                             strokeWidth={2}
                         />
                     ))}
-                    
+
                     {/* Hint text for first point */}
                     {points.length > 2 && (
                         <text
@@ -308,13 +311,13 @@ const DrawingPreview = ({ shape, color }) => {
                             fontWeight="bold"
                             textAnchor="middle"
                         >
-                            Click to close
+                            {t('annotation.hints.clickToClose') || 'Click to close'}
                         </text>
                     )}
                 </g>
             );
         }
-        
+
         default:
             return null;
     }
@@ -334,23 +337,23 @@ const SVGAnnotationLayer = ({
     onPolygonPointMouseDown,
 }) => {
     const { state } = useAnnotation();
-    const { 
-        annotations, 
-        selectedId, 
-        hoveredId, 
-        currentShape, 
+    const {
+        annotations,
+        selectedId,
+        hoveredId,
+        currentShape,
         isDrawing,
         activeLabel,
         activeTool,
     } = state;
-    
+
     // Determine cursor based on tool
     const getCursor = () => {
         if (isDrawing) {
             if (activeTool === ToolTypes.POLYGON) return 'crosshair';
             return 'crosshair';
         }
-        
+
         switch (activeTool) {
             case ToolTypes.SELECT:
                 return 'default';
@@ -364,7 +367,7 @@ const SVGAnnotationLayer = ({
                 return 'default';
         }
     };
-    
+
     return (
         <svg
             width={width}
@@ -389,12 +392,12 @@ const SVGAnnotationLayer = ({
                     onPolygonPointMouseDown={(e, pointIndex) => onPolygonPointMouseDown(e, annotation, pointIndex)}
                 />
             ))}
-            
+
             {/* Render current drawing preview */}
             {isDrawing && currentShape && (
-                <DrawingPreview 
-                    shape={currentShape} 
-                    color={activeLabel?.color || '#EF4444'} 
+                <DrawingPreview
+                    shape={currentShape}
+                    color={activeLabel?.color || '#EF4444'}
                 />
             )}
         </svg>

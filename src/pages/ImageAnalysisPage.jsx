@@ -117,7 +117,7 @@ const ANALYSIS_TOOLS = {
 // --- Sub-Components ---
 
 // Compact Image Card for Source Selection
-const SourceImageCard = ({ image, isSelected, onClick, imageUrl, loading }) => (
+const SourceImageCard = ({ image, isSelected, onClick, imageUrl, loading, size = 'default' }) => (
     <div
         onClick={onClick}
         className={`relative rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border-2 ${isSelected
@@ -125,7 +125,7 @@ const SourceImageCard = ({ image, isSelected, onClick, imageUrl, loading }) => (
             : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
             }`}
     >
-        <div className="aspect-square bg-gray-100 dark:bg-gray-800 overflow-hidden">
+        <div className={`${size === 'large' ? 'aspect-[5/3]' : 'aspect-square'} bg-gray-100 dark:bg-gray-800 overflow-hidden`}>
             {loading ? (
                 <div className="w-full h-full bg-gray-200 dark:bg-gray-700 animate-pulse" />
             ) : imageUrl ? (
@@ -269,7 +269,9 @@ const ImageAnalysisPage = () => {
     // Annotation State
     const [annotationMode, setAnnotationMode] = useState(false);
     const [showAnnotationModal, setShowAnnotationModal] = useState(false);
+    const [showAnnotations, setShowAnnotations] = useState(true); // Toggle annotations visibility
     const [annotations, setAnnotations] = useState([]);
+    const [annotationCanvas, setAnnotationCanvas] = useState(null); // Canvas with 100% opacity for annotation
     const [crop, setCrop] = useState(null);
     const [annotationType, setAnnotationType] = useState('manipulation');
     const [groupId, setGroupId] = useState(1);
@@ -411,6 +413,10 @@ const ImageAnalysisPage = () => {
     useEffect(() => {
         if (!selectedImage || !imageUrls[selectedImage.id]) return;
 
+        // Clear annotation canvas when params change to allow live updates from resultCanvas
+        // This ensures that if the user changes params inside the modal, the modal sees the updated result
+        setAnnotationCanvas(null);
+
         // Clear previous timeout
         if (analysisTimeoutRef.current) {
             clearTimeout(analysisTimeoutRef.current);
@@ -427,6 +433,33 @@ const ImageAnalysisPage = () => {
             }
         };
     }, [selectedImage, selectedTool, params]);
+
+    // Re-run analysis when modal closes to restore original user opacity
+    useEffect(() => {
+        if (!showAnnotationModal && selectedImage) {
+            runAnalysis();
+        }
+    }, [showAnnotationModal]);
+
+    // Escape key handler to unselect image and expand gallery
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && !showAnnotationModal) {
+                // Don't interfere with inputs
+                if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+
+                if (selectedImage) {
+                    setSelectedImage(null);
+                    setResultCanvas(null);
+                    setOriginalCanvas(null);
+                    setAnnotations([]);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedImage, showAnnotationModal]);
 
     // Keyboard shortcuts (Copy/Paste) for Annotations
     useEffect(() => {
@@ -602,25 +635,40 @@ const ImageAnalysisPage = () => {
 
             switch (selectedTool) {
                 case 'ela':
-                    result = await applyErrorLevelAnalysis(canvas, params.elaQuality, params.elaScale, params.elaOpacity);
+                    result = await applyErrorLevelAnalysis(
+                        canvas,
+                        params.elaQuality,
+                        params.elaScale,
+                        showAnnotationModal ? 100 : params.elaOpacity
+                    );
                     break;
 
                 case 'noise':
-                    result = applyNoiseAnalysis(canvas, params.noiseAmplitude, params.noiseEqualize, params.noiseOpacity);
+                    result = applyNoiseAnalysis(
+                        canvas,
+                        params.noiseAmplitude,
+                        params.noiseEqualize,
+                        showAnnotationModal ? 100 : params.noiseOpacity
+                    );
                     break;
 
                 case 'gradient':
                     result = applyLuminanceGradient(
                         canvas,
                         params.gradientIntensity,
-                        params.gradientOpacity / 100,
+                        showAnnotationModal ? 1 : (params.gradientOpacity / 100),
                         params.gradientNormalize,
                         params.gradientEqualize
                     );
                     break;
 
                 case 'levelSweep':
-                    result = applyLevelSweep(canvas, params.sweepPosition, params.sweepWidth, params.sweepOpacity);
+                    result = applyLevelSweep(
+                        canvas,
+                        params.sweepPosition,
+                        params.sweepWidth,
+                        showAnnotationModal ? 100 : params.sweepOpacity
+                    );
                     break;
 
                 case 'cloneDetection':
@@ -949,6 +997,56 @@ const ImageAnalysisPage = () => {
         setCrop(anno.coords); // Show the box as selected
     };
 
+    // Open annotation modal with analysis at 100% opacity
+    const openAnnotationModal = async () => {
+        if (!selectedImage || !imageUrls[selectedImage.id]) {
+            setShowAnnotationModal(true);
+            return;
+        }
+
+        // Re-run analysis with 100% opacity for the annotation canvas
+        try {
+            const imageUrl = imageUrls[selectedImage.id];
+            const { canvas } = await loadImageToCanvas(imageUrl);
+
+            let result = null;
+
+            switch (selectedTool) {
+                case 'ela':
+                    result = await applyErrorLevelAnalysis(canvas, params.elaQuality, params.elaScale, 100);
+                    break;
+                case 'noise':
+                    result = applyNoiseAnalysis(canvas, params.noiseAmplitude, params.noiseEqualize, 100);
+                    break;
+                case 'gradient':
+                    result = applyLuminanceGradient(canvas, params.gradientIntensity, 1.0, params.gradientNormalize, params.gradientEqualize);
+                    break;
+                case 'levelSweep':
+                    result = applyLevelSweep(canvas, params.sweepPosition, params.sweepWidth, 100);
+                    break;
+                case 'cloneDetection':
+                    result = applyCloneDetection(canvas, {
+                        minSimilarity: params.cloneMinSimilarity,
+                        minDetail: params.cloneMinDetail,
+                        minClusterSize: params.cloneMinClusterSize,
+                        blockSize: params.cloneBlockSize,
+                        maxImageSize: params.cloneMaxImageSize,
+                        showQuantized: params.cloneShowQuantized
+                    });
+                    break;
+                default:
+                    break;
+            }
+
+            setAnnotationCanvas(result || resultCanvas);
+        } catch (err) {
+            console.error('Error preparing annotation canvas:', err);
+            setAnnotationCanvas(resultCanvas); // Fallback to current canvas
+        }
+
+        setShowAnnotationModal(true);
+    };
+
     const renderAnnotationControls = () => (
         <div className="flex flex-col h-full bg-white dark:bg-gray-800">
             <h3 className="text-gray-900 dark:text-white text-lg font-semibold px-4 pt-4 pb-2 border-b border-gray-100 dark:border-gray-700">
@@ -1108,35 +1206,49 @@ const ImageAnalysisPage = () => {
 
             {/* Main Content: Split View */}
             <div className="flex-1 flex overflow-hidden">
-                {/* Left Panel: Image Gallery */}
-                <div className={`flex-none border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-all duration-300 ${galleryCollapsed ? 'w-12' : 'w-64'
+                {/* Left Panel: Image Gallery - Expands when no image selected */}
+                <div className={`flex-none border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-all duration-300 ${galleryCollapsed
+                        ? 'w-12'
+                        : selectedImage
+                            ? 'w-64'
+                            : 'w-full max-w-6xl'
                     }`}>
                     <div className="h-full flex flex-col">
                         {/* Gallery Header */}
                         <div className="flex-none p-2 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
                             {!galleryCollapsed && (
-                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                                    {t('analysis.selectImage') || 'Select Image'}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                        {selectedImage
+                                            ? (t('analysis.selectImage') || 'Select Image')
+                                            : (t('analysis.imageGallery') || 'Browse Images')
+                                        }
+                                    </span>
+                                    {!selectedImage && (
+                                        <span className="text-xs text-gray-400">
+                                            ({totalImages} {t('gallery.images', 'images')})
+                                        </span>
+                                    )}
+                                </div>
                             )}
                             <div className="flex items-center gap-1">
                                 {!galleryCollapsed && (
                                     <button
                                         onClick={() => setShowFilters(!showFilters)}
-                                        className={`p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 ${(filterSearch || filterDateFrom || filterDateTo || filterImageType)
+                                        className={`p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 ${(filterSearch || filterDateFrom || filterDateTo || filterImageType)
                                             ? 'text-indigo-500'
                                             : 'text-gray-500'
                                             }`}
                                         title={t('filters.toggle', 'Toggle filters')}
                                     >
-                                        <FiFilter size={14} />
+                                        <FiFilter size={18} />
                                     </button>
                                 )}
                                 <button
                                     onClick={() => setGalleryCollapsed(!galleryCollapsed)}
-                                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                                    className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
                                 >
-                                    {galleryCollapsed ? <FiMaximize2 size={14} /> : <FiMinimize2 size={14} />}
+                                    {galleryCollapsed ? <FiMaximize2 size={18} /> : <FiMinimize2 size={18} />}
                                 </button>
                             </div>
                         </div>
@@ -1221,11 +1333,11 @@ const ImageAnalysisPage = () => {
 
                         {/* Gallery Content */}
                         {!galleryCollapsed && (
-                            <div className="flex-1 overflow-y-auto p-2">
+                            <div className="flex-1 overflow-y-auto p-1.5">
                                 {loadingImages ? (
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {[...Array(9)].map((_, i) => (
-                                            <div key={i} className="aspect-square bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+                                    <div className={`grid gap-4 ${selectedImage ? 'grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'}`}>
+                                        {[...Array(selectedImage ? 9 : 18)].map((_, i) => (
+                                            <div key={i} className={`${selectedImage ? 'aspect-square' : 'aspect-[5/3]'} bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse`} />
                                         ))}
                                     </div>
                                 ) : images.length === 0 ? (
@@ -1233,7 +1345,7 @@ const ImageAnalysisPage = () => {
                                         {t('analysis.noImages') || 'No images'}
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-3 gap-2">
+                                    <div className={`grid gap-4 ${selectedImage ? 'grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'}`}>
                                         {images.map((img) => (
                                             <SourceImageCard
                                                 key={img.id}
@@ -1242,6 +1354,7 @@ const ImageAnalysisPage = () => {
                                                 onClick={() => setSelectedImage(img)}
                                                 imageUrl={imageUrls[img.id]}
                                                 loading={loadingUrls[img.id]}
+                                                size={selectedImage ? 'default' : 'large'}
                                             />
                                         ))}
                                     </div>
@@ -1259,7 +1372,7 @@ const ImageAnalysisPage = () => {
                                 >
                                     <FiChevronLeft size={14} />
                                 </button>
-                                <span className="text-xs text-gray-500">{galleryPage}/{totalGalleryPages}</span>
+                                <span className="text-sm text-gray-500">{galleryPage}/{totalGalleryPages}</span>
                                 <button
                                     onClick={() => setGalleryPage(p => Math.min(totalGalleryPages, p + 1))}
                                     disabled={galleryPage >= totalGalleryPages}
@@ -1272,231 +1385,250 @@ const ImageAnalysisPage = () => {
                     </div>
                 </div>
 
-                {/* Center: Image Display */}
-                <div className="flex-1 flex flex-col bg-gray-100 dark:bg-gray-900 min-w-0">
-                    {/* Image Container */}
-                    <div className="flex-1 flex items-center justify-center p-4 overflow-hidden min-h-0">
-                        {!selectedImage ? (
-                            <div className="text-center text-gray-400">
-                                <FiSearch size={48} className="mx-auto mb-3 opacity-50" />
-                                <p className="text-sm">{t('analysis.selectAndRun') || 'Select an image to analyze'}</p>
-                            </div>
-                        ) : analyzing ? (
-                            <div className="text-center">
-                                <FiRefreshCw className="w-8 h-8 text-indigo-500 animate-spin mx-auto mb-2" />
-                                <p className="text-sm text-gray-500">{t('analysis.processing') || 'Processing...'}</p>
-                            </div>
-                        ) : ANALYSIS_TOOLS[selectedTool]?.hasCanvas ? (
-                            <div
-                                ref={zoomContainerRef}
-                                className={`w-full h-full flex items-center justify-center ${zoomLevel > 1 ? 'overflow-auto' : 'overflow-hidden'
-                                    }`}
-                                style={{
-                                    cursor: zoomLevel > 1 ? 'grab' : 'default'
-                                }}
-                                onDoubleClick={() => setZoomLevel(1)}
-                            >
+                {/* Center: Image Display - Only show when image is selected */}
+                {selectedImage && (
+                    <div className="flex-1 flex flex-col bg-gray-100 dark:bg-gray-900 min-w-0">
+                        {/* Image Container */}
+                        <div className="flex-1 flex items-center justify-center p-4 overflow-hidden min-h-0">
+                            {analyzing ? (
+                                <div className="text-center">
+                                    <FiRefreshCw className="w-8 h-8 text-indigo-500 animate-spin mx-auto mb-2" />
+                                    <p className="text-sm text-gray-500">{t('analysis.processing') || 'Processing...'}</p>
+                                </div>
+                            ) : ANALYSIS_TOOLS[selectedTool]?.hasCanvas ? (
                                 <div
+                                    ref={zoomContainerRef}
+                                    className={`w-full h-full flex items-center justify-center ${zoomLevel > 1 ? 'overflow-auto' : 'overflow-hidden'
+                                        }`}
                                     style={{
-                                        transform: `scale(${zoomLevel})`,
-                                        transformOrigin: 'center center',
-                                        transition: 'transform 0.15s ease-out',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center'
+                                        cursor: zoomLevel > 1 ? 'grab' : 'default'
                                     }}
+                                    onDoubleClick={() => setZoomLevel(1)}
                                 >
-                                    {showOriginal && originalCanvas ? (
-                                        <AnnotationOverlay
-                                            isActive={false}
-                                            crop={crop}
-                                            onChange={setCrop}
-                                            annotations={annotations}
-                                            onAnnotationClick={handleAnnotationClick}
-                                            selectedAnnotationId={selectedAnnotationId}
+                                    <div
+                                        style={{
+                                            transform: `scale(${zoomLevel})`,
+                                            transformOrigin: 'center center',
+                                            transition: 'transform 0.15s ease-out',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        }}
+                                    >
+                                        {showOriginal && originalCanvas ? (
+                                            <AnnotationOverlay
+                                                isActive={false}
+                                                crop={crop}
+                                                onChange={setCrop}
+                                                annotations={showAnnotations ? annotations : []}
+                                                onAnnotationClick={handleAnnotationClick}
+                                                selectedAnnotationId={selectedAnnotationId}
+                                            >
+                                                <img
+                                                    src={originalCanvas.toDataURL()}
+                                                    alt="Original"
+                                                    className="rounded-lg shadow-lg"
+                                                    draggable={false}
+                                                    style={{
+                                                        maxWidth: zoomLevel === 1 ? 'calc(100vw - 450px)' : 'none',
+                                                        maxHeight: zoomLevel === 1 ? 'calc(100vh - 250px)' : 'none',
+                                                        objectFit: 'contain'
+                                                    }}
+                                                />
+                                            </AnnotationOverlay>
+                                        ) : resultCanvas ? (
+                                            <AnnotationOverlay
+                                                isActive={false}
+                                                crop={crop}
+                                                onChange={setCrop}
+                                                annotations={showAnnotations ? annotations : []}
+                                                onAnnotationClick={handleAnnotationClick}
+                                                selectedAnnotationId={selectedAnnotationId}
+                                            >
+                                                <canvas
+                                                    ref={resultCanvasRef}
+                                                    className="rounded-lg shadow-lg"
+                                                    style={{
+                                                        maxWidth: zoomLevel === 1 ? 'calc(100vw - 450px)' : 'none',
+                                                        maxHeight: zoomLevel === 1 ? 'calc(100vh - 250px)' : 'none'
+                                                    }}
+                                                />
+                                            </AnnotationOverlay>
+                                        ) : originalCanvas ? (
+                                            <AnnotationOverlay
+                                                isActive={false}
+                                                crop={crop}
+                                                onChange={setCrop}
+                                                annotations={showAnnotations ? annotations : []}
+                                                onAnnotationClick={handleAnnotationClick}
+                                                selectedAnnotationId={selectedAnnotationId}
+                                            >
+                                                <img
+                                                    src={originalCanvas.toDataURL()}
+                                                    alt="Original"
+                                                    className="rounded-lg shadow-lg opacity-50"
+                                                    draggable={false}
+                                                    style={{
+                                                        maxWidth: zoomLevel === 1 ? 'calc(100vw - 450px)' : 'none',
+                                                        maxHeight: zoomLevel === 1 ? 'calc(100vh - 250px)' : 'none',
+                                                        objectFit: 'contain'
+                                                    }}
+                                                />
+                                            </AnnotationOverlay>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
+                                    {renderNonCanvasResults() || (
+                                        <div className="p-8 text-center text-gray-400">
+                                            <p>{t('analysis.selectImageFirst') || 'Select an image'}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Bottom Bar: Controls */}
+                        <div className="flex-none px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-2">
+                                    {/* Toggle Original */}
+                                    {ANALYSIS_TOOLS[selectedTool]?.hasCanvas && resultCanvas && (
+                                        <button
+                                            onClick={() => setShowOriginal(!showOriginal)}
+                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${showOriginal
+                                                ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+                                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
+                                                }`}
                                         >
-                                            <img
-                                                src={originalCanvas.toDataURL()}
-                                                alt="Original"
-                                                className="rounded-lg shadow-lg"
-                                                draggable={false}
-                                                style={{
-                                                    maxWidth: zoomLevel === 1 ? 'calc(100vw - 450px)' : 'none',
-                                                    maxHeight: zoomLevel === 1 ? 'calc(100vh - 250px)' : 'none',
-                                                    objectFit: 'contain'
-                                                }}
-                                            />
-                                        </AnnotationOverlay>
-                                    ) : resultCanvas ? (
-                                        <AnnotationOverlay
-                                            isActive={false}
-                                            crop={crop}
-                                            onChange={setCrop}
-                                            annotations={annotations}
-                                            onAnnotationClick={handleAnnotationClick}
-                                            selectedAnnotationId={selectedAnnotationId}
+                                            {showOriginal ? <FiEyeOff size={14} /> : <FiEye size={14} />}
+                                            <span>{showOriginal ? t('analysis.result') || 'Show Result' : t('analysis.original') || 'Show Original'}</span>
+                                        </button>
+                                    )}
+
+                                    {/* Toggle Annotations Visibility */}
+                                    {annotations.length > 0 && (
+                                        <button
+                                            onClick={() => setShowAnnotations(!showAnnotations)}
+                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${showAnnotations
+                                                ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
+                                                }`}
+                                            title={showAnnotations ? 'Hide Annotations' : 'Show Annotations'}
                                         >
-                                            <canvas
-                                                ref={resultCanvasRef}
-                                                className="rounded-lg shadow-lg"
-                                                style={{
-                                                    maxWidth: zoomLevel === 1 ? 'calc(100vw - 450px)' : 'none',
-                                                    maxHeight: zoomLevel === 1 ? 'calc(100vh - 250px)' : 'none'
-                                                }}
-                                            />
-                                        </AnnotationOverlay>
-                                    ) : originalCanvas ? (
-                                        <AnnotationOverlay
-                                            isActive={false}
-                                            crop={crop}
-                                            onChange={setCrop}
-                                            annotations={annotations}
-                                            onAnnotationClick={handleAnnotationClick}
-                                            selectedAnnotationId={selectedAnnotationId}
+                                            <FiTag size={14} />
+                                            <span>{showAnnotations ? t('analysis.hideAnnotations') || 'Hide Annotations' : t('analysis.showAnnotations') || 'Show Annotations'}</span>
+                                            <span className="px-1.5 py-0.5 text-xs rounded-full bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200">
+                                                {annotations.length}
+                                            </span>
+                                        </button>
+                                    )}
+
+                                    {/* Zoom Controls */}
+                                    {ANALYSIS_TOOLS[selectedTool]?.hasCanvas && (resultCanvas || originalCanvas) && (
+                                        <>
+                                            {/* Advanced Annotation Button (Opens Modal) */}
+                                            <button
+                                                onClick={openAnnotationModal}
+                                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors border mr-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-purple-600 shadow-sm hover:from-purple-700 hover:to-indigo-700"
+                                                title={t('analysis.advancedAnnotate') || 'Annotate Image'}
+                                            >
+                                                <FiPenTool size={14} />
+                                                <span>{t('analysis.annotate') || 'Annotate'}</span>
+                                            </button>
+
+                                            <div className="flex items-center gap-1 ml-2 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                                                <button
+                                                    onClick={() => setZoomLevel(z => Math.max(0.25, z - 0.25))}
+                                                    className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 transition-colors"
+                                                    title={t('analysis.zoomOut') || 'Zoom Out'}
+                                                >
+                                                    <FiZoomOut size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => setZoomLevel(1)}
+                                                    className={`px-2 py-1 text-xs font-medium rounded transition-colors ${zoomLevel === 1
+                                                        ? 'bg-indigo-600 text-white'
+                                                        : 'hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400'
+                                                        }`}
+                                                    title={t('analysis.fitToScreen') || 'Fit to Screen'}
+                                                >
+                                                    Fit
+                                                </button>
+                                                <span className="text-xs text-gray-500 min-w-[40px] text-center">
+                                                    {Math.round(zoomLevel * 100)}%
+                                                </span>
+                                                <button
+                                                    onClick={() => setZoomLevel(z => Math.min(4, z + 0.25))}
+                                                    className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 transition-colors"
+                                                    title={t('analysis.zoomIn') || 'Zoom In'}
+                                                >
+                                                    <FiZoomIn size={16} />
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                    {/* Download */}
+                                    {resultCanvas && (
+                                        <button
+                                            onClick={() => {
+                                                const link = document.createElement('a');
+                                                const baseName = selectedImage?.filename?.replace(/\.[^/.]+$/, '') || 'image';
+                                                link.download = `${baseName}-${selectedTool}-${Date.now()}.png`;
+                                                link.href = resultCanvas.toDataURL('image/png');
+                                                link.click();
+                                            }}
+                                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                            title={t('common.download') || 'Download'}
                                         >
-                                            <img
-                                                src={originalCanvas.toDataURL()}
-                                                alt="Original"
-                                                className="rounded-lg shadow-lg opacity-50"
-                                                draggable={false}
-                                                style={{
-                                                    maxWidth: zoomLevel === 1 ? 'calc(100vw - 450px)' : 'none',
-                                                    maxHeight: zoomLevel === 1 ? 'calc(100vh - 250px)' : 'none',
-                                                    objectFit: 'contain'
-                                                }}
-                                            />
-                                        </AnnotationOverlay>
-                                    ) : null}
+                                            <FiDownload size={14} />
+                                            <span>{t('common.download') || 'Download'}</span>
+                                        </button>
+                                    )}
+
+                                    {/* Selected filename */}
+                                    {selectedImage && (
+                                        <span className="text-xs text-gray-500 truncate max-w-[200px]">
+                                            {selectedImage.filename}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
-                        ) : (
-                            <div className="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
-                                {renderNonCanvasResults() || (
-                                    <div className="p-8 text-center text-gray-400">
-                                        <p>{t('analysis.selectImageFirst') || 'Select an image'}</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                        </div>
                     </div>
+                )}
 
-                    {/* Bottom Bar: Controls */}
-                    <div className="flex-none px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                        <div className="flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-2">
-                                {/* Toggle Original */}
-                                {ANALYSIS_TOOLS[selectedTool]?.hasCanvas && resultCanvas && (
-                                    <button
-                                        onClick={() => setShowOriginal(!showOriginal)}
-                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${showOriginal
-                                            ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
-                                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
-                                            }`}
-                                    >
-                                        {showOriginal ? <FiEyeOff size={14} /> : <FiEye size={14} />}
-                                        <span>{showOriginal ? t('analysis.result') || 'Show Result' : t('analysis.original') || 'Show Original'}</span>
-                                    </button>
-                                )}
-
-                                {/* Zoom Controls */}
-                                {ANALYSIS_TOOLS[selectedTool]?.hasCanvas && (resultCanvas || originalCanvas) && (
-                                    <>
-                                        {/* Advanced Annotation Button (Opens Modal) */}
-                                        <button
-                                            onClick={() => setShowAnnotationModal(true)}
-                                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors border mr-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-purple-600 shadow-sm hover:from-purple-700 hover:to-indigo-700"
-                                            title={t('analysis.advancedAnnotate') || 'Annotate Image'}
-                                        >
-                                            <FiPenTool size={14} />
-                                            <span>{t('analysis.annotate') || 'Annotate'}</span>
-                                        </button>
-
-                                        <div className="flex items-center gap-1 ml-2 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                                            <button
-                                                onClick={() => setZoomLevel(z => Math.max(0.25, z - 0.25))}
-                                                className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 transition-colors"
-                                                title={t('analysis.zoomOut') || 'Zoom Out'}
-                                            >
-                                                <FiZoomOut size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() => setZoomLevel(1)}
-                                                className={`px-2 py-1 text-xs font-medium rounded transition-colors ${zoomLevel === 1
-                                                    ? 'bg-indigo-600 text-white'
-                                                    : 'hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400'
-                                                    }`}
-                                                title={t('analysis.fitToScreen') || 'Fit to Screen'}
-                                            >
-                                                Fit
-                                            </button>
-                                            <span className="text-xs text-gray-500 min-w-[40px] text-center">
-                                                {Math.round(zoomLevel * 100)}%
-                                            </span>
-                                            <button
-                                                onClick={() => setZoomLevel(z => Math.min(4, z + 0.25))}
-                                                className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 transition-colors"
-                                                title={t('analysis.zoomIn') || 'Zoom In'}
-                                            >
-                                                <FiZoomIn size={16} />
-                                            </button>
-                                        </div>
-                                    </>
-                                )}
+                {/* Right Panel: Parameters - Only show when image is selected */}
+                {selectedImage && (
+                    <div className="flex-none w-64 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                        <div className="h-full flex flex-col">
+                            <div className="flex-none p-3 border-b border-gray-100 dark:border-gray-700">
+                                <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                                    {t('analysis.parameters') || 'Parameters'}
+                                </h3>
                             </div>
 
-                            <div className="flex items-center gap-3">
-                                {/* Download */}
-                                {resultCanvas && (
-                                    <button
-                                        onClick={() => {
-                                            const link = document.createElement('a');
-                                            link.download = `analysis-${selectedTool}-${Date.now()}.png`;
-                                            link.href = resultCanvas.toDataURL('image/png');
-                                            link.click();
-                                        }}
-                                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                                    >
-                                        <FiDownload size={14} />
-                                        <span>{t('common.download') || 'Download'}</span>
-                                    </button>
-                                )}
+                            <div className="flex-1 overflow-y-auto">
+                                <div className="p-3">
+                                    {renderParameters()}
+                                </div>
+                            </div>
 
-                                {/* Selected filename */}
-                                {selectedImage && (
-                                    <span className="text-xs text-gray-500 truncate max-w-[200px]">
-                                        {selectedImage.filename}
-                                    </span>
-                                )}
+                            {/* Tool Description */}
+                            <div className="flex-none p-3 border-t border-gray-100 dark:border-gray-700">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    {t(`analysis.tools.${selectedTool}.description`) || ANALYSIS_TOOLS[selectedTool]?.description}
+                                </p>
                             </div>
                         </div>
                     </div>
-                </div>
-
-                {/* Right Panel: Parameters */}
-                <div className="flex-none w-64 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                    <div className="h-full flex flex-col">
-                        <div className="flex-none p-3 border-b border-gray-100 dark:border-gray-700">
-                            <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                                {t('analysis.parameters') || 'Parameters'}
-                            </h3>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto">
-                            <div className="p-3">
-                                {renderParameters()}
-                            </div>
-                        </div>
-
-                        {/* Tool Description */}
-                        <div className="flex-none p-3 border-t border-gray-100 dark:border-gray-700">
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                {t(`analysis.tools.${selectedTool}.description`) || ANALYSIS_TOOLS[selectedTool]?.description}
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                )}
             </div>
-            
+
             {/* Advanced Annotation Modal */}
             <AnnotationModal
                 isOpen={showAnnotationModal}
@@ -1504,7 +1636,10 @@ const ImageAnalysisPage = () => {
                 imageId={selectedImage?.id}
                 imageName={selectedImage?.filename}
                 existingAnnotations={annotations}
-                onClose={() => setShowAnnotationModal(false)}
+                onClose={() => {
+                    setShowAnnotationModal(false);
+                    setAnnotationCanvas(null); // Clear the annotation canvas
+                }}
                 onSaveSuccess={(savedAnnotations) => {
                     // Refresh annotations from API
                     if (selectedImage) {
@@ -1513,18 +1648,26 @@ const ImageAnalysisPage = () => {
                             .catch(err => console.error('Error refreshing annotations:', err));
                     }
                     setShowAnnotationModal(false);
+                    setAnnotationCanvas(null); // Clear the annotation canvas
                 }}
-                // Analysis overlay props
-                analysisCanvas={resultCanvas}
+                // Analysis overlay props - use annotationCanvas (100% opacity) or fallback to resultCanvas
+                analysisCanvas={annotationCanvas || resultCanvas}
                 analysisToolId={selectedTool}
-                analysisToolName={ANALYSIS_TOOLS[selectedTool]?.name || ''}
+                analysisToolName={t(`analysis.tools.${selectedTool}.name`) || ANALYSIS_TOOLS[selectedTool]?.name || ''}
                 analysisParams={params}
                 onAnalysisParamsChange={setParams}
                 onRunAnalysis={(toolId) => {
                     setSelectedTool(toolId);
                     // Analysis will run automatically due to useEffect watching selectedTool
                 }}
-                availableAnalysisTools={Object.values(ANALYSIS_TOOLS).filter(t => t.hasCanvas)}
+                availableAnalysisTools={Object.values(ANALYSIS_TOOLS)
+                    .filter(tool => tool.hasCanvas)
+                    .map(tool => ({
+                        ...tool,
+                        name: t(`analysis.tools.${tool.id}.name`) || tool.name,
+                        description: t(`analysis.tools.${tool.id}.description`) || tool.description
+                    }))
+                }
             />
         </div>
     );
