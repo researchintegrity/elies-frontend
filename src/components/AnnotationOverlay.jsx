@@ -60,6 +60,7 @@ const AnnotationOverlay = ({
                 {annotations.map(anno => {
                     const { x, y, width, height } = anno.coords || {};
                     const color = getGroupColor(anno.type, anno.group_id);
+                    const shapeType = anno.shape_type || 'rectangle';
 
                     // Don't render invalid coords
                     if (!Number.isFinite(x) || !Number.isFinite(width)) return null;
@@ -70,6 +71,56 @@ const AnnotationOverlay = ({
                     // effectively turning it into the active selection.
                     if (anno._id === selectedAnnotationId) return null;
 
+                    // Render ellipse shape
+                    if (shapeType === 'ellipse') {
+                        return (
+                            <div
+                                key={anno._id}
+                                className={`absolute transition-all group pointer-events-auto ${isActive ? 'cursor-pointer hover:opacity-100' : 'opacity-80'}`}
+                                style={{
+                                    left: `${x}%`,
+                                    top: `${y}%`,
+                                    width: `${width}%`,
+                                    height: `${height}%`,
+                                }}
+                                onClick={(e) => {
+                                    if (isActive && onAnnotationClick) {
+                                        e.stopPropagation();
+                                        onAnnotationClick(anno);
+                                    }
+                                }}
+                                title={anno.text || anno.type}
+                            >
+                                <svg
+                                    className="absolute inset-0 w-full h-full overflow-visible"
+                                    viewBox="0 0 100 100"
+                                    preserveAspectRatio="none"
+                                >
+                                    <ellipse
+                                        cx="50"
+                                        cy="50"
+                                        rx="50"
+                                        ry="50"
+                                        fill={`${color}33`}
+                                        stroke={color}
+                                        strokeWidth="2"
+                                        vectorEffect="non-scaling-stroke"
+                                    />
+                                </svg>
+                                {/* Badge for Group ID */}
+                                {anno.type === 'copy-move' && anno.group_id && (
+                                    <div
+                                        className="absolute -top-3 -left-0.5 text-[10px] text-white px-1.5 rounded-full shadow-sm font-bold leading-none py-0.5"
+                                        style={{ backgroundColor: color }}
+                                    >
+                                        G{anno.group_id}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    }
+
+                    // Render rectangle shape (default)
                     return (
                         <div
                             key={anno._id}

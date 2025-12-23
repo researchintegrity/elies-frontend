@@ -26,6 +26,124 @@ import {
 import { useAnnotation, ShapeTypes } from '../../context/AnnotationContext';
 import { useLanguage } from '../../context/LanguageContext';
 
+// Tool-specific parameter definitions (opacity controlled in annotation screen)
+const TOOL_PARAMS_CONFIG = {
+    ela: {
+        params: ['elaQuality', 'elaScale'],
+        config: {
+            elaQuality: { min: 1, max: 100, step: 5, label: 'Quality' },
+            elaScale: { min: 1, max: 20, step: 1, label: 'Scale' }
+        }
+    },
+    noise: {
+        params: ['noiseAmplitude', 'noiseEqualize'],
+        config: {
+            noiseAmplitude: { min: 1, max: 255, step: 1, label: 'Amplitude' },
+            noiseEqualize: { type: 'boolean', label: 'Equalize' }
+        }
+    },
+    gradient: {
+        params: ['gradientIntensity', 'gradientNormalize', 'gradientEqualize'],
+        config: {
+            gradientIntensity: { min: 1, max: 10, step: 1, label: 'Intensity' },
+            gradientNormalize: { type: 'boolean', label: 'Normalize' },
+            gradientEqualize: { type: 'boolean', label: 'Equalize' }
+        }
+    },
+    levelSweep: {
+        params: ['sweepPosition', 'sweepWidth'],
+        config: {
+            sweepPosition: { min: 0, max: 255, step: 1, label: 'Position' },
+            sweepWidth: { min: 1, max: 128, step: 1, label: 'Width' }
+        }
+    },
+    cloneDetection: {
+        params: ['cloneMinSimilarity', 'cloneMinDetail', 'cloneMinClusterSize', 'cloneBlockSize', 'cloneMaxImageSize', 'cloneShowQuantized'],
+        config: {
+            cloneMinSimilarity: { min: 0.5, max: 1, step: 0.05, label: 'Min Similarity' },
+            cloneMinDetail: { min: 1, max: 10, step: 0.5, label: 'Min Detail' },
+            cloneMinClusterSize: { min: 1, max: 10, step: 1, label: 'Min Cluster' },
+            cloneBlockSize: { min: 4, max: 32, step: 2, label: 'Block Size' },
+            cloneMaxImageSize: { min: 512, max: 4096, step: 256, label: 'Max Image' },
+            cloneShowQuantized: { type: 'boolean', label: 'Show Quantized' }
+        }
+    }
+};
+
+// Analysis Parameters Section - shows only current tool's parameters
+const AnalysisParametersSection = ({ toolId, params, onParamsChange }) => {
+    if (!toolId || !params) return null;
+    
+    const toolConfig = TOOL_PARAMS_CONFIG[toolId];
+    if (!toolConfig) return null;
+    
+    const { params: paramKeys, config } = toolConfig;
+    const relevantParams = paramKeys.filter(key => key in params);
+    
+    if (relevantParams.length === 0) return null;
+    
+    return (
+        <div>
+            <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                Parameters
+            </h4>
+            <div className="space-y-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                {relevantParams.map(key => {
+                    const value = params[key];
+                    const paramConfig = config[key] || {};
+                    const label = paramConfig.label || key.replace(/([A-Z])/g, ' $1').trim();
+                    
+                    if (paramConfig.type === 'boolean' || typeof value === 'boolean') {
+                        return (
+                            <div key={key} className="flex items-center justify-between">
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                    {label}
+                                </label>
+                                <button
+                                    onClick={() => onParamsChange({ ...params, [key]: !value })}
+                                    className={`relative w-10 h-5 rounded-full transition-colors ${
+                                        value ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-600'
+                                    }`}
+                                >
+                                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                        value ? 'translate-x-5' : 'translate-x-0.5'
+                                    }`} />
+                                </button>
+                            </div>
+                        );
+                    }
+                    
+                    const min = paramConfig.min ?? 0;
+                    const max = paramConfig.max ?? 100;
+                    const step = paramConfig.step ?? 1;
+                    
+                    return (
+                        <div key={key} className="space-y-1">
+                            <div className="flex items-center justify-between">
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                    {label}
+                                </label>
+                                <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400">
+                                    {typeof value === 'number' ? value.toFixed(step < 1 ? 2 : 0) : value}
+                                </span>
+                            </div>
+                            <input
+                                type="range"
+                                min={min}
+                                max={max}
+                                step={step}
+                                value={value}
+                                onChange={(e) => onParamsChange({ ...params, [key]: parseFloat(e.target.value) })}
+                                className="w-full h-1.5 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                            />
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
 // Shape icon mapping
 const ShapeIcon = ({ type, size = 14 }) => {
     switch (type) {
@@ -174,11 +292,23 @@ const LabelFilter = ({ label, isActive, count, onClick }) => (
 );
 
 // Main Panel Component
-const LabelsPanel = ({ onClose }) => {
+const LabelsPanel = ({ 
+    onClose,
+    // Analysis props
+    analysisToolId = '',
+    analysisToolName = '',
+    analysisParams = {},
+    onAnalysisParamsChange = null,
+    onRunAnalysis = null,
+    availableAnalysisTools = [],
+    showAnalysisOverlay = false,
+    onToggleAnalysisOverlay = null,
+}) => {
     const { t } = useLanguage();
     const { state, actions } = useAnnotation();
     const { annotations, selectedId, availableLabels, nextGroupId, activeLabel } = state;
     
+    const [activeTab, setActiveTab] = useState('annotations'); // 'annotations' | 'analysis'
     const [filterLabel, setFilterLabel] = useState(null);
     const [isAddingLabel, setIsAddingLabel] = useState(false);
     const [newLabelName, setNewLabelName] = useState('');
@@ -224,39 +354,82 @@ const LabelsPanel = ({ onClose }) => {
     
     return (
         <div className="flex flex-col h-full bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-2">
-                    <FiLayers className="text-indigo-600" />
-                    <h3 className="font-semibold text-gray-900 dark:text-white">
-                        {t('annotation.listTitle')}
-                    </h3>
-                    <span className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 rounded-full text-gray-600 dark:text-gray-400">
-                        {annotations.length}
-                    </span>
+            {/* Header with Tabs */}
+            <div className="flex-none border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between px-4 py-2">
+                    <div className="flex items-center gap-2">
+                        <FiLayers className="text-indigo-600" />
+                        <h3 className="font-semibold text-gray-900 dark:text-white">
+                            {t('annotation.panel') || 'Panel'}
+                        </h3>
+                    </div>
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                        >
+                            <FiX size={18} />
+                        </button>
+                    )}
                 </div>
-                {onClose && (
+                
+                {/* Tab Navigation */}
+                <div className="flex border-b border-gray-200 dark:border-gray-600">
                     <button
-                        onClick={onClose}
-                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                        onClick={() => setActiveTab('annotations')}
+                        className={`flex-1 px-4 py-3 text-sm font-semibold transition-all ${
+                            activeTab === 'annotations'
+                                ? 'bg-indigo-600 text-white border-b-2 border-indigo-600'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        }`}
                     >
-                        <FiX size={18} />
+                        <div className="flex items-center justify-center gap-2">
+                            <FiTag size={16} />
+                            <span>Annotations</span>
+                            {annotations.length > 0 && (
+                                <span className={`px-1.5 py-0.5 text-xs rounded-full font-bold ${
+                                    activeTab === 'annotations' 
+                                        ? 'bg-white/20 text-white' 
+                                        : 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300'
+                                }`}>
+                                    {annotations.length}
+                                </span>
+                            )}
+                        </div>
                     </button>
-                )}
+                    {availableAnalysisTools.length > 0 && (
+                        <button
+                            onClick={() => setActiveTab('analysis')}
+                            className={`flex-1 px-4 py-3 text-sm font-semibold transition-all ${
+                                activeTab === 'analysis'
+                                    ? 'bg-indigo-600 text-white border-b-2 border-indigo-600'
+                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            }`}
+                        >
+                            <div className="flex items-center justify-center gap-2">
+                                <FiEye size={16} />
+                                <span>Analysis</span>
+                            </div>
+                        </button>
+                    )}
+                </div>
             </div>
             
-            {/* Label Filters */}
-            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                <div className="flex items-center gap-2 mb-2">
-                    <FiTag className="text-gray-400" size={14} />
-                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        {t('annotation.filterByLabel')}
-                    </span>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                    <button
-                        onClick={() => setFilterLabel(null)}
-                        className={`
+            {/* Tab Content */}
+            {activeTab === 'annotations' ? (
+                <>
+                    {/* Label Filters */}
+                    <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                        <div className="flex items-center gap-2 mb-2">
+                            <FiTag className="text-gray-400" size={14} />
+                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                                {t('annotation.filterByLabel')}
+                            </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                            <button
+                                onClick={() => setFilterLabel(null)}
+                                className={`
                             px-2 py-1 rounded-full text-xs font-medium transition-all
                             ${!filterLabel 
                                 ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900' 
@@ -398,6 +571,103 @@ const LabelsPanel = ({ onClose }) => {
                     </button>
                 )}
             </div>
+                </>
+            ) : (
+                /* Analysis Tab Content */
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {/* Analysis Overlay Toggle */}
+                    {onToggleAnalysisOverlay && (
+                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                            <div className="flex items-center gap-2">
+                                <FiEye className="text-indigo-500" size={18} />
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Show Analysis Overlay
+                                </span>
+                            </div>
+                            <button
+                                onClick={onToggleAnalysisOverlay}
+                                className={`relative w-12 h-6 rounded-full transition-colors ${
+                                    showAnalysisOverlay ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-600'
+                                }`}
+                            >
+                                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                    showAnalysisOverlay ? 'translate-x-7' : 'translate-x-1'
+                                }`} />
+                            </button>
+                        </div>
+                    )}
+                    
+                    {/* Current Analysis Tool */}
+                    {analysisToolName && (
+                        <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg border border-indigo-200 dark:border-indigo-800">
+                            <div className="flex items-center gap-2 mb-1">
+                                <FiLayers className="text-indigo-600" size={16} />
+                                <span className="text-xs font-medium text-indigo-500 dark:text-indigo-400 uppercase">
+                                    Current Analysis
+                                </span>
+                            </div>
+                            <p className="text-sm text-indigo-700 dark:text-indigo-300 font-semibold">
+                                {analysisToolName}
+                            </p>
+                        </div>
+                    )}
+                    
+                    {/* Analysis Tools Selection */}
+                    {availableAnalysisTools.length > 0 && (
+                        <div>
+                            <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                                Available Analysis Tools
+                            </h4>
+                            <div className="space-y-1.5">
+                                {availableAnalysisTools.map(tool => (
+                                    <button
+                                        key={tool.id}
+                                        onClick={() => onRunAnalysis && onRunAnalysis(tool.id)}
+                                        className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-all ${
+                                            analysisToolId === tool.id
+                                                ? 'bg-indigo-100 dark:bg-indigo-900/40 border-2 border-indigo-400'
+                                                : 'bg-gray-50 dark:bg-gray-700/50 border-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600'
+                                        }`}
+                                    >
+                                        {tool.icon && <tool.icon size={16} className={analysisToolId === tool.id ? 'text-indigo-600' : 'text-gray-500'} />}
+                                        <div className="flex-1 min-w-0">
+                                            <p className={`text-sm font-medium truncate ${
+                                                analysisToolId === tool.id 
+                                                    ? 'text-indigo-700 dark:text-indigo-300' 
+                                                    : 'text-gray-900 dark:text-white'
+                                            }`}>
+                                                {tool.name}
+                                            </p>
+                                            {tool.description && (
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                                    {tool.description}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Analysis Parameters - Show only current tool's params */}
+                    {analysisToolId && analysisParams && onAnalysisParamsChange && (
+                        <AnalysisParametersSection
+                            toolId={analysisToolId}
+                            params={analysisParams}
+                            onParamsChange={onAnalysisParamsChange}
+                        />
+                    )}
+                    
+                    {/* Help text */}
+                    <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            <strong>Tip:</strong> Use analysis results to identify manipulation regions, 
+                            then switch to the Annotations tab to mark them. Press <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-600 rounded text-xs">A</kbd> to toggle the overlay.
+                        </p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

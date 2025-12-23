@@ -1308,7 +1308,7 @@ const ImageAnalysisPage = () => {
                                 >
                                     {showOriginal && originalCanvas ? (
                                         <AnnotationOverlay
-                                            isActive={annotationMode}
+                                            isActive={false}
                                             crop={crop}
                                             onChange={setCrop}
                                             annotations={annotations}
@@ -1329,7 +1329,7 @@ const ImageAnalysisPage = () => {
                                         </AnnotationOverlay>
                                     ) : resultCanvas ? (
                                         <AnnotationOverlay
-                                            isActive={annotationMode}
+                                            isActive={false}
                                             crop={crop}
                                             onChange={setCrop}
                                             annotations={annotations}
@@ -1347,7 +1347,7 @@ const ImageAnalysisPage = () => {
                                         </AnnotationOverlay>
                                     ) : originalCanvas ? (
                                         <AnnotationOverlay
-                                            isActive={annotationMode}
+                                            isActive={false}
                                             crop={crop}
                                             onChange={setCrop}
                                             annotations={annotations}
@@ -1401,27 +1401,14 @@ const ImageAnalysisPage = () => {
                                 {/* Zoom Controls */}
                                 {ANALYSIS_TOOLS[selectedTool]?.hasCanvas && (resultCanvas || originalCanvas) && (
                                     <>
-                                        {/* Quick Annotation Toggle (Simple Mode) */}
-                                        <button
-                                            onClick={() => setAnnotationMode(!annotationMode)}
-                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors border mr-2 ${annotationMode
-                                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                                                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50'
-                                                }`}
-                                            title={t('analysis.quickAnnotate') || 'Quick Annotate (Rectangle only)'}
-                                        >
-                                            <FiEdit2 size={14} />
-                                            <span>{t('analysis.annotate')}</span>
-                                        </button>
-                                        
                                         {/* Advanced Annotation Button (Opens Modal) */}
                                         <button
                                             onClick={() => setShowAnnotationModal(true)}
                                             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors border mr-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-purple-600 shadow-sm hover:from-purple-700 hover:to-indigo-700"
-                                            title={t('analysis.advancedAnnotate') || 'Advanced Annotation (Rectangles, Ellipses, Polygons)'}
+                                            title={t('analysis.advancedAnnotate') || 'Annotate Image'}
                                         >
                                             <FiPenTool size={14} />
-                                            <span>{t('analysis.advancedAnnotate') || 'Advanced'}</span>
+                                            <span>{t('analysis.annotate') || 'Annotate'}</span>
                                         </button>
 
                                         <div className="flex items-center gap-1 ml-2 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
@@ -1489,19 +1476,15 @@ const ImageAnalysisPage = () => {
                 <div className="flex-none w-64 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                     <div className="h-full flex flex-col">
                         <div className="flex-none p-3 border-b border-gray-100 dark:border-gray-700">
-                            {annotationMode ? null : (
-                                <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                                    {t('analysis.parameters') || 'Parameters'}
-                                </h3>
-                            )}
+                            <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                                {t('analysis.parameters') || 'Parameters'}
+                            </h3>
                         </div>
 
                         <div className="flex-1 overflow-y-auto">
-                            {annotationMode ? renderAnnotationControls() : (
-                                <div className="p-3">
-                                    {renderParameters()}
-                                </div>
-                            )}
+                            <div className="p-3">
+                                {renderParameters()}
+                            </div>
                         </div>
 
                         {/* Tool Description */}
@@ -1531,6 +1514,17 @@ const ImageAnalysisPage = () => {
                     }
                     setShowAnnotationModal(false);
                 }}
+                // Analysis overlay props
+                analysisCanvas={resultCanvas}
+                analysisToolId={selectedTool}
+                analysisToolName={ANALYSIS_TOOLS[selectedTool]?.name || ''}
+                analysisParams={params}
+                onAnalysisParamsChange={setParams}
+                onRunAnalysis={(toolId) => {
+                    setSelectedTool(toolId);
+                    // Analysis will run automatically due to useEffect watching selectedTool
+                }}
+                availableAnalysisTools={Object.values(ANALYSIS_TOOLS).filter(t => t.hasCanvas)}
             />
         </div>
     );

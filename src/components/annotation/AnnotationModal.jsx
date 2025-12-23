@@ -17,6 +17,10 @@ import {
     FiMaximize,
     FiHelpCircle,
     FiCopy,
+    FiEye,
+    FiEyeOff,
+    FiSliders,
+    FiLayers,
 } from 'react-icons/fi';
 import { 
     AnnotationProvider, 
@@ -63,6 +67,14 @@ const AnnotationModalInner = ({
     existingAnnotations = [],
     onClose,
     onSaveSuccess,
+    // Analysis overlay props
+    analysisCanvas = null,
+    analysisToolId = '',
+    analysisToolName = '',
+    analysisParams = {},
+    onAnalysisParamsChange = null,
+    onRunAnalysis = null,
+    availableAnalysisTools = [],
 }) => {
     const { t } = useLanguage();
     const { state, actions, computed } = useAnnotation();
@@ -80,6 +92,8 @@ const AnnotationModalInner = ({
     const [showPanel, setShowPanel] = useState(true);
     const [clipboard, setClipboard] = useState(null);
     const [showHotkeys, setShowHotkeys] = useState(false);
+    const [showAnalysisOverlay, setShowAnalysisOverlay] = useState(false);
+    const [analysisOpacity, setAnalysisOpacity] = useState(0.5);
     
     // Interaction state
     const [isDragging, setIsDragging] = useState(false);
@@ -426,19 +440,26 @@ const AnnotationModalInner = ({
                 setShowHotkeys(prev => !prev);
             }
             
+            // Toggle analysis overlay with 'a' (only if analysis is available)
+            if (!e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'a' && analysisCanvas) {
+                e.preventDefault();
+                setShowAnalysisOverlay(prev => !prev);
+            }
+            
             if (!e.ctrlKey && !e.metaKey) {
                 switch (e.key.toLowerCase()) {
                     case 'v': actions.setTool(ToolTypes.SELECT); break;
                     case 'r': actions.setTool(ToolTypes.RECTANGLE); break;
                     case 'e': actions.setTool(ToolTypes.ELLIPSE); break;
                     case 'p': actions.setTool(ToolTypes.POLYGON); break;
+                    // 'a' handled above for analysis toggle
                 }
             }
         };
         
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isDrawing, selectedId, annotations, clipboard, actions, onClose]);
+    }, [isDrawing, selectedId, annotations, clipboard, analysisCanvas, actions, onClose]);
     
     // Zoom
     const handleZoomIn = useCallback(() => setZoom(z => Math.min(4, z + 0.25)), []);
@@ -550,6 +571,43 @@ const AnnotationModalInner = ({
                     )}
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* Analysis Overlay Toggle */}
+                    {analysisCanvas && (
+                        <div className="flex items-center gap-2 px-2 py-1 bg-gray-700/50 rounded-lg">
+                            <button
+                                onClick={() => setShowAnalysisOverlay(!showAnalysisOverlay)}
+                                className={`p-2 rounded-lg transition-colors ${
+                                    showAnalysisOverlay 
+                                        ? 'bg-indigo-600 text-white' 
+                                        : 'hover:bg-gray-600 text-gray-400 hover:text-white'
+                                }`}
+                                title={showAnalysisOverlay ? 'Hide Analysis Overlay' : 'Show Analysis Overlay'}
+                            >
+                                {showAnalysisOverlay ? <FiEye size={18} /> : <FiEyeOff size={18} />}
+                            </button>
+                            {showAnalysisOverlay && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-400">Opacity</span>
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="1"
+                                        step="0.1"
+                                        value={analysisOpacity}
+                                        onChange={(e) => setAnalysisOpacity(parseFloat(e.target.value))}
+                                        className="w-20 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                                    />
+                                    <span className="text-xs text-indigo-400 w-8">{Math.round(analysisOpacity * 100)}%</span>
+                                </div>
+                            )}
+                            {analysisToolName && (
+                                <span className="text-xs text-indigo-400 px-2 py-0.5 bg-indigo-500/20 rounded">
+                                    {analysisToolName}
+                                </span>
+                            )}
+                        </div>
+                    )}
+                    
                     {clipboard && (
                         <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-400 rounded flex items-center gap-1">
                             <FiCopy size={12} />
@@ -618,6 +676,19 @@ const AnnotationModalInner = ({
                             }}
                         />
                         
+                        {/* Analysis Overlay */}
+                        {imageLoaded && showAnalysisOverlay && analysisCanvas && (
+                            <img
+                                src={analysisCanvas.toDataURL()}
+                                alt="Analysis overlay"
+                                className="absolute inset-0 w-full h-full rounded-lg pointer-events-none"
+                                style={{ 
+                                    opacity: analysisOpacity,
+                                    mixBlendMode: 'normal',
+                                }}
+                            />
+                        )}
+                        
                         {imageLoaded && (
                             <SVGAnnotationLayer
                                 width={imageSize.width}
@@ -638,7 +709,17 @@ const AnnotationModalInner = ({
                 {/* Labels Panel */}
                 {showPanel && (
                     <div className="w-80 flex-none bg-gray-800">
-                        <LabelsPanel onClose={() => setShowPanel(false)} />
+                        <LabelsPanel 
+                            onClose={() => setShowPanel(false)}
+                            analysisToolId={analysisToolId}
+                            analysisToolName={analysisToolName}
+                            analysisParams={analysisParams}
+                            onAnalysisParamsChange={onAnalysisParamsChange}
+                            onRunAnalysis={onRunAnalysis}
+                            availableAnalysisTools={availableAnalysisTools}
+                            showAnalysisOverlay={showAnalysisOverlay}
+                            onToggleAnalysisOverlay={() => setShowAnalysisOverlay(!showAnalysisOverlay)}
+                        />
                     </div>
                 )}
             </div>
@@ -711,6 +792,18 @@ const AnnotationModalInner = ({
                                     <HotkeyRow shortcut="?" description="Show this help" />
                                 </div>
                             </div>
+                            
+                            {/* Analysis */}
+                            {analysisCanvas && (
+                                <div>
+                                    <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-2">
+                                        Analysis
+                                    </h4>
+                                    <div className="space-y-2">
+                                        <HotkeyRow shortcut="A" description="Toggle analysis overlay" />
+                                    </div>
+                                </div>
+                            )}
                             
                             {/* Polygon specific */}
                             <div>
