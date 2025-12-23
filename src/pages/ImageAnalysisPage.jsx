@@ -32,11 +32,22 @@ import {
     FiCalendar,
     FiTag,
     FiX,
-    FiFilter
+    FiFilter,
+    FiEdit,
+    FiEdit2,
+    FiLayers,
+    FiTrash2,
+    FiPlus,
+    FiSave,
+    FiCheckSquare,
+    FiSquare,
+    FiPenTool
 } from 'react-icons/fi';
 import { api } from '../services/api';
 import { showToast } from '../utils/alert';
 import { useLanguage } from '../context/LanguageContext';
+import AnnotationOverlay from '../components/AnnotationOverlay';
+import { AnnotationModal } from '../components/annotation';
 import { SkeletonCard, EmptyState } from '../components/common';
 import {
     loadImageToCanvas,
@@ -255,6 +266,32 @@ const ImageAnalysisPage = () => {
     const [availableCategories, setAvailableCategories] = useState([]);
     const [showFilters, setShowFilters] = useState(false);
 
+    // Annotation State
+    const [annotationMode, setAnnotationMode] = useState(false);
+    const [showAnnotationModal, setShowAnnotationModal] = useState(false);
+    const [annotations, setAnnotations] = useState([]);
+    const [crop, setCrop] = useState(null);
+    const [annotationType, setAnnotationType] = useState('manipulation');
+    const [groupId, setGroupId] = useState(1);
+    const [annotationText, setAnnotationText] = useState('');
+    const [selectedAnnotationId, setSelectedAnnotationId] = useState(null);
+    const [copiedAnnotation, setCopiedAnnotation] = useState(null);
+
+    // Helpers
+    const getGroupColor = (type, id) => {
+        if (type !== 'copy-move') return '#EF4444'; // Red for general manipulation
+        const colors = [
+            '#3B82F6', // Blue
+            '#10B981', // Green
+            '#F59E0B', // Amber
+            '#8B5CF6', // Purple
+            '#EC4899', // Pink
+            '#06B6D4', // Cyan
+        ];
+        return colors[(id - 1) % colors.length] || '#3B82F6';
+    };
+
+
     // Refs
     const resultCanvasRef = useRef(null);
     const analysisTimeoutRef = useRef(null);
@@ -337,6 +374,39 @@ const ImageAnalysisPage = () => {
         }
     }, [images]);
 
+    // Fetch annotations when image changes
+    useEffect(() => {
+        if (!selectedImage) {
+            setAnnotations([]);
+            return;
+        }
+
+        const fetchAnnotations = async () => {
+            try {
+                const data = await api.getAnnotations(selectedImage.id);
+                setAnnotations(data || []);
+
+                // Determine next group ID
+                if (data && data.length > 0) {
+                    const maxGroup = data
+                        .filter(a => a.type === 'copy-move')
+                        .reduce((max, a) => (a.group_id > max ? a.group_id : max), 0);
+                    if (maxGroup > 0) setGroupId(maxGroup + 1);
+                }
+            } catch (err) {
+                console.error('Error fetching annotations:', err);
+                setAnnotations([]); // Clear on error or no annotations
+            }
+        };
+
+        fetchAnnotations();
+        // Reset local state
+        setCrop(null);
+        setSelectedAnnotationId(null);
+        setAnnotationText('');
+    }, [selectedImage]);
+
+
     // Auto-run analysis when tool or params change (debounced)
     useEffect(() => {
         if (!selectedImage || !imageUrls[selectedImage.id]) return;
@@ -357,6 +427,86 @@ const ImageAnalysisPage = () => {
             }
         };
     }, [selectedImage, selectedTool, params]);
+
+    // Keyboard shortcuts (Copy/Paste) for Annotations
+    useEffect(() => {
+        if (!annotationMode) return;
+
+        const handleKeyDown = async (e) => {
+            if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+
+            // Copy: Ctrl+C
+            if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+                if (crop && crop.width > 0) {
+                    const info = {
+                        coords: crop,
+                        type: annotationType,
+                        group_id: groupId,
+                        text: annotationText
+                    };
+                    setCopiedAnnotation(info);
+                    showToast(t('common.copied') || 'Copied!', 'success');
+                } else if (selectedAnnotationId) {
+                    const existing = annotations.find(a => a._id === selectedAnnotationId);
+                    if (existing) {
+                        const info = {
+                            coords: existing.coords,
+                            type: existing.type,
+                            group_id: existing.group_id,
+                            text: existing.text
+                        };
+                        setCopiedAnnotation(info);
+                        showToast(t('common.copied') || 'Copied!', 'success');
+                    }
+                }
+            }
+
+            // Paste: Ctrl+V
+            if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+                if (copiedAnnotation && selectedImage) {
+                    e.preventDefault();
+                    const offset = 2; // % offset
+                    const copyCoords = copiedAnnotation.coords || {};
+                    const newCoords = {
+                        ...copyCoords,
+                        x: Math.min((copyCoords.x || 0) + offset, 100 - (copyCoords.width || 0)),
+                        y: Math.min((copyCoords.y || 0) + offset, 100 - (copyCoords.height || 0)),
+                        width: copyCoords.width || 0,
+                        height: copyCoords.height || 0
+                    };
+
+                    const payload = {
+                        image_id: selectedImage.id,
+                        text: copiedAnnotation.text,
+                        coords: newCoords,
+                        type: copiedAnnotation.type,
+                        group_id: copiedAnnotation.type === 'copy-move' ? copiedAnnotation.group_id : null
+                    };
+
+                    try {
+                        const saved = await api.createAnnotation(payload);
+                        const newAnno = { ...saved, ...payload, _id: saved._id || saved.id };
+                        setAnnotations(prev => [...prev, newAnno]);
+
+                        // Select pasted
+                        setCrop(newCoords);
+                        setSelectedAnnotationId(newAnno._id);
+                        setAnnotationType(newAnno.type);
+                        if (newAnno.group_id) setGroupId(newAnno.group_id);
+                        setAnnotationText(newAnno.text || '');
+
+                        showToast(t('common.pasted') || 'Pasted!', 'success');
+                    } catch (err) {
+                        console.error('Error pasting annotation:', err);
+                        showToast(t('analysis.error'), 'error');
+                    }
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [annotationMode, crop, selectedAnnotationId, copiedAnnotation, annotationType, groupId, annotationText, selectedImage, annotations]);
+
 
     const fetchImages = useCallback(async (page = 1) => {
         setLoadingImages(true);
@@ -598,6 +748,7 @@ const ImageAnalysisPage = () => {
                             unit="%"
                             onChange={(v) => setParams(p => ({ ...p, gradientOpacity: v }))}
                         />
+
                     </div>
                 );
 
@@ -706,6 +857,225 @@ const ImageAnalysisPage = () => {
 
         return null;
     };
+
+    // Annotation Handlers
+    const handleSaveAnnotation = async () => {
+        if (!selectedImage) return;
+
+        // If no crop, we can't save a new region unless we are editing??
+        // Assuming we creating new or updating...
+        // For update we might not need crop if we just edit text.
+        // But for now let's assume save = create new from crop OR update existing text.
+
+        let coords = null;
+        if (crop && crop.width > 0 && crop.height > 0) {
+            coords = {
+                x: crop.x,
+                y: crop.y,
+                width: crop.width,
+                height: crop.height
+            };
+        } else if (selectedAnnotationId) {
+            // Keep existing coords
+            const existing = annotations.find(a => a._id === selectedAnnotationId);
+            if (existing) coords = existing.coords;
+        }
+
+        if (!coords) {
+            showToast(t('analysis.drawRegion'), 'warning');
+            return;
+        }
+
+        const annotationData = {
+            image_id: selectedImage.id,
+            text: annotationText,
+            coords: coords,
+            type: annotationType,
+            group_id: annotationType === 'copy-move' ? parseInt(groupId) : null
+        };
+
+        try {
+            // If editing, delete old first (naive update) or use update endpoint if exists?
+            // API only has create/delete. So delete then create.
+            if (selectedAnnotationId) {
+                await api.deleteAnnotation(selectedAnnotationId);
+            }
+
+            const saved = await api.createAnnotation(annotationData);
+
+            // Optimistic update or refetch? simpler to append
+            // But we need the ID.
+            // saved should have ID.
+            const newAnno = { ...saved, ...annotationData, _id: saved._id || saved.id }; // Fallback
+
+            setAnnotations(prev => {
+                const filtered = prev.filter(a => a._id !== selectedAnnotationId);
+                return [...filtered, newAnno];
+            });
+
+            // Reset
+            setCrop(null);
+            setAnnotationText('');
+            setSelectedAnnotationId(null);
+            showToast(t('common.success'), 'success');
+        } catch (err) {
+            console.error('Error saving annotation:', err);
+            showToast(t('analysis.error'), 'error');
+        }
+    };
+
+    const handleDeleteAnnotation = async (id) => {
+        if (!confirm(t('common.confirm'))) return;
+        try {
+            await api.deleteAnnotation(id);
+            setAnnotations(prev => prev.filter(a => a._id !== id));
+            if (selectedAnnotationId === id) {
+                setSelectedAnnotationId(null);
+                setCrop(null);
+                setAnnotationText('');
+            }
+            showToast(t('common.success'), 'success');
+        } catch (err) {
+            showToast(t('analysis.error'), 'error');
+        }
+    };
+
+    const handleAnnotationClick = (anno) => {
+        if (!annotationMode) return;
+        setSelectedAnnotationId(anno._id);
+        setAnnotationText(anno.text || '');
+        setAnnotationType(anno.type);
+        if (anno.group_id) setGroupId(anno.group_id);
+        setCrop(anno.coords); // Show the box as selected
+    };
+
+    const renderAnnotationControls = () => (
+        <div className="flex flex-col h-full bg-white dark:bg-gray-800">
+            <h3 className="text-gray-900 dark:text-white text-lg font-semibold px-4 pt-4 pb-2 border-b border-gray-100 dark:border-gray-700">
+                {t('annotation.listTitle')}
+            </h3>
+
+            <div className="flex-1 p-4 overflow-y-auto space-y-4">
+                {/* Input Controls */}
+                <div className="space-y-4">
+                    {/* Type Selector */}
+                    <div className="flex p-1 bg-gray-100 dark:bg-black/30 rounded-lg">
+                        <button
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${annotationType === 'manipulation' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                            onClick={() => setAnnotationType('manipulation')}
+                        >
+                            <FiEdit2 /> {t('annotation.manipulation')}
+                        </button>
+                        <button
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${annotationType === 'copy-move' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                            onClick={() => setAnnotationType('copy-move')}
+                        >
+                            <FiCopy /> {t('annotation.copyMove')}
+                        </button>
+                    </div>
+
+                    {/* Group ID */}
+                    {annotationType === 'copy-move' && (
+                        <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800">
+                            <FiLayers className="text-blue-500" />
+                            <div className="flex-1">
+                                <label className="block text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">
+                                    {t('annotation.groupId')}
+                                </label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={groupId}
+                                    onChange={(e) => setGroupId(e.target.value)}
+                                    className="w-full bg-white dark:bg-black/20 border border-blue-200 dark:border-blue-700 rounded px-2 py-1 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Text Description */}
+                    <textarea
+                        value={annotationText}
+                        onChange={(e) => setAnnotationText(e.target.value)}
+                        placeholder={t('annotation.placeholder')}
+                        className="w-full h-[80px] bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-3 text-gray-900 dark:text-white text-base resize-y focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                    />
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleSaveAnnotation}
+                            disabled={!crop && !selectedAnnotationId}
+                            className="flex-1 py-3 bg-indigo-600 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            <FiSave />
+                            {selectedAnnotationId ? t('common.update') : t('analysis.saveAnnotation')}
+                        </button>
+                        {selectedAnnotationId && (
+                            <button
+                                onClick={() => {
+                                    setSelectedAnnotationId(null);
+                                    setCrop(null);
+                                    setAnnotationText('');
+                                }}
+                                className="px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-sm font-bold"
+                            >
+                                {t('common.cancel')}
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* List */}
+                <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+                    <h4 className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider flex justify-between">
+                        <span>{t('analysis.annotationList')} ({annotations.length})</span>
+                    </h4>
+                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1 scrollbar-custom">
+                        {annotations.length === 0 ? (
+                            <p className="text-sm text-gray-400 italic text-center py-4">{t('annotation.noAnnotations')}</p>
+                        ) : (
+                            annotations.map(anno => {
+                                const color = getGroupColor(anno.type, anno.group_id);
+                                return (
+                                    <div
+                                        key={anno._id}
+                                        onClick={() => handleAnnotationClick(anno)}
+                                        className={`group relative flex flex-col rounded-lg p-3 border transition-all cursor-pointer ${selectedAnnotationId === anno._id
+                                            ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 ring-1 ring-indigo-500/30'
+                                            : 'bg-gray-50 dark:bg-black/20 border-transparent hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-sm'
+                                            }`}
+                                    >
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <div
+                                                    className="w-3 h-3 rounded-full shadow-sm"
+                                                    style={{ backgroundColor: color }}
+                                                />
+                                                <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                                    {anno.type === 'copy-move' ? `${t('annotation.copyMove')} (G${anno.group_id})` : t('annotation.manipulation')}
+                                                </span>
+                                            </div>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteAnnotation(anno._id); }}
+                                                className="text-gray-400 hover:text-red-500 px-1 transition-colors opacity-0 group-hover:opacity-100"
+                                            >
+                                                <FiTrash2 size={14} />
+                                            </button>
+                                        </div>
+                                        {anno.text && (
+                                            <p className="text-sm text-gray-800 dark:text-gray-200 line-clamp-2">{anno.text}</p>
+                                        )}
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
 
     return (
         <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 overflow-hidden">
@@ -937,36 +1307,65 @@ const ImageAnalysisPage = () => {
                                     }}
                                 >
                                     {showOriginal && originalCanvas ? (
-                                        <img
-                                            src={originalCanvas.toDataURL()}
-                                            alt="Original"
-                                            className="rounded-lg shadow-lg"
-                                            style={{
-                                                maxWidth: zoomLevel === 1 ? 'calc(100vw - 450px)' : 'none',
-                                                maxHeight: zoomLevel === 1 ? 'calc(100vh - 250px)' : 'none',
-                                                objectFit: 'contain'
-                                            }}
-                                        />
+                                        <AnnotationOverlay
+                                            isActive={annotationMode}
+                                            crop={crop}
+                                            onChange={setCrop}
+                                            annotations={annotations}
+                                            onAnnotationClick={handleAnnotationClick}
+                                            selectedAnnotationId={selectedAnnotationId}
+                                        >
+                                            <img
+                                                src={originalCanvas.toDataURL()}
+                                                alt="Original"
+                                                className="rounded-lg shadow-lg"
+                                                draggable={false}
+                                                style={{
+                                                    maxWidth: zoomLevel === 1 ? 'calc(100vw - 450px)' : 'none',
+                                                    maxHeight: zoomLevel === 1 ? 'calc(100vh - 250px)' : 'none',
+                                                    objectFit: 'contain'
+                                                }}
+                                            />
+                                        </AnnotationOverlay>
                                     ) : resultCanvas ? (
-                                        <canvas
-                                            ref={resultCanvasRef}
-                                            className="rounded-lg shadow-lg"
-                                            style={{
-                                                maxWidth: zoomLevel === 1 ? 'calc(100vw - 450px)' : 'none',
-                                                maxHeight: zoomLevel === 1 ? 'calc(100vh - 250px)' : 'none'
-                                            }}
-                                        />
+                                        <AnnotationOverlay
+                                            isActive={annotationMode}
+                                            crop={crop}
+                                            onChange={setCrop}
+                                            annotations={annotations}
+                                            onAnnotationClick={handleAnnotationClick}
+                                            selectedAnnotationId={selectedAnnotationId}
+                                        >
+                                            <canvas
+                                                ref={resultCanvasRef}
+                                                className="rounded-lg shadow-lg"
+                                                style={{
+                                                    maxWidth: zoomLevel === 1 ? 'calc(100vw - 450px)' : 'none',
+                                                    maxHeight: zoomLevel === 1 ? 'calc(100vh - 250px)' : 'none'
+                                                }}
+                                            />
+                                        </AnnotationOverlay>
                                     ) : originalCanvas ? (
-                                        <img
-                                            src={originalCanvas.toDataURL()}
-                                            alt="Original"
-                                            className="rounded-lg shadow-lg opacity-50"
-                                            style={{
-                                                maxWidth: zoomLevel === 1 ? 'calc(100vw - 450px)' : 'none',
-                                                maxHeight: zoomLevel === 1 ? 'calc(100vh - 250px)' : 'none',
-                                                objectFit: 'contain'
-                                            }}
-                                        />
+                                        <AnnotationOverlay
+                                            isActive={annotationMode}
+                                            crop={crop}
+                                            onChange={setCrop}
+                                            annotations={annotations}
+                                            onAnnotationClick={handleAnnotationClick}
+                                            selectedAnnotationId={selectedAnnotationId}
+                                        >
+                                            <img
+                                                src={originalCanvas.toDataURL()}
+                                                alt="Original"
+                                                className="rounded-lg shadow-lg opacity-50"
+                                                draggable={false}
+                                                style={{
+                                                    maxWidth: zoomLevel === 1 ? 'calc(100vw - 450px)' : 'none',
+                                                    maxHeight: zoomLevel === 1 ? 'calc(100vh - 250px)' : 'none',
+                                                    objectFit: 'contain'
+                                                }}
+                                            />
+                                        </AnnotationOverlay>
                                     ) : null}
                                 </div>
                             </div>
@@ -1001,35 +1400,60 @@ const ImageAnalysisPage = () => {
 
                                 {/* Zoom Controls */}
                                 {ANALYSIS_TOOLS[selectedTool]?.hasCanvas && (resultCanvas || originalCanvas) && (
-                                    <div className="flex items-center gap-1 ml-2 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                                    <>
+                                        {/* Quick Annotation Toggle (Simple Mode) */}
                                         <button
-                                            onClick={() => setZoomLevel(z => Math.max(0.25, z - 0.25))}
-                                            className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 transition-colors"
-                                            title={t('analysis.zoomOut') || 'Zoom Out'}
-                                        >
-                                            <FiZoomOut size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => setZoomLevel(1)}
-                                            className={`px-2 py-1 text-xs font-medium rounded transition-colors ${zoomLevel === 1
-                                                ? 'bg-indigo-600 text-white'
-                                                : 'hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400'
+                                            onClick={() => setAnnotationMode(!annotationMode)}
+                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors border mr-2 ${annotationMode
+                                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50'
                                                 }`}
-                                            title={t('analysis.fitToScreen') || 'Fit to Screen'}
+                                            title={t('analysis.quickAnnotate') || 'Quick Annotate (Rectangle only)'}
                                         >
-                                            Fit
+                                            <FiEdit2 size={14} />
+                                            <span>{t('analysis.annotate')}</span>
                                         </button>
-                                        <span className="text-xs text-gray-500 min-w-[40px] text-center">
-                                            {Math.round(zoomLevel * 100)}%
-                                        </span>
+                                        
+                                        {/* Advanced Annotation Button (Opens Modal) */}
                                         <button
-                                            onClick={() => setZoomLevel(z => Math.min(4, z + 0.25))}
-                                            className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 transition-colors"
-                                            title={t('analysis.zoomIn') || 'Zoom In'}
+                                            onClick={() => setShowAnnotationModal(true)}
+                                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors border mr-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-purple-600 shadow-sm hover:from-purple-700 hover:to-indigo-700"
+                                            title={t('analysis.advancedAnnotate') || 'Advanced Annotation (Rectangles, Ellipses, Polygons)'}
                                         >
-                                            <FiZoomIn size={16} />
+                                            <FiPenTool size={14} />
+                                            <span>{t('analysis.advancedAnnotate') || 'Advanced'}</span>
                                         </button>
-                                    </div>
+
+                                        <div className="flex items-center gap-1 ml-2 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                                            <button
+                                                onClick={() => setZoomLevel(z => Math.max(0.25, z - 0.25))}
+                                                className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 transition-colors"
+                                                title={t('analysis.zoomOut') || 'Zoom Out'}
+                                            >
+                                                <FiZoomOut size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => setZoomLevel(1)}
+                                                className={`px-2 py-1 text-xs font-medium rounded transition-colors ${zoomLevel === 1
+                                                    ? 'bg-indigo-600 text-white'
+                                                    : 'hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400'
+                                                    }`}
+                                                title={t('analysis.fitToScreen') || 'Fit to Screen'}
+                                            >
+                                                Fit
+                                            </button>
+                                            <span className="text-xs text-gray-500 min-w-[40px] text-center">
+                                                {Math.round(zoomLevel * 100)}%
+                                            </span>
+                                            <button
+                                                onClick={() => setZoomLevel(z => Math.min(4, z + 0.25))}
+                                                className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 transition-colors"
+                                                title={t('analysis.zoomIn') || 'Zoom In'}
+                                            >
+                                                <FiZoomIn size={16} />
+                                            </button>
+                                        </div>
+                                    </>
                                 )}
                             </div>
 
@@ -1065,13 +1489,19 @@ const ImageAnalysisPage = () => {
                 <div className="flex-none w-64 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                     <div className="h-full flex flex-col">
                         <div className="flex-none p-3 border-b border-gray-100 dark:border-gray-700">
-                            <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                                {t('analysis.parameters') || 'Parameters'}
-                            </h3>
+                            {annotationMode ? null : (
+                                <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                                    {t('analysis.parameters') || 'Parameters'}
+                                </h3>
+                            )}
                         </div>
 
-                        <div className="flex-1 p-3 overflow-y-auto">
-                            {renderParameters()}
+                        <div className="flex-1 overflow-y-auto">
+                            {annotationMode ? renderAnnotationControls() : (
+                                <div className="p-3">
+                                    {renderParameters()}
+                                </div>
+                            )}
                         </div>
 
                         {/* Tool Description */}
@@ -1083,6 +1513,25 @@ const ImageAnalysisPage = () => {
                     </div>
                 </div>
             </div>
+            
+            {/* Advanced Annotation Modal */}
+            <AnnotationModal
+                isOpen={showAnnotationModal}
+                imageUrl={selectedImage ? imageUrls[selectedImage.id] : null}
+                imageId={selectedImage?.id}
+                imageName={selectedImage?.filename}
+                existingAnnotations={annotations}
+                onClose={() => setShowAnnotationModal(false)}
+                onSaveSuccess={(savedAnnotations) => {
+                    // Refresh annotations from API
+                    if (selectedImage) {
+                        api.getAnnotations(selectedImage.id)
+                            .then(data => setAnnotations(data || []))
+                            .catch(err => console.error('Error refreshing annotations:', err));
+                    }
+                    setShowAnnotationModal(false);
+                }}
+            />
         </div>
     );
 };

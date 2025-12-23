@@ -434,6 +434,32 @@ const translations = {
         'analysis.params.autoContrast': 'Contraste Automático',
         'analysis.params.autoContrastChannel': 'Contraste Automático (Por Canal)',
 
+        // Annotation Integration
+        'analysis.annotate': 'Anotar',
+        'analysis.annotateMode': 'Modo de Anotação',
+        'analysis.exitAnnotation': 'Sair da Anotação',
+        'analysis.saveAnnotation': 'Salvar Anotação',
+        'analysis.drawRegion': 'Desenhe uma região para anotar',
+        'analysis.annotationList': 'Anotações',
+        'analysis.type': 'Tipo',
+        'analysis.group': 'Grupo',
+        'analysis.description': 'Descrição',
+        'analysis.deleteAnnotation': 'Excluir Anotação',
+        'analysis.placeholder': 'Descreva esta anotação...',
+        'analysis.toggleOriginal': 'Alternar Original',
+        'analysis.advancedAnnotate': 'Avançado',
+        'analysis.quickAnnotate': 'Anotação rápida (apenas retângulos)',
+        
+        // Advanced Annotation
+        'annotation.filterByLabel': 'Filtrar por tipo',
+        'annotation.activeLabel': 'Tipo ativo',
+        'annotation.addLabel': 'Adicionar novo tipo',
+        'annotation.drawRegionHint': 'Use as ferramentas para desenhar regiões',
+        'annotation.polygonHint': 'Clique para adicionar pontos. Clique duplo ou no primeiro ponto para fechar. Esc para cancelar.',
+        'common.unsaved': 'Não salvo',
+        'common.add': 'Adicionar',
+
+
         // Provenance Analysis Page
         'sidebar.provenance': 'Proveniência',
         'provenance.title': 'Análise de Proveniência',
@@ -1078,6 +1104,32 @@ const translations = {
         'analysis.params.histogramEqualization': 'Histogram Equalization',
         'analysis.params.autoContrast': 'Auto Contrast',
         'analysis.params.autoContrastChannel': 'Auto Contrast (Per Channel)',
+
+        // Annotation Integration
+        'analysis.annotate': 'Annotate',
+        'analysis.annotateMode': 'Annotation Mode',
+        'analysis.exitAnnotation': 'Exit Annotation',
+        'analysis.saveAnnotation': 'Save Annotation',
+        'analysis.drawRegion': 'Draw a region to annotate',
+        'analysis.annotationList': 'Annotations',
+        'analysis.type': 'Type',
+        'analysis.group': 'Group',
+        'analysis.description': 'Description',
+        'analysis.deleteAnnotation': 'Delete Annotation',
+        'analysis.placeholder': 'Describe this annotation...',
+        'analysis.toggleOriginal': 'Toggle Original',
+        'analysis.advancedAnnotate': 'Advanced',
+        'analysis.quickAnnotate': 'Quick annotate (rectangles only)',
+        
+        // Advanced Annotation
+        'annotation.filterByLabel': 'Filter by label',
+        'annotation.activeLabel': 'Active label',
+        'annotation.addLabel': 'Add new label',
+        'annotation.drawRegionHint': 'Use the tools to draw regions',
+        'annotation.polygonHint': 'Click to add points. Double-click or click the first point to close. Press Esc to cancel.',
+        'common.unsaved': 'Unsaved',
+        'common.add': 'Add',
+
 
         // Provenance Analysis Page
         'sidebar.provenance': 'Provenance',

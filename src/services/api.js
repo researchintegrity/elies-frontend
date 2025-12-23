@@ -132,6 +132,35 @@ export const api = {
         return api.delete(`/images/${imageId}/types/${typeName}`);
     },
 
+    // --- Annotations ---
+
+    getAnnotations: async (imageId) => {
+        // Query param image_id style seems consistent with startProvenanceAnalysis etc.
+        return api.get('/annotations', { image_id: imageId });
+    },
+
+    createAnnotation: async (annotationData) => {
+        return api.post('/annotations', annotationData);
+    },
+
+    updateAnnotation: async (annotationId, annotationData) => {
+        return api.put(`/annotations/${annotationId}`, annotationData);
+    },
+
+    deleteAnnotation: async (annotationId) => {
+        return api.delete(`/annotations/${annotationId}`);
+    },
+
+    /**
+     * Bulk save/sync annotations for an image
+     * @param {string} imageId - Image ID
+     * @param {Array} annotations - Array of annotation objects
+     * @returns {Promise<{success: boolean, annotations: Array}>}
+     */
+    saveAnnotations: async (imageId, annotations) => {
+        return api.post(`/images/${imageId}/annotations/sync`, { annotations });
+    },
+
     // --- Documents ---
 
     getWatermarkRemovalStatus: async (documentId) => {

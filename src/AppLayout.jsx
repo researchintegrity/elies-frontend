@@ -10,7 +10,7 @@ const UploadPDFPage = lazy(() => import('./pages/UploadPDFPage'));
 const UploadImagePage = lazy(() => import('./pages/UploadImagePage'));
 const ViewImagesPage = lazy(() => import('./pages/ViewImagesPage'));
 const ViewPDFPage = lazy(() => import('./pages/ViewPDFPage'));
-const AnnotationPage = lazy(() => import('./pages/AnnotationPage'));
+
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const CBIRSearchPage = lazy(() => import('./pages/CBIRSearchPage'));
 const ImageAnalysisPage = lazy(() => import('./pages/ImageAnalysisPage'));
@@ -21,8 +21,8 @@ const ManipulationDetectionPage = lazy(() => import('./pages/ManipulationDetecti
 // Page keys
 const PAGES = {
   UPLOAD_IMAGE: 'uploadImage',
+
   VIEW_IMAGES: 'viewImages',
-  ANNOTATION: 'annotation',
   UPLOAD_PDF: 'uploadPDF',
   VIEW_PDFS: 'viewPDFs',
   PROFILE: 'profile',
@@ -47,8 +47,7 @@ function AppLayout() {
         return <UploadImagePage />;
       case PAGES.VIEW_IMAGES:
         return <ViewImagesPage />;
-      case PAGES.ANNOTATION:
-        return <AnnotationPage />;
+
       case PAGES.UPLOAD_PDF:
         return <UploadPDFPage />;
       case PAGES.VIEW_PDFS:
