@@ -1,6 +1,6 @@
 // src/pages/ManipulationDetectionPage.jsx
 /**
- * Manipulation Detection Page
+ * Manipulation Detection Page - Wizard Format
  * 
  * Detects manipulated/forged regions in images using TruFor deep learning model.
  * TruFor leverages both high-level (RGB) and low-level (Noiseprint++) features
@@ -9,7 +9,7 @@
  * ELIS Scientific Integrity Platform
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     FiShield,
     FiImage,
@@ -22,7 +22,14 @@ import {
     FiChevronRight,
     FiX,
     FiInfo,
-    FiDownload
+    FiDownload,
+    FiSearch,
+    FiTag,
+    FiCalendar,
+    FiGrid,
+    FiArrowRight,
+    FiArrowLeft,
+    FiSettings
 } from 'react-icons/fi';
 import { useImages } from '../hooks/useImages';
 import { useLanguage } from '../context/LanguageContext';
@@ -31,10 +38,68 @@ import { showAlert, showToast } from '../utils/alert';
 
 // --- Constants ---
 const IMAGES_PER_PAGE = 12;
-const POLL_INTERVAL = 3000; // 3 seconds (TrueFor can be slower)
-const MAX_POLL_ATTEMPTS = 120; // Max 6 minutes of polling
+const POLL_INTERVAL = 3000;
+const MAX_POLL_ATTEMPTS = 120;
+
+// Wizard Steps
+const STEPS = {
+    SELECT: 0,
+    CONFIGURE: 1,
+    RESULTS: 2
+};
+
+const STEP_LABELS = ['select', 'configure', 'results'];
+
+// --- Skeleton Component ---
+const SkeletonCard = () => (
+    <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 animate-pulse">
+        <div className="aspect-square bg-gray-200 dark:bg-gray-700" />
+        <div className="p-2">
+            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+        </div>
+    </div>
+);
 
 // --- Sub-Components ---
+
+// Step Indicator
+const StepIndicator = ({ currentStep, steps, onStepClick, canNavigate, t }) => {
+    return (
+        <div className="flex items-center justify-center gap-2">
+            {steps.map((step, index) => {
+                const isActive = index === currentStep;
+                const isCompleted = index < currentStep;
+                const isClickable = canNavigate(index);
+
+                return (
+                    <React.Fragment key={step}>
+                        {index > 0 && (
+                            <div className={`h-0.5 w-8 transition-colors ${isCompleted ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                        )}
+                        <button
+                            onClick={() => isClickable && onStepClick(index)}
+                            disabled={!isClickable}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${isActive
+                                    ? 'bg-emerald-600 text-white shadow-lg'
+                                    : isCompleted
+                                        ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-200'
+                                        : isClickable
+                                            ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 hover:bg-gray-200'
+                                            : 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                                }`}
+                        >
+                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${isActive ? 'bg-white/20' : isCompleted ? 'bg-emerald-500 text-white' : 'bg-gray-300 dark:bg-gray-600'
+                                }`}>
+                                {isCompleted ? <FiCheck size={12} /> : index + 1}
+                            </span>
+                            <span className="hidden sm:inline">{t(`manipulation.step.${step}`)}</span>
+                        </button>
+                    </React.Fragment>
+                );
+            })}
+        </div>
+    );
+};
 
 // Image Card for Selection
 const ImageCard = ({ image, isSelected, onClick, imageUrl, loading }) => {
@@ -50,12 +115,10 @@ const ImageCard = ({ image, isSelected, onClick, imageUrl, loading }) => {
             onClick={onClick}
         >
             {/* Selection Indicator */}
-            <div
-                className={`absolute top-2 left-2 z-10 transition-opacity duration-200 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-            >
+            <div className={`absolute top-2 left-2 z-10 transition-opacity duration-200 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                 <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected
                     ? 'bg-emerald-500 border-emerald-500 text-white'
-                    : 'bg-white/80 dark:bg-black/50 border-white/50 dark:border-gray-400'
+                    : 'bg-white/80 dark:bg-black/50 border-white/50'
                     }`}>
                     {isSelected && <FiCheck size={14} strokeWidth={3} />}
                 </div>
@@ -72,12 +135,7 @@ const ImageCard = ({ image, isSelected, onClick, imageUrl, loading }) => {
                 {loading ? (
                     <div className="w-full h-full animate-pulse bg-gray-200 dark:bg-gray-700" />
                 ) : imageUrl ? (
-                    <img
-                        src={imageUrl}
-                        alt={image.filename}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        loading="lazy"
-                    />
+                    <img src={imageUrl} alt={image.filename} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400">
                         <FiImage size={24} />
@@ -94,7 +152,7 @@ const ImageCard = ({ image, isSelected, onClick, imageUrl, loading }) => {
     );
 };
 
-// Image with lazy loading
+// Lazy Image Card
 const LazyImageCard = ({ image, isSelected, onClick }) => {
     const [imageUrl, setImageUrl] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -105,86 +163,62 @@ const LazyImageCard = ({ image, isSelected, onClick }) => {
             try {
                 const blob = await api.download(`/images/${image.id}/download`);
                 const url = URL.createObjectURL(blob);
-                if (isMounted) {
-                    setImageUrl(url);
-                    setLoading(false);
-                }
+                if (isMounted) { setImageUrl(url); setLoading(false); }
             } catch (err) {
                 if (isMounted) setLoading(false);
             }
         };
         if (image?.id) loadImage();
-        return () => {
-            isMounted = false;
-            if (imageUrl) URL.revokeObjectURL(imageUrl);
-        };
+        return () => { isMounted = false; if (imageUrl) URL.revokeObjectURL(imageUrl); };
     }, [image?.id]);
 
-    return (
-        <ImageCard
-            image={image}
-            isSelected={isSelected}
-            onClick={onClick}
-            imageUrl={imageUrl}
-            loading={loading}
-        />
-    );
+    return <ImageCard image={image} isSelected={isSelected} onClick={onClick} imageUrl={imageUrl} loading={loading} />;
 };
 
-// Score Display Component
-const ScoreDisplay = ({ score, t }) => {
-    // Score is between 0-1, where higher means more likely manipulated
-    const percentage = Math.round(score * 100);
-    const isLikelyManipulated = score > 0.5;
-    const isHighRisk = score > 0.7;
+// Compact Selected Image Preview
+const CompactImagePreview = ({ image, onRemove, t }) => {
+    const [imageUrl, setImageUrl] = useState(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        if (image?.id) {
+            api.download(`/images/${image.id}/download`)
+                .then(blob => { if (isMounted) setImageUrl(URL.createObjectURL(blob)); })
+                .catch(() => { });
+        }
+        return () => { isMounted = false; if (imageUrl) URL.revokeObjectURL(imageUrl); };
+    }, [image?.id]);
+
+    if (!image) {
+        return (
+            <div className="flex items-center gap-2 p-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
+                <div className="w-10 h-10 rounded bg-gray-100 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
+                    <FiImage className="text-gray-400" size={16} />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <span className="text-[10px] font-bold uppercase text-emerald-500">{t('manipulation.image')}</span>
+                    <p className="text-xs text-gray-400 italic truncate">{t('manipulation.notSelected')}</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className={`p-4 rounded-xl border ${isHighRisk
-            ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-            : isLikelyManipulated
-                ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
-                : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-            }`}>
-            <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {t('manipulation.integrityScore')}
-                </span>
-                <span className={`text-lg font-bold ${isHighRisk
-                    ? 'text-red-600 dark:text-red-400'
-                    : isLikelyManipulated
-                        ? 'text-amber-600 dark:text-amber-400'
-                        : 'text-green-600 dark:text-green-400'
-                    }`}>
-                    {percentage}%
-                </span>
+        <div className="flex items-center gap-2 p-2 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20">
+            <div className="w-10 h-10 rounded overflow-hidden bg-gray-100 flex-shrink-0">
+                {imageUrl ? (
+                    <img src={imageUrl} alt={image.filename} className="w-full h-full object-cover" />
+                ) : (
+                    <div className="w-full h-full animate-pulse bg-gray-200 dark:bg-gray-700" />
+                )}
             </div>
-
-            {/* Progress bar */}
-            <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                <div
-                    className={`h-full transition-all duration-500 ${isHighRisk
-                        ? 'bg-red-500'
-                        : isLikelyManipulated
-                            ? 'bg-amber-500'
-                            : 'bg-green-500'
-                        }`}
-                    style={{ width: `${percentage}%` }}
-                />
+            <div className="flex-1 min-w-0">
+                <span className="text-[10px] font-bold uppercase text-emerald-600 dark:text-emerald-400">{t('manipulation.image')}</span>
+                <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{image.filename}</p>
             </div>
-
-            <p className={`text-xs mt-2 ${isHighRisk
-                ? 'text-red-600 dark:text-red-400'
-                : isLikelyManipulated
-                    ? 'text-amber-600 dark:text-amber-400'
-                    : 'text-green-600 dark:text-green-400'
-                }`}>
-                {isHighRisk
-                    ? t('manipulation.highRisk')
-                    : isLikelyManipulated
-                        ? t('manipulation.mediumRisk')
-                        : t('manipulation.lowRisk')
-                }
-            </p>
+            <button onClick={onRemove} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600">
+                <FiX size={14} />
+            </button>
         </div>
     );
 };
@@ -195,30 +229,19 @@ const ResultsViewer = ({ analysisId, status, results, statusMessage, t }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // Check if we have any visualization result (either direct or in files array)
     const hasVisualization = results?.visualization || (results?.files && results.files.length > 0);
 
     useEffect(() => {
-        // Clean up previous URL
         if (visualizationUrl) URL.revokeObjectURL(visualizationUrl);
         setVisualizationUrl(null);
         setError(null);
 
-        if (status !== 'completed' || !results) {
-            return;
-        }
-
-        // Only try to download if we have visualization data
-        if (!hasVisualization) {
-            setLoading(false);
-            return;
-        }
+        if (status !== 'completed' || !results) return;
+        if (!hasVisualization) { setLoading(false); return; }
 
         setLoading(true);
-
         const loadResults = async () => {
             try {
-                // The backend handles both 'visualization' and 'files' fallback
                 const blob = await api.download(`/analyses/${analysisId}/results/visualization/download`);
                 setVisualizationUrl(URL.createObjectURL(blob));
             } catch (err) {
@@ -228,24 +251,20 @@ const ResultsViewer = ({ analysisId, status, results, statusMessage, t }) => {
                 setLoading(false);
             }
         };
-
         loadResults();
 
-        return () => {
-            if (visualizationUrl) URL.revokeObjectURL(visualizationUrl);
-        };
+        return () => { if (visualizationUrl) URL.revokeObjectURL(visualizationUrl); };
     }, [status, results, analysisId, hasVisualization]);
 
     if (status === 'pending' || status === 'processing') {
         return (
             <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-                <FiLoader className="w-8 h-8 animate-spin mb-4" />
-                <p className="font-medium">
-                    {status === 'pending' ? t('manipulation.pending') : t('manipulation.processing')}
-                </p>
-                {statusMessage && (
-                    <p className="text-sm text-gray-400 mt-2">{statusMessage}</p>
-                )}
+                <div className="relative mb-6">
+                    <div className="w-16 h-16 rounded-full border-4 border-emerald-100 dark:border-emerald-900/30" />
+                    <div className="absolute inset-0 w-16 h-16 rounded-full border-4 border-transparent border-t-emerald-500 animate-spin" />
+                </div>
+                <p className="font-medium text-lg mb-2">{status === 'pending' ? t('manipulation.pending') : t('manipulation.processing')}</p>
+                {statusMessage && <p className="text-sm text-gray-400">{statusMessage}</p>}
             </div>
         );
     }
@@ -253,18 +272,17 @@ const ResultsViewer = ({ analysisId, status, results, statusMessage, t }) => {
     if (status === 'failed') {
         return (
             <div className="flex flex-col items-center justify-center py-16 text-red-500">
-                <FiAlertCircle className="w-8 h-8 mb-4" />
-                <p className="font-medium">{t('manipulation.failed')}</p>
+                <FiAlertCircle className="w-12 h-12 mb-4" />
+                <p className="font-medium text-lg">{t('manipulation.failed')}</p>
             </div>
         );
     }
 
-    // Show error if download failed
     if (error) {
         return (
             <div className="flex flex-col items-center justify-center py-16 text-red-500">
                 <FiAlertCircle className="w-8 h-8 mb-4" />
-                <p className="font-medium">{t('manipulation.downloadError') || 'Failed to load results'}</p>
+                <p className="font-medium">{t('manipulation.downloadError')}</p>
                 <p className="text-sm mt-2 text-gray-500">{error}</p>
             </div>
         );
@@ -272,49 +290,73 @@ const ResultsViewer = ({ analysisId, status, results, statusMessage, t }) => {
 
     if (status === 'completed' && !hasVisualization) {
         return (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-                <FiCheck className="w-8 h-8 mb-4 text-green-500" />
-                <p className="font-medium">{t('manipulation.noResults')}</p>
+            <div className="flex flex-col items-center justify-center py-16">
+                <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-4">
+                    <FiCheck className="w-8 h-8 text-green-500" />
+                </div>
+                <p className="font-medium text-lg text-gray-900 dark:text-white">{t('manipulation.noResults')}</p>
             </div>
         );
     }
 
     return (
         <div className="space-y-4">
-            {/* Result Image */}
-            <div className="rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 min-h-[200px] flex items-center justify-center">
+            <div className="rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 min-h-[300px] flex items-center justify-center">
                 {loading ? (
                     <div className="flex flex-col items-center py-12 text-gray-500">
                         <FiLoader className="w-6 h-6 animate-spin mb-2" />
-                        <span className="text-sm">{t('manipulation.loadingResults') || 'Loading results...'}</span>
+                        <span className="text-sm">{t('manipulation.loadingResults')}</span>
                     </div>
                 ) : visualizationUrl ? (
                     <img src={visualizationUrl} alt="TruFor Visualization" className="w-full h-auto" />
                 ) : (
-                    <span className="text-gray-400 text-sm">{t('manipulation.noVisualization') || 'No visualization available'}</span>
+                    <span className="text-gray-400 text-sm">{t('manipulation.noVisualization')}</span>
                 )}
             </div>
-
-            {/* Download button */}
             {visualizationUrl && (
-                <a
-                    href={visualizationUrl}
-                    download={`trufor_result_${analysisId}.png`}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
-                >
-                    <FiDownload size={16} />
-                    {t('manipulation.downloadResult')}
+                <a href={visualizationUrl} download={`trufor_result_${analysisId}.png`} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm font-medium">
+                    <FiDownload size={16} />{t('manipulation.downloadResult')}
                 </a>
             )}
         </div>
     );
 };
 
-// --- Main Component ---
+// Illustrated Empty State for Results
+const IllustratedGuide = ({ t }) => (
+    <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+        <div className="relative mb-8">
+            <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30 flex items-center justify-center">
+                <FiShield className="w-12 h-12 text-emerald-500" />
+            </div>
+            <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                <FiZap className="w-4 h-4 text-green-500" />
+            </div>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{t('manipulation.guideTitle')}</h3>
+        <div className="space-y-3 text-left max-w-xs">
+            {[1, 2, 3].map(i => (
+                <div key={i} className="flex items-start gap-2">
+                    <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{i}</span>
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{t(`manipulation.guideStep${i}Title`)}</p>
+                        <p className="text-xs text-gray-500">{t(`manipulation.guideStep${i}Desc`)}</p>
+                    </div>
+                </div>
+            ))}
+        </div>
+    </div>
+);
 
+// --- Main Component ---
 const ManipulationDetectionPage = () => {
     const { images, loading: imagesLoading, fetchImages, pagination } = useImages();
     const { t } = useLanguage();
+
+    // Wizard state
+    const [currentStep, setCurrentStep] = useState(STEPS.SELECT);
 
     // Image selection
     const [selectedImage, setSelectedImage] = useState(null);
@@ -332,283 +374,380 @@ const ManipulationDetectionPage = () => {
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
 
-    // Fetch images on mount
+    // Filter state
+    const [filterMode, setFilterMode] = useState('all');
+    const [filterTags, setFilterTags] = useState([]);
+    const [filterDateFrom, setFilterDateFrom] = useState('');
+    const [filterDateTo, setFilterDateTo] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [availableCategories, setAvailableCategories] = useState([]);
+
+    // Fetch categories on mount
     useEffect(() => {
-        fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE });
-    }, [fetchImages, currentPage]);
+        const fetchCategories = async () => {
+            try {
+                const data = await api.get('/images', { page: 1, per_page: 100 });
+                const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
+                const categories = new Set();
+                imageList.forEach(img => {
+                    (img.image_type || []).forEach(type => categories.add(type));
+                });
+                setAvailableCategories(Array.from(categories).sort());
+            } catch (err) {
+                console.error('Error fetching categories:', err);
+            }
+        };
+        fetchCategories();
+    }, []);
+
+    // Fetch images with filters
+    useEffect(() => {
+        if (currentStep === STEPS.SELECT) {
+            const params = { page: currentPage, per_page: IMAGES_PER_PAGE };
+            if (searchQuery) params.search = searchQuery;
+            if (filterMode === 'tags' && filterTags.length > 0) {
+                params.image_type = filterTags.join(',');
+            }
+            if (filterMode === 'date') {
+                if (filterDateFrom) params.date_from = filterDateFrom;
+                if (filterDateTo) params.date_to = filterDateTo;
+            }
+            fetchImages(params);
+        }
+    }, [fetchImages, currentPage, currentStep, searchQuery, filterMode, filterTags, filterDateFrom, filterDateTo]);
+
+    // Reset page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filterMode, filterTags, filterDateFrom, filterDateTo, searchQuery]);
+
+    // Clear filters
+    const handleClearFilters = () => {
+        setFilterMode('all');
+        setFilterTags([]);
+        setFilterDateFrom('');
+        setFilterDateTo('');
+        setSearchQuery('');
+        setCurrentPage(1);
+    };
 
     // Poll for analysis status
     useEffect(() => {
         if (!analysisId || analysisStatus === 'completed' || analysisStatus === 'failed') return;
-
         let pollCount = 0;
         const pollInterval = setInterval(async () => {
             try {
                 pollCount++;
-                if (pollCount > MAX_POLL_ATTEMPTS) {
-                    clearInterval(pollInterval);
-                    setIsAnalyzing(false);
-                    showToast(t('manipulation.timeout'), 'warning');
-                    return;
-                }
-
+                if (pollCount > MAX_POLL_ATTEMPTS) { clearInterval(pollInterval); setIsAnalyzing(false); showToast(t('manipulation.timeout'), 'warning'); return; }
                 const analysis = await api.getAnalysisById(analysisId);
                 setAnalysisStatus(analysis.status);
                 setStatusMessage(analysis.status_message);
-
-                if (analysis.status === 'completed') {
-                    setAnalysisResults(analysis.results);
-                    setIsAnalyzing(false);
-                    clearInterval(pollInterval);
-                    showToast(t('manipulation.completed'), 'success');
-                } else if (analysis.status === 'failed') {
-                    setIsAnalyzing(false);
-                    clearInterval(pollInterval);
-                    showToast(t('manipulation.failed'), 'error');
-                }
-            } catch (err) {
-                console.error('Error polling analysis status:', err);
-            }
+                if (analysis.status === 'completed') { setAnalysisResults(analysis.results); setIsAnalyzing(false); clearInterval(pollInterval); showToast(t('manipulation.completed'), 'success'); }
+                else if (analysis.status === 'failed') { setIsAnalyzing(false); clearInterval(pollInterval); showToast(t('manipulation.failed'), 'error'); }
+            } catch (err) { console.error('Error polling:', err); }
         }, POLL_INTERVAL);
-
         return () => clearInterval(pollInterval);
     }, [analysisId, analysisStatus, t]);
 
-    // Handle image selection
+    // Handle image click
     const handleImageClick = useCallback((image) => {
         setSelectedImage(prev => prev?.id === image.id ? null : image);
-        // Reset analysis when selection changes
-        setAnalysisId(null);
-        setAnalysisStatus(null);
-        setAnalysisResults(null);
-        setStatusMessage(null);
     }, []);
+
+    // Navigation
+    const canNavigateToStep = (step) => {
+        if (step === STEPS.SELECT) return true;
+        if (step === STEPS.CONFIGURE) return !!selectedImage;
+        if (step === STEPS.RESULTS) return analysisId !== null;
+        return false;
+    };
+
+    const goToNextStep = () => { if (currentStep < STEPS.RESULTS) setCurrentStep(prev => prev + 1); };
+    const goToPrevStep = () => { if (currentStep > STEPS.SELECT) setCurrentStep(prev => prev - 1); };
 
     // Run analysis
     const handleRunAnalysis = async () => {
-        if (!selectedImage) {
-            showToast(t('manipulation.selectImageFirst'), 'warning');
-            return;
-        }
+        if (!selectedImage) { showToast(t('manipulation.selectImageFirst'), 'warning'); return; }
 
-        setIsAnalyzing(true);
-        setAnalysisStatus('pending');
-        setAnalysisResults(null);
-        setStatusMessage(null);
+        setIsAnalyzing(true); setAnalysisStatus('pending'); setAnalysisResults(null); setStatusMessage(null); setCurrentStep(STEPS.RESULTS);
 
         try {
-            const response = await api.startManipulationAnalysis(selectedImage.id, {
-                save_noiseprint: saveNoiseprint
-            });
-
+            const response = await api.startManipulationAnalysis(selectedImage.id, { save_noiseprint: saveNoiseprint });
             setAnalysisId(response.analysis_id);
             showToast(t('manipulation.analysisStarted'), 'success');
         } catch (err) {
             console.error('Error starting analysis:', err);
             showAlert(t('common.error'), err.message, 'error');
-            setIsAnalyzing(false);
-            setAnalysisStatus(null);
+            setIsAnalyzing(false); setAnalysisStatus(null); setCurrentStep(STEPS.CONFIGURE);
         }
     };
 
-    // Reset analysis
+    // Reset
     const handleReset = () => {
-        setSelectedImage(null);
-        setAnalysisId(null);
-        setAnalysisStatus(null);
-        setAnalysisResults(null);
-        setStatusMessage(null);
-        setIsAnalyzing(false);
+        setCurrentStep(STEPS.SELECT); setSelectedImage(null);
+        setAnalysisId(null); setAnalysisStatus(null); setAnalysisResults(null); setStatusMessage(null); setIsAnalyzing(false);
+        setSaveNoiseprint(false); handleClearFilters();
     };
 
-    // Check if ready to analyze
-    const canAnalyze = !!selectedImage;
+    const canProceed = useMemo(() => {
+        if (currentStep === STEPS.SELECT) return !!selectedImage;
+        if (currentStep === STEPS.CONFIGURE) return true;
+        return false;
+    }, [currentStep, selectedImage]);
 
-    return (
-        <div className="w-full h-full flex flex-col gap-6">
-            {/* Header */}
-            <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white">
-                        <FiShield className="w-5 h-5" />
-                    </div>
-                    {t('manipulation.title')}
-                </h1>
-                <p className="text-gray-500 dark:text-gray-400 mt-1">{t('manipulation.subtitle')}</p>
-            </div>
+    // Render step content
+    const renderStepContent = () => {
+        switch (currentStep) {
+            case STEPS.SELECT:
+                return (
+                    <div className="flex gap-4 h-full">
+                        {/* Left Panel: Selected Image */}
+                        <div className="w-64 flex-shrink-0 flex flex-col gap-3">
+                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+                                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">{t('manipulation.selectedImage')}</h3>
+                                <CompactImagePreview image={selectedImage} onRemove={() => setSelectedImage(null)} t={t} />
 
-            {/* Main Content */}
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
-                {/* Left Panel - Configuration */}
-                <div className="lg:col-span-1 flex flex-col gap-4">
-                    {/* Info Card */}
-                    <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800 p-4">
-                        <div className="flex items-start gap-3">
-                            <FiInfo className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
-                            <div>
-                                <h3 className="text-sm font-semibold text-emerald-900 dark:text-emerald-100 mb-1">
-                                    {t('manipulation.aboutTitle')}
-                                </h3>
-                                <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">
-                                    {t('manipulation.aboutDescription')}
-                                </p>
+                                {/* Instructions */}
+                                <div className="mt-3 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800">
+                                    <div className="flex gap-2 items-start">
+                                        <FiInfo className="text-emerald-500 flex-shrink-0 mt-0.5" size={12} />
+                                        <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
+                                            {t('manipulation.selectInstructions')}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Options */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('manipulation.options')}</h3>
-
-                        {/* Save Noiseprint Toggle */}
-                        <label className="flex items-center justify-between cursor-pointer group">
-                            <div>
-                                <span className="text-sm text-gray-700 dark:text-gray-300">{t('manipulation.saveNoiseprint')}</span>
-                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                                    {t('manipulation.saveNoiseprintDesc')}
-                                </p>
-                            </div>
-                            <div className="relative">
-                                <input
-                                    type="checkbox"
-                                    checked={saveNoiseprint}
-                                    onChange={(e) => setSaveNoiseprint(e.target.checked)}
-                                    className="sr-only peer"
-                                />
-                                <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:ring-2 peer-focus:ring-emerald-300 dark:peer-focus:ring-emerald-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                            </div>
-                        </label>
-                    </div>
-
-                    {/* Selected Image */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex-1">
-                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('manipulation.selectedImage')}</h3>
-
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-3">
-                                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase w-16">{t('manipulation.image')}</span>
-                                {selectedImage ? (
-                                    <div className="flex-1 flex items-center gap-2 p-2 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg">
-                                        <span className="text-sm text-gray-900 dark:text-white truncate">{selectedImage.filename}</span>
-                                        <button onClick={() => setSelectedImage(null)} className="text-gray-400 hover:text-gray-600">
-                                            <FiX size={14} />
+                        {/* Right Panel: Gallery with Filters */}
+                        <div className="flex-1 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex flex-col min-h-0">
+                            {/* Filter Tabs + Search */}
+                            <div className="flex flex-wrap items-center gap-2 mb-3 flex-shrink-0">
+                                <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-0.5">
+                                    {[
+                                        { mode: 'all', icon: FiGrid, label: t('common.all') },
+                                        { mode: 'tags', icon: FiTag, label: t('filters.tags') },
+                                        { mode: 'date', icon: FiCalendar, label: t('filters.date') },
+                                    ].map(({ mode: m, icon: Icon, label }) => (
+                                        <button
+                                            key={m}
+                                            onClick={() => setFilterMode(m)}
+                                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${filterMode === m
+                                                    ? 'bg-white dark:bg-gray-600 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                                                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                                                }`}
+                                        >
+                                            <Icon size={12} />
+                                            {label}
                                         </button>
-                                    </div>
-                                ) : (
-                                    <span className="text-xs text-gray-400 italic">{t('manipulation.notSelected')}</span>
+                                    ))}
+                                </div>
+
+                                {/* Search */}
+                                <div className="relative flex-1 min-w-[150px]">
+                                    <FiSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder={t('gallery.searchPlaceholder')}
+                                        className="w-full pl-8 pr-8 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 outline-none"
+                                    />
+                                    {searchQuery && (
+                                        <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                            <FiX size={12} />
+                                        </button>
+                                    )}
+                                </div>
+
+                                {(filterMode !== 'all' || searchQuery || filterTags.length > 0) && (
+                                    <button onClick={handleClearFilters} className="text-xs text-gray-500 hover:text-gray-700">
+                                        {t('filters.clearFilters')}
+                                    </button>
                                 )}
                             </div>
-                        </div>
-                    </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex gap-2">
-                        <button
-                            onClick={handleReset}
-                            className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                        >
-                            <FiRefreshCw className="inline-block mr-2" />
-                            {t('common.reset') || 'Reset'}
-                        </button>
-                        <button
-                            onClick={handleRunAnalysis}
-                            disabled={!canAnalyze || isAnalyzing}
-                            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${canAnalyze && !isAnalyzing
-                                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                                : 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed'
-                                }`}
-                        >
-                            {isAnalyzing ? (
-                                <>
-                                    <FiLoader className="animate-spin" />
-                                    {t('manipulation.analyzing')}
-                                </>
-                            ) : (
-                                <>
-                                    <FiZap />
-                                    {t('manipulation.analyze')}
-                                </>
+                            {/* Filter Controls */}
+                            {filterMode === 'tags' && (
+                                <div className="flex flex-wrap gap-1.5 mb-3 flex-shrink-0">
+                                    {availableCategories.map(tag => (
+                                        <button
+                                            key={tag}
+                                            onClick={() => setFilterTags(prev => prev.includes(tag) ? prev.filter(tt => tt !== tag) : [...prev, tag])}
+                                            className={`px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${filterTags.includes(tag) ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200'
+                                                }`}
+                                        >
+                                            #{tag}
+                                        </button>
+                                    ))}
+                                </div>
                             )}
-                        </button>
-                    </div>
-                </div>
 
-                {/* Center Panel - Image Gallery */}
-                <div className="lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex flex-col min-h-0">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('manipulation.selectImage')}</h3>
+                            {filterMode === 'date' && (
+                                <div className="flex items-center gap-2 mb-3 flex-shrink-0">
+                                    <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} className="px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs" />
+                                    <span className="text-gray-400 text-xs">→</span>
+                                    <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} className="px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs" />
+                                </div>
+                            )}
 
-                    {/* Image Grid */}
-                    <div className="flex-1 overflow-y-auto scrollbar-custom">
-                        {imagesLoading ? (
-                            <div className="grid grid-cols-2 gap-3">
-                                {Array.from({ length: 6 }).map((_, i) => (
-                                    <div key={i} className="aspect-square bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
-                                ))}
+                            {/* Image Grid */}
+                            <div className="flex-1 overflow-y-auto scrollbar-custom">
+                                {imagesLoading ? (
+                                    <div className="grid grid-cols-3 lg:grid-cols-4 gap-3">
+                                        {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
+                                    </div>
+                                ) : images.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                                        <FiImage className="w-12 h-12 mb-3" />
+                                        <p className="text-sm">{t('manipulation.noImages')}</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-3 lg:grid-cols-4 gap-3">
+                                        {images.map(image => (
+                                            <LazyImageCard key={image.id} image={image} isSelected={selectedImage?.id === image.id} onClick={() => handleImageClick(image)} />
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        ) : images.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-                                <FiImage className="w-12 h-12 mb-3" />
-                                <p className="text-sm">{t('manipulation.noImages')}</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-2 gap-3">
-                                {images.map(image => (
-                                    <LazyImageCard
-                                        key={image.id}
-                                        image={image}
-                                        isSelected={selectedImage?.id === image.id}
-                                        onClick={() => handleImageClick(image)}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </div>
 
-                    {/* Pagination */}
-                    {pagination.totalPages > 1 && (
-                        <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700 mt-3">
-                            <button
-                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                disabled={currentPage === 1}
-                                className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-700"
-                            >
-                                <FiChevronLeft />
-                            </button>
-                            <span className="text-sm text-gray-600 dark:text-gray-400">
-                                {currentPage} / {pagination.totalPages}
-                            </span>
-                            <button
-                                onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
-                                disabled={currentPage === pagination.totalPages}
-                                className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-700"
-                            >
-                                <FiChevronRight />
-                            </button>
+                            {/* Pagination */}
+                            {pagination.totalPages > 1 && (
+                                <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700 mt-3 flex-shrink-0">
+                                    <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 rounded-lg disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                        <FiChevronLeft />
+                                    </button>
+                                    <span className="text-sm text-gray-600 dark:text-gray-400">{currentPage} / {pagination.totalPages}</span>
+                                    <button onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))} disabled={currentPage === pagination.totalPages} className="p-2 rounded-lg disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                        <FiChevronRight />
+                                    </button>
+                                </div>
+                            )}
                         </div>
+                    </div>
+                );
+
+            case STEPS.CONFIGURE:
+                return (
+                    <div className="max-w-2xl mx-auto">
+                        <div className="text-center mb-6">
+                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t('manipulation.step.configureTitle')}</h2>
+                            <p className="text-gray-500">{t('manipulation.step.configureDesc')}</p>
+                        </div>
+
+                        {/* Selected Image Summary */}
+                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-4">
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('manipulation.selectedImage')}</h3>
+                            <CompactImagePreview image={selectedImage} onRemove={() => { setSelectedImage(null); setCurrentStep(STEPS.SELECT); }} t={t} />
+                        </div>
+
+                        {/* Options */}
+                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-4">
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('manipulation.options')}</h3>
+                            <label className="flex items-center justify-between cursor-pointer group">
+                                <div>
+                                    <span className="text-sm text-gray-700 dark:text-gray-300">{t('manipulation.saveNoiseprint')}</span>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{t('manipulation.saveNoiseprintDesc')}</p>
+                                </div>
+                                <div className="relative">
+                                    <input type="checkbox" checked={saveNoiseprint} onChange={(e) => setSaveNoiseprint(e.target.checked)} className="sr-only peer" />
+                                    <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:ring-2 peer-focus:ring-emerald-300 dark:peer-focus:ring-emerald-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                                </div>
+                            </label>
+                        </div>
+
+                        {/* About TruFor */}
+                        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800 p-4">
+                            <div className="flex items-start gap-3">
+                                <FiInfo className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
+                                <div>
+                                    <h3 className="text-sm font-semibold text-emerald-900 dark:text-emerald-100 mb-1">{t('manipulation.aboutTitle')}</h3>
+                                    <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">{t('manipulation.aboutDescription')}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+
+            case STEPS.RESULTS:
+                return (
+                    <div className="max-w-4xl mx-auto">
+                        <div className="text-center mb-6">
+                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t('manipulation.results')}</h2>
+                            <p className="text-gray-500">{t('manipulation.step.resultsDesc')}</p>
+                        </div>
+                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+                            {analysisId ? <ResultsViewer analysisId={analysisId} status={analysisStatus} results={analysisResults} statusMessage={statusMessage} t={t} /> : <IllustratedGuide t={t} />}
+                        </div>
+                    </div>
+                );
+
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <div className="w-full h-full flex flex-col">
+            {/* Header */}
+            <div className="flex-shrink-0 mb-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white">
+                            <FiShield className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('manipulation.title')}</h1>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">{t('manipulation.subtitle')}</p>
+                        </div>
+                    </div>
+                    {currentStep > STEPS.SELECT && (
+                        <button onClick={handleReset} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700">
+                            <FiRefreshCw size={16} />{t('manipulation.startOver')}
+                        </button>
                     )}
                 </div>
+            </div>
 
-                {/* Right Panel - Results */}
-                <div className="lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex flex-col min-h-0">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('manipulation.results')}</h3>
+            {/* Step Indicator with Navigation */}
+            <div className="flex items-center justify-between gap-4 mb-4 flex-shrink-0">
+                {/* Back Button */}
+                <button onClick={goToPrevStep} disabled={currentStep === STEPS.SELECT}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentStep === STEPS.SELECT ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                >
+                    <FiArrowLeft size={16} />{t('common.back')}
+                </button>
 
-                    <div className="flex-1 overflow-y-auto">
-                        {analysisId ? (
-                            <ResultsViewer
-                                analysisId={analysisId}
-                                status={analysisStatus}
-                                results={analysisResults}
-                                statusMessage={statusMessage}
-                                t={t}
-                            />
-                        ) : (
-                            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-                                <FiShield className="w-12 h-12 mb-4" />
-                                <p className="text-sm text-center">{t('manipulation.selectAndRun')}</p>
-                            </div>
-                        )}
-                    </div>
+                {/* Step Indicator */}
+                <StepIndicator currentStep={currentStep} steps={STEP_LABELS} onStepClick={setCurrentStep} canNavigate={canNavigateToStep} t={t} />
+
+                {/* Action Buttons */}
+                <div className="flex gap-2">
+                    {currentStep === STEPS.SELECT && (
+                        <button onClick={goToNextStep} disabled={!canProceed}
+                            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${canProceed ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'}`}
+                        >
+                            {t('common.next')}<FiArrowRight size={16} />
+                        </button>
+                    )}
+                    {currentStep === STEPS.CONFIGURE && (
+                        <button onClick={handleRunAnalysis} disabled={isAnalyzing}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                            {isAnalyzing ? <><FiLoader className="animate-spin" size={16} />{t('manipulation.analyzing')}</> : <><FiZap size={16} />{t('manipulation.analyze')}</>}
+                        </button>
+                    )}
+                    {currentStep === STEPS.RESULTS && (
+                        <button onClick={handleReset} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700">
+                            <FiRefreshCw size={16} />{t('manipulation.newAnalysis')}
+                        </button>
+                    )}
                 </div>
+            </div>
+
+            {/* Step Content */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+                {renderStepContent()}
             </div>
         </div>
     );
