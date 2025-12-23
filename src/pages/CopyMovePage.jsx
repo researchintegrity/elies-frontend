@@ -40,7 +40,7 @@ import { api } from '../services/api';
 import { showAlert, showToast } from '../utils/alert';
 
 // --- Constants ---
-const IMAGES_PER_PAGE = 12;
+const IMAGES_PER_PAGE = 18;
 const POLL_INTERVAL = 2000;
 const MAX_POLL_ATTEMPTS = 60;
 
@@ -801,14 +801,14 @@ const CopyMovePage = () => {
                             )}
 
                             {/* Image Grid */}
-                            <div className="flex-1 overflow-y-auto scrollbar-custom">
+                            <div className="flex-1 overflow-y-auto scrollbar-custom max-h-[calc(100vh-420px)]">
                                 {imagesLoading ? (
-                                    <div className="grid grid-cols-3 lg:grid-cols-4 gap-3">
+                                    <div className="grid grid-cols-6 gap-2">
                                         {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
                                     </div>
                                 ) : filterMode === 'similar' && similarityResults.length > 0 ? (
                                     /* Show paginated similarity results */
-                                    <div className="grid grid-cols-3 lg:grid-cols-4 gap-3">
+                                    <div className="grid grid-cols-6 gap-2">
                                         {similarityResults
                                             .slice((similarityPage - 1) * SIMILARITY_PER_PAGE, similarityPage * SIMILARITY_PER_PAGE)
                                             .map((result, idx) => {
@@ -836,7 +836,7 @@ const CopyMovePage = () => {
                                         <p className="text-sm">{t('copyMove.noImages')}</p>
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-3 lg:grid-cols-4 gap-3">
+                                    <div className="grid grid-cols-6 gap-2">
                                         {images.map(image => (
                                             <LazyImageCard key={image.id} image={image} isSelected={sourceImage?.id === image.id || targetImage?.id === image.id} onClick={() => handleImageClick(image)} role={getImageRole(image)} t={t} />
                                         ))}

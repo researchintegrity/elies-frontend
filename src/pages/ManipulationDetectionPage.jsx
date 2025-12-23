@@ -37,7 +37,7 @@ import { api } from '../services/api';
 import { showAlert, showToast } from '../utils/alert';
 
 // --- Constants ---
-const IMAGES_PER_PAGE = 12;
+const IMAGES_PER_PAGE = 18;
 const POLL_INTERVAL = 3000;
 const MAX_POLL_ATTEMPTS = 120;
 
@@ -80,12 +80,12 @@ const StepIndicator = ({ currentStep, steps, onStepClick, canNavigate, t }) => {
                             onClick={() => isClickable && onStepClick(index)}
                             disabled={!isClickable}
                             className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${isActive
-                                    ? 'bg-emerald-600 text-white shadow-lg'
-                                    : isCompleted
-                                        ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-200'
-                                        : isClickable
-                                            ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 hover:bg-gray-200'
-                                            : 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                                ? 'bg-emerald-600 text-white shadow-lg'
+                                : isCompleted
+                                    ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-200'
+                                    : isClickable
+                                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 hover:bg-gray-200'
+                                        : 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
                                 }`}
                         >
                             <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${isActive ? 'bg-white/20' : isCompleted ? 'bg-emerald-500 text-white' : 'bg-gray-300 dark:bg-gray-600'
@@ -533,8 +533,8 @@ const ManipulationDetectionPage = () => {
                                             key={m}
                                             onClick={() => setFilterMode(m)}
                                             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${filterMode === m
-                                                    ? 'bg-white dark:bg-gray-600 text-emerald-600 dark:text-emerald-400 shadow-sm'
-                                                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                                                ? 'bg-white dark:bg-gray-600 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                                                : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                                                 }`}
                                         >
                                             <Icon size={12} />
@@ -592,9 +592,9 @@ const ManipulationDetectionPage = () => {
                             )}
 
                             {/* Image Grid */}
-                            <div className="flex-1 overflow-y-auto scrollbar-custom">
+                            <div className="flex-1 overflow-y-auto scrollbar-custom max-h-[calc(100vh-380px)]">
                                 {imagesLoading ? (
-                                    <div className="grid grid-cols-3 lg:grid-cols-4 gap-3">
+                                    <div className="grid grid-cols-6 gap-2">
                                         {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
                                     </div>
                                 ) : images.length === 0 ? (
@@ -603,7 +603,7 @@ const ManipulationDetectionPage = () => {
                                         <p className="text-sm">{t('manipulation.noImages')}</p>
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-3 lg:grid-cols-4 gap-3">
+                                    <div className="grid grid-cols-6 gap-2">
                                         {images.map(image => (
                                             <LazyImageCard key={image.id} image={image} isSelected={selectedImage?.id === image.id} onClick={() => handleImageClick(image)} />
                                         ))}
