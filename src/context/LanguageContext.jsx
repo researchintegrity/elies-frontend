@@ -75,6 +75,7 @@ const translations = {
         'common.update': 'Atualizar',
         'common.back': 'Voltar',
         'common.selected': 'selecionadas',
+        'common.optional': 'opcional',
 
         // Upload Pages
         'upload.title': 'Upload de Imagens',
@@ -503,6 +504,13 @@ const translations = {
         'provenance.foundSimilarImages': 'Encontradas {{count}} imagens similares',
         'provenance.allImagesPrefix': 'Todas as',
         'provenance.allImagesSuffix': 'imagens da galeria serão consideradas na análise',
+        // Wizard steps
+        'provenance.step.select': 'Selecionar',
+        'provenance.step.configure': 'Configurar',
+        'provenance.step.results': 'Resultados',
+        'provenance.startOver': 'Recomeçar',
+        'provenance.newAnalysis': 'Nova Análise',
+        'provenance.queryImageConfigureHint': 'Configure os parâmetros para análise desta imagem',
 
         // Copy-Move Detection
         'sidebar.copyMove': 'Detecção Copy-Move',
@@ -713,6 +721,7 @@ const translations = {
         'common.update': 'Update',
         'common.back': 'Back',
         'common.selected': 'selected',
+        'common.optional': 'optional',
 
         // Upload Pages
         'upload.title': 'Upload Images',
@@ -1140,6 +1149,13 @@ const translations = {
         'provenance.foundSimilarImages': 'Found {{count}} similar images',
         'provenance.allImagesPrefix': 'All',
         'provenance.allImagesSuffix': 'images from the gallery will be considered in the analysis',
+        // Wizard steps
+        'provenance.step.select': 'Select',
+        'provenance.step.configure': 'Configure',
+        'provenance.step.results': 'Results',
+        'provenance.startOver': 'Start Over',
+        'provenance.newAnalysis': 'New Analysis',
+        'provenance.queryImageConfigureHint': 'Configure parameters for analyzing this image',
 
         // Copy-Move Detection
         'sidebar.copyMove': 'Copy-Move Detection',
