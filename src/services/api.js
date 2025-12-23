@@ -26,14 +26,17 @@ const getHeaders = (isMultipart = false) => {
 };
 
 const handleResponse = async (response) => {
-    // Handle 401 Unauthorized globally
+    // Handle 401 Unauthorized globally - clear auth and redirect to login
     if (response.status === 401) {
-        // Optional: Clear token and redirect to login
-        // localStorage.removeItem('authToken');
-        // localStorage.removeItem('user');
-        // window.location.href = '/login'; 
-        // Note: For now, we'll just throw the error and let the context/component handle the redirect if needed,
-        // or we can dispatch a custom event.
+        // Clear authentication data from localStorage
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+
+        // Force page reload which will redirect to login screen
+        // (App.jsx renders AuthPage when isAuthenticated is false)
+        window.location.reload();
+
+        // Throw error to prevent further processing
         throw new Error('Sessão expirada ou inválida. Por favor, faça login novamente.');
     }
 
