@@ -581,6 +581,11 @@ const translations = {
         'manipulation.downloadResult': 'Baixar Resultado',
         'manipulation.selectAndRun': 'Selecione uma imagem e execute a análise para ver o mapa de manipulações',
         'manipulation.noImages': 'Nenhuma imagem disponível',
+
+        // API Error Messages
+        'api.sessionExpired': 'Sessão expirada ou inválida. Por favor, faça login novamente.',
+        'api.requestError': 'Ocorreu um erro na requisição.',
+        'api.downloadError': 'Falha no download do arquivo.',
     },
     en: {
         // Auth Page
@@ -1159,6 +1164,11 @@ const translations = {
         'manipulation.downloadResult': 'Download Result',
         'manipulation.selectAndRun': 'Select an image and run analysis to see the manipulation map',
         'manipulation.noImages': 'No images available',
+
+        // API Error Messages
+        'api.sessionExpired': 'Session expired or invalid. Please log in again.',
+        'api.requestError': 'An error occurred with the request.',
+        'api.downloadError': 'Failed to download the file.',
     }
 };
 
@@ -1221,6 +1231,18 @@ export const useLanguage = () => {
         throw new Error('useLanguage must be used within a LanguageProvider');
     }
     return context;
+};
+
+/**
+ * Standalone translation function for use outside of React components
+ * (e.g., in api.js or other service files)
+ * Reads the language from localStorage and returns the translated string
+ * @param {string} key - The translation key
+ * @returns {string} The translated string or the key if not found
+ */
+export const translate = (key) => {
+    const language = (typeof window !== 'undefined' && localStorage.getItem('elis-language')) || 'pt';
+    return translations[language]?.[key] || translations['pt']?.[key] || key;
 };
 
 export default LanguageContext;

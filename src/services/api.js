@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../config/api';
+import { translate } from '../context/LanguageContext';
 
 /**
  * Centralized API Client
@@ -37,7 +38,7 @@ const handleResponse = async (response) => {
         window.location.reload();
 
         // Throw error to prevent further processing
-        throw new Error('Sessão expirada ou inválida. Por favor, faça login novamente.');
+        throw new Error(translate('api.sessionExpired'));
     }
 
     // Handle 204 No Content (Success with no body)
@@ -57,7 +58,7 @@ const handleResponse = async (response) => {
     }
 
     if (!response.ok) {
-        const errorMessage = data?.detail || data?.message || 'Ocorreu um erro na requisição.';
+        const errorMessage = data?.detail || data?.message || translate('api.requestError');
         throw new Error(errorMessage);
     }
 
@@ -115,7 +116,7 @@ export const api = {
 
         if (!response.ok) {
             // Try to parse error message if possible, otherwise generic
-            throw new Error('Falha no download do arquivo.');
+            throw new Error(translate('api.downloadError'));
         }
 
         return response.blob();
