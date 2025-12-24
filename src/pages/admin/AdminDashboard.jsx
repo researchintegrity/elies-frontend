@@ -48,6 +48,7 @@ const StatCard = ({ icon: Icon, title, value, subtitle, color = 'primary' }) => 
 };
 
 const StorageBar = ({ used, total }) => {
+  const { t } = useLanguage();
   const percentage = total > 0 ? Math.min(100, (used / total) * 100) : 0;
   let barColor = 'bg-green-500';
   if (percentage > 90) barColor = 'bg-red-500';
@@ -62,8 +63,8 @@ const StorageBar = ({ used, total }) => {
         />
       </div>
       <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
-        <span>{formatBytes(used)} used</span>
-        <span>{formatBytes(total)} total</span>
+        <span>{formatBytes(used)} {t('admin.used') || 'used'}</span>
+        <span>{formatBytes(total)} {t('admin.total') || 'total'}</span>
       </div>
     </div>
   );
@@ -162,7 +163,7 @@ const AdminDashboard = () => {
               icon={FiHardDrive}
               title={t('admin.storageUsed') || 'Storage Used'}
               value={formatBytes(stats.total_storage_used_bytes)}
-              subtitle={`of ${formatBytes(stats.total_storage_allocated_bytes)} allocated`}
+              subtitle={`${t('admin.of') || 'of'} ${formatBytes(stats.total_storage_allocated_bytes)} ${t('admin.allocated') || 'allocated'}`}
               color="amber"
             />
           </div>
@@ -186,19 +187,19 @@ const AdminDashboard = () => {
               </h3>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 dark:text-gray-400">Active Users</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t('admin.activeUsers') || 'Active Users'}</span>
                   <span className="font-semibold text-green-600 dark:text-green-400">
                     {stats.active_users}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 dark:text-gray-400">Inactive Users</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t('admin.inactiveUsers') || 'Inactive Users'}</span>
                   <span className="font-semibold text-gray-500">
                     {stats.total_users - stats.active_users}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 dark:text-gray-400">Administrators</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t('admin.administrators') || 'Administrators'}</span>
                   <span className="font-semibold text-purple-600 dark:text-purple-400">
                     {stats.admin_count}
                   </span>
@@ -212,19 +213,19 @@ const AdminDashboard = () => {
               </h3>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 dark:text-gray-400">Total Used</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t('admin.totalUsed') || 'Total Used'}</span>
                   <span className="font-semibold text-gray-900 dark:text-white">
                     {formatBytes(stats.total_storage_used_bytes)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 dark:text-gray-400">Total Allocated</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t('admin.totalAllocated') || 'Total Allocated'}</span>
                   <span className="font-semibold text-gray-900 dark:text-white">
                     {formatBytes(stats.total_storage_allocated_bytes)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 dark:text-gray-400">Avg per User</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t('admin.avgPerUser') || 'Avg per User'}</span>
                   <span className="font-semibold text-gray-900 dark:text-white">
                     {stats.total_users > 0
                       ? formatBytes(stats.total_storage_used_bytes / stats.total_users)
