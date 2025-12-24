@@ -7,7 +7,7 @@
  * 
  * Inspired by Label Studio's annotation workflow.
  */
-import React, { createContext, useContext, useReducer, useCallback, useRef, useMemo } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useMemo } from 'react';
 
 // --- Types & Constants ---
 

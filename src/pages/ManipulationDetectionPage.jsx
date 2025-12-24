@@ -29,7 +29,6 @@ import {
     FiGrid,
     FiArrowRight,
     FiArrowLeft,
-    FiSettings
 } from 'react-icons/fi';
 import { useImages } from '../hooks/useImages';
 import { useLanguage } from '../context/LanguageContext';

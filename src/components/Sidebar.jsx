@@ -208,6 +208,14 @@ const Sidebar = ({ activePage, onNavigate, pages, isCollapsed = false, onToggle 
           <DisabledItem icon={FiLayers} label={t('sidebar.categories')} />
         </NavSection>
 
+        {/* Admin Section - Only visible to admins */}
+        {user?.roles?.includes('admin') && (
+          <NavSection title={t('sidebar.admin') || 'Admin'}>
+            <NavItem pageKey={pages.ADMIN_DASHBOARD} icon={FiGrid} label={t('sidebar.adminDashboard') || 'Dashboard'} />
+            <NavItem pageKey={pages.ADMIN_USERS} icon={FiSettings} label={t('sidebar.adminUsers') || 'User Management'} />
+          </NavSection>
+        )}
+
         <NavSection title={t('sidebar.settings')}>
           <DisabledItem icon={FiSettings} label={t('sidebar.general')} />
           <NavItem pageKey={pages.PROFILE} icon={FiUser} label={t('sidebar.profile')} />

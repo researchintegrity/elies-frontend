@@ -311,7 +311,7 @@ const ResultsViewer = ({ analysisId, status, results, t }) => {
     const [clustersUrl, setClustersUrl] = useState(null);
     const [activeTab, setActiveTab] = useState('matches');
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    const [, setError] = useState(null);
 
     useEffect(() => {
         if (matchesUrl) URL.revokeObjectURL(matchesUrl);

@@ -8,19 +8,10 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
     FiX,
-    FiSave,
-    FiDownload,
-    FiAlertCircle,
-    FiCheck,
-    FiZoomIn,
-    FiZoomOut,
-    FiMaximize,
     FiHelpCircle,
     FiCopy,
     FiEye,
     FiEyeOff,
-    FiSliders,
-    FiLayers,
 } from 'react-icons/fi';
 import {
     AnnotationProvider,
@@ -37,7 +28,6 @@ import {
     resizeAnnotation,
     movePolygonPoint,
     toPercentCoords,
-    fromPercentCoords,
     exportAnnotationsToJSON,
     isValidAnnotation,
     distance,
@@ -77,8 +67,8 @@ const AnnotationModalInner = ({
     availableAnalysisTools = [],
 }) => {
     const { t } = useLanguage();
-    const { state, actions, computed } = useAnnotation();
-    const { activeTool, isDrawing, currentShape, selectedId, annotations, activeLabel } = state;
+    const { state, actions } = useAnnotation();
+    const { activeTool, isDrawing, currentShape, selectedId, annotations } = state;
 
     // Refs
     const containerRef = useRef(null);

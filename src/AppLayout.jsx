@@ -18,6 +18,10 @@ const ProvenancePage = lazy(() => import('./pages/ProvenancePage'));
 const CopyMovePage = lazy(() => import('./pages/CopyMovePage'));
 const ManipulationDetectionPage = lazy(() => import('./pages/ManipulationDetectionPage'));
 
+// Admin pages
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
+
 // Page keys
 const PAGES = {
   UPLOAD_IMAGE: 'uploadImage',
@@ -32,6 +36,9 @@ const PAGES = {
   PROVENANCE: 'provenance',
   COPY_MOVE: 'copyMove',
   MANIPULATION_DETECTION: 'manipulationDetection',
+  // Admin pages
+  ADMIN_DASHBOARD: 'adminDashboard',
+  ADMIN_USERS: 'adminUsers',
 };
 
 function AppLayout() {
@@ -66,6 +73,11 @@ function AppLayout() {
         return <CopyMovePage />;
       case PAGES.MANIPULATION_DETECTION:
         return <ManipulationDetectionPage />;
+      // Admin pages
+      case PAGES.ADMIN_DASHBOARD:
+        return <AdminDashboard />;
+      case PAGES.ADMIN_USERS:
+        return <AdminUsersPage />;
       default:
         return <ViewImagesPage />;
     }

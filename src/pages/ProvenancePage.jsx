@@ -15,7 +15,6 @@ import {
     FiLayers,
     FiZap,
     FiInfo,
-    FiFilter,
     FiTag,
     FiCalendar,
     FiGrid,
@@ -199,7 +198,6 @@ const StatusBadge = ({ status, t }) => {
 const MatchedPairCard = ({ pair, getImageUrl }) => {
     const img1Url = getImageUrl(pair.image1_id);
     const img2Url = getImageUrl(pair.image2_id);
-    const sourceIsImg1 = pair.source_image_id ? pair.source_image_id === pair.image1_id : true; // Heuristic if not provided
 
     return (
         <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-emerald-500/30 transition-colors">

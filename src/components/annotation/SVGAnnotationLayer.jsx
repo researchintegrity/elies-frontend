@@ -11,7 +11,6 @@ import { useLanguage } from '../../context/LanguageContext';
 import {
     normalizeRect,
     getResizeHandles,
-    HandlePositions,
     getCursorForHandle,
 } from '../../utils/annotationHelpers';
 

@@ -16,11 +16,9 @@ import {
     FiRotateCw,
     FiZoomIn,
     FiZoomOut,
-    FiMaximize,
     FiDownload,
     FiSave,
     FiTag,
-    FiMove,
 } from 'react-icons/fi';
 import { useAnnotation, ToolTypes } from '../../context/AnnotationContext';
 import { useLanguage } from '../../context/LanguageContext';

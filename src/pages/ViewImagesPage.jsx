@@ -1115,7 +1115,7 @@ const ViewImagesPage = () => {
           )}
 
           {/* Top Selection Buttons */}
-          {!similarityMode && pagination.total > 0 && (
+          {pagination.total > 0 && (
             <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800/50">
               <button
                 onClick={() => {

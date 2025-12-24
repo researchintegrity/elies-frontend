@@ -469,7 +469,6 @@ export function applyCloneDetection(canvas, options = {}) {
         showQuantized = false
     } = options;
 
-    const ctx = canvas.getContext('2d');
     let width = canvas.width;
     let height = canvas.height;
 

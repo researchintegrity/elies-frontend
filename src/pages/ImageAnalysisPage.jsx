@@ -7,7 +7,7 @@
  * 
  * ELIS Scientific Integrity Platform
  */
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     FiZap,
     FiActivity,
@@ -20,7 +20,6 @@ import {
     FiAlertTriangle,
     FiCheck,
     FiDownload,
-    FiExternalLink,
     FiRefreshCw,
     FiMaximize2,
     FiMinimize2,
@@ -33,14 +32,10 @@ import {
     FiTag,
     FiX,
     FiFilter,
-    FiEdit,
     FiEdit2,
     FiLayers,
     FiTrash2,
-    FiPlus,
     FiSave,
-    FiCheckSquare,
-    FiSquare,
     FiPenTool
 } from 'react-icons/fi';
 import { api } from '../services/api';
@@ -48,7 +43,6 @@ import { showToast } from '../utils/alert';
 import { useLanguage } from '../context/LanguageContext';
 import AnnotationOverlay from '../components/AnnotationOverlay';
 import { AnnotationModal } from '../components/annotation';
-import { SkeletonCard, EmptyState } from '../components/common';
 import {
     loadImageToCanvas,
     applyErrorLevelAnalysis,
@@ -209,7 +203,7 @@ const ImageAnalysisPage = () => {
     // Gallery State
     const [images, setImages] = useState([]);
     const [imageUrls, setImageUrls] = useState({});
-    const [imageBlobs, setImageBlobs] = useState({});
+    const [, setImageBlobs] = useState({});
     const [loadingImages, setLoadingImages] = useState(true);
     const [loadingUrls, setLoadingUrls] = useState({});
 
@@ -267,7 +261,7 @@ const ImageAnalysisPage = () => {
     const [showFilters, setShowFilters] = useState(false);
 
     // Annotation State
-    const [annotationMode, setAnnotationMode] = useState(false);
+    const [annotationMode] = useState(false);
     const [showAnnotationModal, setShowAnnotationModal] = useState(false);
     const [showAnnotations, setShowAnnotations] = useState(true); // Toggle annotations visibility
     const [annotations, setAnnotations] = useState([]);
@@ -1047,134 +1041,6 @@ const ImageAnalysisPage = () => {
         setShowAnnotationModal(true);
     };
 
-    const renderAnnotationControls = () => (
-        <div className="flex flex-col h-full bg-white dark:bg-gray-800">
-            <h3 className="text-gray-900 dark:text-white text-lg font-semibold px-4 pt-4 pb-2 border-b border-gray-100 dark:border-gray-700">
-                {t('annotation.listTitle')}
-            </h3>
-
-            <div className="flex-1 p-4 overflow-y-auto space-y-4">
-                {/* Input Controls */}
-                <div className="space-y-4">
-                    {/* Type Selector */}
-                    <div className="flex p-1 bg-gray-100 dark:bg-black/30 rounded-lg">
-                        <button
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${annotationType === 'manipulation' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
-                            onClick={() => setAnnotationType('manipulation')}
-                        >
-                            <FiEdit2 /> {t('annotation.manipulation')}
-                        </button>
-                        <button
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${annotationType === 'copy-move' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
-                            onClick={() => setAnnotationType('copy-move')}
-                        >
-                            <FiCopy /> {t('annotation.copyMove')}
-                        </button>
-                    </div>
-
-                    {/* Group ID */}
-                    {annotationType === 'copy-move' && (
-                        <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800">
-                            <FiLayers className="text-blue-500" />
-                            <div className="flex-1">
-                                <label className="block text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">
-                                    {t('annotation.groupId')}
-                                </label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    value={groupId}
-                                    onChange={(e) => setGroupId(e.target.value)}
-                                    className="w-full bg-white dark:bg-black/20 border border-blue-200 dark:border-blue-700 rounded px-2 py-1 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Text Description */}
-                    <textarea
-                        value={annotationText}
-                        onChange={(e) => setAnnotationText(e.target.value)}
-                        placeholder={t('annotation.placeholder')}
-                        className="w-full h-[80px] bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-3 text-gray-900 dark:text-white text-base resize-y focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-                    />
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-2">
-                        <button
-                            onClick={handleSaveAnnotation}
-                            disabled={!crop && !selectedAnnotationId}
-                            className="flex-1 py-3 bg-indigo-600 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                            <FiSave />
-                            {selectedAnnotationId ? t('common.update') : t('analysis.saveAnnotation')}
-                        </button>
-                        {selectedAnnotationId && (
-                            <button
-                                onClick={() => {
-                                    setSelectedAnnotationId(null);
-                                    setCrop(null);
-                                    setAnnotationText('');
-                                }}
-                                className="px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-sm font-bold"
-                            >
-                                {t('common.cancel')}
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                {/* List */}
-                <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
-                    <h4 className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider flex justify-between">
-                        <span>{t('analysis.annotationList')} ({annotations.length})</span>
-                    </h4>
-                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1 scrollbar-custom">
-                        {annotations.length === 0 ? (
-                            <p className="text-sm text-gray-400 italic text-center py-4">{t('annotation.noAnnotations')}</p>
-                        ) : (
-                            annotations.map(anno => {
-                                const color = getGroupColor(anno.type, anno.group_id);
-                                return (
-                                    <div
-                                        key={anno._id}
-                                        onClick={() => handleAnnotationClick(anno)}
-                                        className={`group relative flex flex-col rounded-lg p-3 border transition-all cursor-pointer ${selectedAnnotationId === anno._id
-                                            ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 ring-1 ring-indigo-500/30'
-                                            : 'bg-gray-50 dark:bg-black/20 border-transparent hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-sm'
-                                            }`}
-                                    >
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className="flex items-center gap-2">
-                                                <div
-                                                    className="w-3 h-3 rounded-full shadow-sm"
-                                                    style={{ backgroundColor: color }}
-                                                />
-                                                <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                                                    {anno.type === 'copy-move' ? `${t('annotation.copyMove')} (G${anno.group_id})` : t('annotation.manipulation')}
-                                                </span>
-                                            </div>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteAnnotation(anno._id); }}
-                                                className="text-gray-400 hover:text-red-500 px-1 transition-colors opacity-0 group-hover:opacity-100"
-                                            >
-                                                <FiTrash2 size={14} />
-                                            </button>
-                                        </div>
-                                        {anno.text && (
-                                            <p className="text-sm text-gray-800 dark:text-gray-200 line-clamp-2">{anno.text}</p>
-                                        )}
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-
-
     return (
         <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 overflow-hidden">
             {/* Top Bar: Tools */}
@@ -1591,11 +1457,9 @@ const ImageAnalysisPage = () => {
                                     )}
 
                                     {/* Selected filename */}
-                                    {selectedImage && (
-                                        <span className="text-xs text-gray-500 truncate max-w-[200px]">
-                                            {selectedImage.filename}
-                                        </span>
-                                    )}
+                                    <span className="text-xs text-gray-500 truncate max-w-[200px]">
+                                        {selectedImage.filename}
+                                    </span>
                                 </div>
                             </div>
                         </div>

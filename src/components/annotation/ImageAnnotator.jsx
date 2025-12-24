@@ -16,7 +16,6 @@ import {
     AnnotationProvider, 
     ShapeTypes, 
     ToolTypes,
-    DefaultLabels,
 } from '../../context/AnnotationContext';
 import {
     findAnnotationAtPoint,
@@ -25,7 +24,6 @@ import {
     moveAnnotation,
     resizeAnnotation,
     movePolygonPoint,
-    normalizeRect,
     distance,
     toPercentCoords,
     fromPercentCoords,
@@ -37,9 +35,6 @@ import AnnotationToolbar from './AnnotationToolbar';
 import LabelsPanel from './LabelsPanel';
 import { useLanguage } from '../../context/LanguageContext';
 import { FiAlertCircle } from 'react-icons/fi';
-
-// Minimum drag distance to start drawing
-const MIN_DRAG_DISTANCE = 5;
 
 // Inner component that uses the annotation context
 const ImageAnnotatorInner = ({
@@ -53,8 +48,8 @@ const ImageAnnotatorInner = ({
     readOnly = false,
 }) => {
     const { t } = useLanguage();
-    const { state, actions, computed } = useAnnotation();
-    const { activeTool, isDrawing, currentShape, selectedId, annotations, activeLabel } = state;
+    const { state, actions } = useAnnotation();
+    const { activeTool, isDrawing, currentShape, selectedId, annotations } = state;
     
     // Refs
     const containerRef = useRef(null);
@@ -64,9 +59,7 @@ const ImageAnnotatorInner = ({
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
     const [zoom, setZoom] = useState(1);
-    const [pan, setPan] = useState({ x: 0, y: 0 });
-    const [isPanning, setIsPanning] = useState(false);
-    const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+    const [setPan] = useState({ x: 0, y: 0 });
     const [isSaving, setIsSaving] = useState(false);
     const [showPanel, setShowPanel] = useState(initialShowLabelsPanel);
     
