@@ -77,6 +77,11 @@ const translations = {
         'common.selected': 'selecionadas',
         'common.optional': 'opcional',
         'common.download': 'Baixar',
+        'common.refresh': 'Atualizar',
+        'common.search': 'Buscar',
+        'common.previous': 'Anterior',
+        'common.next': 'Próximo',
+        'common.saving': 'Salvando...',
 
         // Upload Pages
         'upload.title': 'Upload de Imagens',
@@ -230,6 +235,73 @@ const translations = {
         'batchTag.addToExisting': 'Elas serão adicionadas às tags existentes.',
         'batchTag.newTags': 'Novas Tags',
         'batchTag.addTags': 'Adicionar Tags',
+
+        // Admin
+        'admin.dashboard': 'Painel Administrativo',
+        'admin.dashboardSubtitle': 'Visão geral e estatísticas do sistema',
+        'admin.totalUsers': 'Total de Usuários',
+        'admin.activeUsers': 'Usuários Ativos',
+        'admin.adminUsers': 'Administradores',
+        'admin.storageUsed': 'Armazenamento Usado',
+        'admin.storageOverview': 'Visão Geral do Armazenamento',
+        'admin.userBreakdown': 'Detalhamento de Usuários',
+        'admin.storageStats': 'Estatísticas de Armazenamento',
+        'sidebar.admin': 'Administração',
+        'sidebar.adminDashboard': 'Painel Admin',
+        'sidebar.adminUsers': 'Gerenciar Usuários',
+        'admin.userManagement': 'Gerenciamento de Usuários',
+        'admin.userManagementSubtitle': 'Gerencie contas de usuários e permissões',
+        'admin.searchUsers': 'Buscar por usuário, email ou nome...',
+        'admin.allRoles': 'Todos os Cargos',
+        'admin.admins': 'Administradores',
+        'admin.users': 'Usuários',
+        'admin.allStatus': 'Todos os Status',
+        'admin.active': 'Ativo',
+        'admin.inactive': 'Inativo',
+        'admin.showingUsers': 'Mostrando {showing} de {total} usuários',
+        'admin.user': 'Usuário',
+        'admin.status': 'Status',
+        'admin.role': 'Cargo',
+        'admin.storage': 'Armazenamento',
+        'admin.lastLogin': 'Último Login',
+        'admin.actions': 'Ações',
+        'admin.editUser': 'Editar Usuário',
+        'admin.deactivate': 'Desativar',
+        'admin.activate': 'Ativar',
+        'admin.removeAdmin': 'Remover Admin',
+        'admin.makeAdmin': 'Tornar Admin',
+        'admin.resetPassword': 'Redefinir Senha',
+        'admin.pageInfo': 'Página {current} de {total}',
+        'admin.info': 'Informações',
+        'admin.quota': 'Cota',
+        'admin.password': 'Senha',
+        'admin.quotaUpdated': 'Cota atualizada com sucesso',
+        'admin.cannotModifyOwnRole': 'Não é possível modificar seu próprio cargo de admin',
+        'admin.demotedFromAdmin': 'Usuário removido de admin',
+        'admin.promotedToAdmin': 'Usuário promovido a admin',
+        'admin.cannotDeactivateSelf': 'Não é possível desativar sua própria conta',
+        'admin.userActivated': 'Usuário ativado',
+        'admin.userDeactivated': 'Usuário desativado',
+        'admin.cannotResetAdminPassword': 'Não é possível redefinir a senha de outro administrador',
+        'admin.passwordTooShort': 'A senha deve ter pelo menos 4 caracteres',
+        'admin.passwordResetSuccess': 'Senha redefinida com sucesso',
+        'admin.copiedToClipboard': 'Copiado para a área de transferência!',
+        'admin.storageUsage': 'Uso de Armazenamento',
+        'admin.deactivateUser': 'Desativar Usuário',
+        'admin.activateUser': 'Ativar Usuário',
+        'admin.currentQuota': 'Cota Atual',
+        'admin.newQuota': 'Definir Nova Cota',
+        'admin.updateQuota': 'Atualizar Cota',
+        'admin.currentRoles': 'Cargos Atuais',
+        'admin.removeAdminRole': 'Remover Cargo Admin',
+        'admin.grantAdminRole': 'Conceder Cargo Admin',
+        'admin.cannotModifyOwnRoleInfo': 'Você não pode modificar seu próprio cargo de admin para evitar bloqueio.',
+        'admin.cannotResetAdminPasswordInfo': 'Não é possível redefinir a senha de outro usuário administrador.',
+        'admin.generatedPassword': 'Senha Gerada:',
+        'admin.setNewPassword': 'Definir Nova Senha',
+        'admin.enterNewPassword': 'Digite a nova senha...',
+        'admin.setPassword': 'Definir Senha',
+        'admin.generateRandom': 'Gerar Aleatória',
 
         // Profile Page
         'profile.title': 'Meu Perfil',
@@ -816,6 +888,11 @@ const translations = {
         'common.selected': 'selected',
         'common.optional': 'optional',
         'common.download': 'Download',
+        'common.refresh': 'Refresh',
+        'common.search': 'Search',
+        'common.previous': 'Previous',
+        'common.next': 'Next',
+        'common.saving': 'Saving...',
 
         // Upload Pages
         'upload.title': 'Upload Images',
@@ -968,6 +1045,73 @@ const translations = {
         'batchTag.addToExisting': 'They will be added to existing tags.',
         'batchTag.newTags': 'New Tags',
         'batchTag.addTags': 'Add Tags',
+
+        // Admin
+        'admin.dashboard': 'Admin Dashboard',
+        'admin.dashboardSubtitle': 'System overview and statistics',
+        'admin.totalUsers': 'Total Users',
+        'admin.activeUsers': 'Active Users',
+        'admin.adminUsers': 'Admin Users',
+        'admin.storageUsed': 'Storage Used',
+        'admin.storageOverview': 'Storage Overview',
+        'admin.userBreakdown': 'User Breakdown',
+        'admin.storageStats': 'Storage Statistics',
+        'sidebar.admin': 'Admin',
+        'sidebar.adminDashboard': 'Admin Dashboard',
+        'sidebar.adminUsers': 'User Management',
+        'admin.userManagement': 'User Management',
+        'admin.userManagementSubtitle': 'Manage user accounts and permissions',
+        'admin.searchUsers': 'Search by username, email, or name...',
+        'admin.allRoles': 'All Roles',
+        'admin.admins': 'Admins',
+        'admin.users': 'Users',
+        'admin.allStatus': 'All Status',
+        'admin.active': 'Active',
+        'admin.inactive': 'Inactive',
+        'admin.showingUsers': 'Showing {showing} of {total} users',
+        'admin.user': 'User',
+        'admin.status': 'Status',
+        'admin.role': 'Role',
+        'admin.storage': 'Storage',
+        'admin.lastLogin': 'Last Login',
+        'admin.actions': 'Actions',
+        'admin.editUser': 'Edit User',
+        'admin.deactivate': 'Deactivate',
+        'admin.activate': 'Activate',
+        'admin.removeAdmin': 'Remove Admin',
+        'admin.makeAdmin': 'Make Admin',
+        'admin.resetPassword': 'Reset Password',
+        'admin.pageInfo': 'Page {current} of {total}',
+        'admin.info': 'Info',
+        'admin.quota': 'Quota',
+        'admin.password': 'Password',
+        'admin.quotaUpdated': 'Quota updated successfully',
+        'admin.cannotModifyOwnRole': 'Cannot modify your own admin role',
+        'admin.demotedFromAdmin': 'User demoted from admin',
+        'admin.promotedToAdmin': 'User promoted to admin',
+        'admin.cannotDeactivateSelf': 'Cannot deactivate your own account',
+        'admin.userActivated': 'User activated',
+        'admin.userDeactivated': 'User deactivated',
+        'admin.cannotResetAdminPassword': 'Cannot reset another admin\'s password',
+        'admin.passwordTooShort': 'Password must be at least 4 characters',
+        'admin.passwordResetSuccess': 'Password reset successfully',
+        'admin.copiedToClipboard': 'Copied to clipboard!',
+        'admin.storageUsage': 'Storage Usage',
+        'admin.deactivateUser': 'Deactivate User',
+        'admin.activateUser': 'Activate User',
+        'admin.currentQuota': 'Current Quota',
+        'admin.newQuota': 'Set New Quota',
+        'admin.updateQuota': 'Update Quota',
+        'admin.currentRoles': 'Current Roles',
+        'admin.removeAdminRole': 'Remove Admin Role',
+        'admin.grantAdminRole': 'Grant Admin Role',
+        'admin.cannotModifyOwnRoleInfo': 'You cannot modify your own admin role to prevent lockout.',
+        'admin.cannotResetAdminPasswordInfo': 'Cannot reset password for another admin user.',
+        'admin.generatedPassword': 'Generated Password:',
+        'admin.setNewPassword': 'Set New Password',
+        'admin.enterNewPassword': 'Enter new password...',
+        'admin.setPassword': 'Set Password',
+        'admin.generateRandom': 'Generate Random',
 
         // Profile Page
         'profile.title': 'My Profile',
@@ -1511,8 +1655,17 @@ export const LanguageProvider = ({ children }) => {
     }, []);
 
     // Translation function
-    const t = useCallback((key) => {
-        return translations[language]?.[key] || translations['pt']?.[key] || key;
+    const t = useCallback((key, params = {}) => {
+        let text = translations[language]?.[key] || translations['pt']?.[key] || key;
+
+        // Simple interpolation
+        if (params && typeof params === 'object') {
+            Object.keys(params).forEach(param => {
+                text = text.replace(new RegExp(`\\{${param}\\}`, 'g'), params[param]);
+            });
+        }
+
+        return text;
     }, [language]);
 
     // Get locale for date formatting
@@ -1550,9 +1703,18 @@ export const useLanguage = () => {
  * @param {string} key - The translation key
  * @returns {string} The translated string or the key if not found
  */
-export const translate = (key) => {
+export const translate = (key, params = {}) => {
     const language = (typeof window !== 'undefined' && localStorage.getItem('elis-language')) || 'pt';
-    return translations[language]?.[key] || translations['pt']?.[key] || key;
+    let text = translations[language]?.[key] || translations['pt']?.[key] || key;
+
+    // Simple interpolation
+    if (params && typeof params === 'object') {
+        Object.keys(params).forEach(param => {
+            text = text.replace(new RegExp(`\\{${param}\\}`, 'g'), params[param]);
+        });
+    }
+
+    return text;
 };
 
 export default LanguageContext;

@@ -67,11 +67,10 @@ const RoleBadge = ({ role }) => {
   const isAdmin = role === 'admin';
   return (
     <span
-      className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-        isAdmin
+      className={`px-2 py-0.5 text-xs font-medium rounded-full ${isAdmin
           ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
           : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-      }`}
+        }`}
     >
       {role}
     </span>
@@ -80,11 +79,10 @@ const RoleBadge = ({ role }) => {
 
 const StatusBadge = ({ isActive }) => (
   <span
-    className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-      isActive
+    className={`px-2 py-0.5 text-xs font-medium rounded-full ${isActive
         ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
         : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-    }`}
+      }`}
   >
     {isActive ? 'Active' : 'Inactive'}
   </span>
@@ -93,7 +91,7 @@ const StatusBadge = ({ isActive }) => (
 const AdminUsersPage = () => {
   const { t } = useLanguage();
   const { user: currentUser } = useAuth();
-  
+
   // State
   const [users, setUsers] = useState([]);
   const [totalUsers, setTotalUsers] = useState(0);
@@ -101,12 +99,12 @@ const AdminUsersPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // Filters
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  
+
   // Modal state
   const [selectedUser, setSelectedUser] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -181,7 +179,7 @@ const AdminUsersPage = () => {
     const newRoles = isAdmin
       ? user.roles.filter((r) => r !== 'admin')
       : [...(user.roles || ['user']), 'admin'];
-    
+
     try {
       const updatedUser = await api.patch(`/admin/users/${user._id}/role`, {
         roles: newRoles,
@@ -288,7 +286,7 @@ const AdminUsersPage = () => {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500" />
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-h-[300px]">
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-dark-deep">
                 <tr>
@@ -313,7 +311,7 @@ const AdminUsersPage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {users.map((user) => (
+                {users.map((user, index) => (
                   <tr
                     key={user._id}
                     className="hover:bg-gray-50 dark:hover:bg-dark-deep/50 transition-colors"
@@ -366,7 +364,12 @@ const AdminUsersPage = () => {
 
                         {/* Dropdown Menu */}
                         {dropdownOpen === user._id && (
-                          <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-dark-card rounded-xl shadow-lg border border-gray-100 dark:border-gray-800 py-1 z-50">
+                          <div
+                            className={`absolute right-0 w-48 bg-white dark:bg-dark-card rounded-xl shadow-lg border border-gray-100 dark:border-gray-800 py-1 z-50 ${index >= users.length - 2 && users.length > 2
+                                ? 'bottom-full mb-2'
+                                : 'mt-2'
+                              }`}
+                          >
                             <button
                               onClick={() => handleUserClick(user)}
                               className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -374,7 +377,7 @@ const AdminUsersPage = () => {
                               <FiEdit2 className="w-4 h-4" />
                               {t('admin.editUser') || 'Edit User'}
                             </button>
-                            
+
                             {currentUser?._id !== user._id && (
                               <>
                                 <button
@@ -393,7 +396,7 @@ const AdminUsersPage = () => {
                                     </>
                                   )}
                                 </button>
-                                
+
                                 <button
                                   onClick={() => handleToggleAdmin(user)}
                                   className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
