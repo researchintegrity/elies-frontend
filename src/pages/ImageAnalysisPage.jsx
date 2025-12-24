@@ -325,10 +325,12 @@ const ImageAnalysisPage = () => {
         if (!container) return;
 
         const handleWheel = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const delta = e.deltaY > 0 ? -0.1 : 0.1;
-            setZoomLevel(prevZoom => Math.min(4, Math.max(0.25, prevZoom + delta)));
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                e.stopPropagation();
+                const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                setZoomLevel(prevZoom => Math.min(4, Math.max(0.25, prevZoom + delta)));
+            }
         };
 
         container.addEventListener('wheel', handleWheel, { passive: false });
@@ -1074,10 +1076,10 @@ const ImageAnalysisPage = () => {
             <div className="flex-1 flex overflow-hidden">
                 {/* Left Panel: Image Gallery - Expands when no image selected */}
                 <div className={`flex-none border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-all duration-300 ${galleryCollapsed
-                        ? 'w-12'
-                        : selectedImage
-                            ? 'w-64'
-                            : 'w-full max-w-6xl'
+                    ? 'w-12'
+                    : selectedImage
+                        ? 'w-64'
+                        : 'w-full max-w-6xl'
                     }`}>
                     <div className="h-full flex flex-col">
                         {/* Gallery Header */}
