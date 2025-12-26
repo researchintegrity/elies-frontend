@@ -224,36 +224,64 @@ const CompactImagePreview = ({ image, onRemove, t }) => {
 
 // Results Viewer
 const ResultsViewer = ({ analysisId, status, results, statusMessage, t }) => {
-    const [visualizationUrl, setVisualizationUrl] = useState(null);
+    const [predMapUrl, setPredMapUrl] = useState(null);
+    const [confMapUrl, setConfMapUrl] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    const hasVisualization = results?.visualization || (results?.files && results.files.length > 0);
+    const hasPredMap = results?.pred_map;
+    const hasConfMap = results?.conf_map;
+    const hasResults = hasPredMap || hasConfMap || (results?.files && results.files.length > 0);
 
     useEffect(() => {
-        if (visualizationUrl) URL.revokeObjectURL(visualizationUrl);
-        setVisualizationUrl(null);
+        // Cleanup previous URLs
+        if (predMapUrl) URL.revokeObjectURL(predMapUrl);
+        if (confMapUrl) URL.revokeObjectURL(confMapUrl);
+        setPredMapUrl(null);
+        setConfMapUrl(null);
         setError(null);
 
         if (status !== 'completed' || !results) return;
-        if (!hasVisualization) { setLoading(false); return; }
+        if (!hasResults) { setLoading(false); return; }
 
         setLoading(true);
         const loadResults = async () => {
-            try {
-                const blob = await api.download(`/analyses/${analysisId}/results/visualization/download`);
-                setVisualizationUrl(URL.createObjectURL(blob));
-            } catch (err) {
-                console.error('Failed to download visualization:', err);
-                setError(`Visualization: ${err.message}`);
-            } finally {
-                setLoading(false);
+            const errors = [];
+
+            // Load prediction map
+            if (hasPredMap || results?.files?.some(f => f.includes('_pred_map'))) {
+                try {
+                    const blob = await api.download(`/analyses/${analysisId}/results/pred_map/download`);
+                    setPredMapUrl(URL.createObjectURL(blob));
+                } catch (err) {
+                    console.error('Failed to download pred_map:', err);
+                    errors.push(`Prediction Map: ${err.message}`);
+                }
             }
+
+            // Load confidence map
+            if (hasConfMap || results?.files?.some(f => f.includes('_conf_map'))) {
+                try {
+                    const blob = await api.download(`/analyses/${analysisId}/results/conf_map/download`);
+                    setConfMapUrl(URL.createObjectURL(blob));
+                } catch (err) {
+                    console.error('Failed to download conf_map:', err);
+                    errors.push(`Confidence Map: ${err.message}`);
+                }
+            }
+
+            if (errors.length > 0 && !predMapUrl && !confMapUrl) {
+                setError(errors.join('; '));
+            }
+            setLoading(false);
         };
         loadResults();
 
-        return () => { if (visualizationUrl) URL.revokeObjectURL(visualizationUrl); };
-    }, [status, results, analysisId, hasVisualization]);
+        return () => {
+            if (predMapUrl) URL.revokeObjectURL(predMapUrl);
+            if (confMapUrl) URL.revokeObjectURL(confMapUrl);
+        };
+    }, [status, results, analysisId, hasResults, hasPredMap, hasConfMap]);
 
     if (status === 'pending' || status === 'processing') {
         return (
@@ -287,7 +315,7 @@ const ResultsViewer = ({ analysisId, status, results, statusMessage, t }) => {
         );
     }
 
-    if (status === 'completed' && !hasVisualization) {
+    if (status === 'completed' && !hasResults) {
         return (
             <div className="flex flex-col items-center justify-center py-16">
                 <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-4">
@@ -298,25 +326,63 @@ const ResultsViewer = ({ analysisId, status, results, statusMessage, t }) => {
         );
     }
 
-    return (
-        <div className="space-y-4">
-            <div className="rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 min-h-[300px] flex items-center justify-center">
-                {loading ? (
+    // Render single result image with label and download button
+    const renderResultImage = (url, title, filename, isLoading) => (
+        <div className="flex-1 space-y-3">
+            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 text-center">{title}</h4>
+            <div className="rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 min-h-[250px] flex items-center justify-center">
+                {isLoading ? (
                     <div className="flex flex-col items-center py-12 text-gray-500">
                         <FiLoader className="w-6 h-6 animate-spin mb-2" />
                         <span className="text-sm">{t('manipulation.loadingResults')}</span>
                     </div>
-                ) : visualizationUrl ? (
-                    <img src={visualizationUrl} alt="TruFor Visualization" className="w-full h-auto" />
+                ) : url ? (
+                    <img src={url} alt={title} className="w-full h-auto" />
                 ) : (
                     <span className="text-gray-400 text-sm">{t('manipulation.noVisualization')}</span>
                 )}
             </div>
-            {visualizationUrl && (
-                <a href={visualizationUrl} download={`trufor_result_${analysisId}.png`} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm font-medium">
-                    <FiDownload size={16} />{t('manipulation.downloadResult')}
-                </a>
+            {url && (
+                <div className="flex justify-center">
+                    <a href={url} download={filename} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                        <FiDownload size={16} />{t('manipulation.downloadResult')}
+                    </a>
+                </div>
             )}
+        </div>
+    );
+
+    return (
+        <div className="space-y-6">
+            {/* Two-column layout for the result images */}
+            <div className="flex gap-6">
+                {renderResultImage(
+                    predMapUrl,
+                    t('manipulation.predictionMap'),
+                    `trufor_pred_map_${analysisId}.png`,
+                    loading && !predMapUrl
+                )}
+                {renderResultImage(
+                    confMapUrl,
+                    t('manipulation.confidenceMap'),
+                    `trufor_conf_map_${analysisId}.png`,
+                    loading && !confMapUrl
+                )}
+            </div>
+
+            {/* Legend/Help text */}
+            <div className="mt-4 p-4 rounded-lg bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700">
+                <div className="flex items-start gap-3">
+                    <FiInfo className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="font-medium text-gray-900 dark:text-white mb-1">{t('manipulation.resultLegendTitle')}</p>
+                        <ul className="space-y-1 text-xs">
+                            <li><strong>{t('manipulation.predictionMap')}:</strong> {t('manipulation.predictionMapDesc')}</li>
+                            <li><strong>{t('manipulation.confidenceMap')}:</strong> {t('manipulation.confidenceMapDesc')}</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };

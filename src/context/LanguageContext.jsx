@@ -762,8 +762,7 @@ const translations = {
         'copyMove.summary': 'Resumo',
         'copyMove.noSimilarFound': 'Nenhuma imagem similar encontrada',
         'copyMove.selectSourceForSimilar': 'Selecione uma imagem de origem primeiro',
-        'common.reset': 'Limpar',
-        'common.next': 'Próximo',
+
 
         // Manipulation Detection (TruFor)
         'sidebar.manipulationDetection': 'Detecção de Manipulação',
@@ -817,6 +816,12 @@ const translations = {
         'manipulation.guideStep2Desc': 'Ajuste parâmetros se necessário',
         'manipulation.guideStep3Title': 'Execute a análise',
         'manipulation.guideStep3Desc': 'Veja o mapa de manipulação',
+        // Result outputs
+        'manipulation.predictionMap': 'Mapa de Predição',
+        'manipulation.confidenceMap': 'Mapa de Confiança',
+        'manipulation.resultLegendTitle': 'Entendendo os Resultados',
+        'manipulation.predictionMapDesc': 'Mostra regiões potencialmente manipuladas. Azul = autêntico, vermelho = possível manipulação.',
+        'manipulation.confidenceMapDesc': 'Indica o nível de confiança da detecção. Branco = alta confiança, preto = baixa confiança.',
 
         // API Error Messages
         'api.sessionExpired': 'Sessão expirada ou inválida. Por favor, faça login novamente.',
@@ -1581,8 +1586,7 @@ const translations = {
         'copyMove.summary': 'Summary',
         'copyMove.noSimilarFound': 'No similar images found',
         'copyMove.selectSourceForSimilar': 'Select a source image first',
-        'common.reset': 'Reset',
-        'common.next': 'Next',
+
 
         // Manipulation Detection (TruFor)
         'sidebar.manipulationDetection': 'Manipulation Detection',
@@ -1636,6 +1640,12 @@ const translations = {
         'manipulation.guideStep2Desc': 'Adjust parameters if needed',
         'manipulation.guideStep3Title': 'Run analysis',
         'manipulation.guideStep3Desc': 'View the manipulation map',
+        // Result outputs
+        'manipulation.predictionMap': 'Prediction Map',
+        'manipulation.confidenceMap': 'Confidence Map',
+        'manipulation.resultLegendTitle': 'Understanding the Results',
+        'manipulation.predictionMapDesc': 'Shows potentially manipulated regions. Blue = authentic, red = possible manipulation.',
+        'manipulation.confidenceMapDesc': 'Indicates detection confidence level. White = high confidence, black = low confidence.',
 
         // API Error Messages
         'api.sessionExpired': 'Session expired or invalid. Please log in again.',
