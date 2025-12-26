@@ -499,6 +499,87 @@ const ProvenancePage = () => {
         loadReproduceData();
     }, [t]);
 
+    // Handle view results from Analysis Dashboard (load stored results)
+    useEffect(() => {
+        const viewResultsData = sessionStorage.getItem('viewResultsAnalysis');
+        if (!viewResultsData) return;
+
+        const loadViewResultsData = async () => {
+            setLoadingReproduce(true); // Reuse loading state
+            try {
+                const { analysisId, imageId, parameters, type, results } = JSON.parse(viewResultsData);
+                sessionStorage.removeItem('viewResultsAnalysis'); // Clear after reading
+
+                // Only handle provenance type
+                if (type !== 'provenance') {
+                    setLoadingReproduce(false);
+                    return;
+                }
+
+                // Load source image info (might be deleted but we continue anyway)
+                let sourceImageDeleted = false;
+                if (imageId) {
+                    try {
+                        const img = await api.get(`/images/${imageId}`);
+                        setSelectedImage({
+                            id: img._id,
+                            imageId: img._id,
+                            filename: img.filename,
+                            imageType: img.image_type || []
+                        });
+                    } catch (err) {
+                        console.error('Source image no longer exists:', err);
+                        sourceImageDeleted = true;
+                    }
+                }
+
+                // Apply parameters
+                if (parameters) {
+                    if (parameters.k !== undefined) setTopK(parameters.k);
+                    if (parameters.q !== undefined) setTopQ(parameters.q);
+                    if (parameters.max_depth !== undefined) setMaxDepth(parameters.max_depth);
+                    if (parameters.descriptor_type) setDescriptorType(parameters.descriptor_type);
+                }
+
+                // Load analysis results from backend
+                if (analysisId) {
+                    try {
+                        const analysisData = await api.get(`/analyses/${analysisId}`);
+                        if (analysisData.results?.graph) {
+                            setAnalysisResults(analysisData.results);
+                            setAnalysisId(analysisId);
+                            setAnalysisStatus('completed');
+                        }
+                    } catch (err) {
+                        console.error('Failed to load analysis results:', err);
+                    }
+                }
+
+                // Navigate to results step
+                setTimeout(() => {
+                    setCurrentStep(STEPS.RESULTS);
+                    showToast(t('analysisDashboard.resultsLoaded') || 'Results loaded successfully', 'success');
+
+                    if (sourceImageDeleted) {
+                        setTimeout(() => {
+                            showAlert(
+                                t('common.warning'),
+                                t('provenance.sourceImageDeletedButResultsAvailable') || 'Source image was deleted but cached results are available',
+                                'warning'
+                            );
+                        }, 300);
+                    }
+                    setLoadingReproduce(false);
+                }, 500);
+            } catch (err) {
+                console.error('Failed to parse view results data:', err);
+                setLoadingReproduce(false);
+            }
+        };
+
+        loadViewResultsData();
+    }, [t]);
+
     // Fetch images with filters
     useEffect(() => {
         fetchImages(galleryPage, galleryFilters);

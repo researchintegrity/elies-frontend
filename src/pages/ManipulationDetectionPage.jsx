@@ -522,6 +522,99 @@ const ManipulationDetectionPage = () => {
         loadReproduceData();
     }, [t]);
 
+    // Handle view results from Analysis Dashboard (load stored results)
+    useEffect(() => {
+        const viewResultsData = sessionStorage.getItem('viewResultsAnalysis');
+        if (!viewResultsData) return;
+
+        const loadViewResultsData = async () => {
+            setLoadingReproduce(true);
+            try {
+                const { analysisId, imageId, parameters, type, results } = JSON.parse(viewResultsData);
+                sessionStorage.removeItem('viewResultsAnalysis'); // Clear after reading
+
+                // Only handle trufor type
+                if (type !== 'trufor') {
+                    setLoadingReproduce(false);
+                    return;
+                }
+
+                // Load source image info (might be deleted but we continue anyway)
+                let sourceImageDeleted = false;
+                if (imageId) {
+                    try {
+                        const img = await api.get(`/images/${imageId}`);
+                        const blob = await api.download(`/images/${imageId}/download`);
+                        const url = URL.createObjectURL(blob);
+                        setSelectedImage({ id: img._id, filename: img.filename, url });
+                    } catch (err) {
+                        console.error('Source image no longer exists:', err);
+                        sourceImageDeleted = true;
+                    }
+                }
+
+                // Load result info from backend - set flags for ResultsViewer to load
+                if (analysisId) {
+                    try {
+                        setAnalysisId(analysisId);
+                        setAnalysisStatus('completed');
+
+                        // Fetch analysis to get result flags and integrity score
+                        const analysisData = await api.get(`/analyses/${analysisId}`);
+                        if (analysisData.results) {
+                            // Set the results with flags that ResultsViewer expects
+                            setAnalysisResults({
+                                pred_map: analysisData.results.pred_map || true,
+                                conf_map: analysisData.results.conf_map || true,
+                                integrity_score: analysisData.results.integrity_score
+                            });
+
+                            // Set integrity score if available
+                            if (analysisData.results.integrity_score !== undefined) {
+                                setIntegrityScore(analysisData.results.integrity_score);
+                            }
+                        } else {
+                            // If no results info, assume both images exist
+                            setAnalysisResults({
+                                pred_map: true,
+                                conf_map: true
+                            });
+                        }
+                    } catch (err) {
+                        console.error('Failed to load analysis results:', err);
+                        // Fallback: assume both images exist
+                        setAnalysisResults({
+                            pred_map: true,
+                            conf_map: true
+                        });
+                    }
+                }
+
+                // Navigate to results step
+                setTimeout(() => {
+                    setCurrentStep(STEPS.RESULTS);
+                    showToast(t('analysisDashboard.resultsLoaded') || 'Results loaded successfully', 'success');
+
+                    if (sourceImageDeleted) {
+                        setTimeout(() => {
+                            showAlert(
+                                t('common.warning'),
+                                t('manipulation.sourceImageDeletedButResultsAvailable') || 'Source image was deleted but cached results are available',
+                                'warning'
+                            );
+                        }, 300);
+                    }
+                    setLoadingReproduce(false);
+                }, 500);
+            } catch (err) {
+                console.error('Failed to parse view results data:', err);
+                setLoadingReproduce(false);
+            }
+        };
+
+        loadViewResultsData();
+    }, [t]);
+
     // Fetch images with filters
     useEffect(() => {
         if (currentStep === STEPS.SELECT) {

@@ -44,8 +44,9 @@ const PAGES = {
 };
 
 function AppLayout() {
-  // Check sessionStorage for reproduce navigation
+  // Check sessionStorage for reproduce/view results navigation
   const getInitialPage = () => {
+    // First check for reproduce navigation
     const reproduceData = sessionStorage.getItem('reproduceAnalysis');
     if (reproduceData) {
       try {
@@ -57,6 +58,20 @@ function AppLayout() {
         console.error('Failed to parse reproduce data:', err);
       }
     }
+
+    // Then check for view results navigation
+    const viewResultsData = sessionStorage.getItem('viewResultsAnalysis');
+    if (viewResultsData) {
+      try {
+        const { targetPage } = JSON.parse(viewResultsData);
+        if (targetPage) {
+          return targetPage;
+        }
+      } catch (err) {
+        console.error('Failed to parse view results data:', err);
+      }
+    }
+
     return PAGES.VIEW_IMAGES;
   };
 

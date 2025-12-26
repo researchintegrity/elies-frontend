@@ -578,6 +578,107 @@ const CopyMovePage = () => {
         loadReproduceData();
     }, [t]);
 
+    // Handle view results from Analysis Dashboard (load stored results)
+    useEffect(() => {
+        const viewResultsData = sessionStorage.getItem('viewResultsAnalysis');
+        if (!viewResultsData) return;
+
+        const loadViewResultsData = async () => {
+            setLoadingReproduce(true);
+            try {
+                const { analysisId, imageId, targetImageId, parameters, type, results } = JSON.parse(viewResultsData);
+                sessionStorage.removeItem('viewResultsAnalysis'); // Clear after reading
+
+                // Only handle copy-move types
+                if (!['single_image_copy_move', 'cross_image_copy_move'].includes(type)) {
+                    setLoadingReproduce(false);
+                    return;
+                }
+
+                const isCrossMode = type === 'cross_image_copy_move';
+                setMode(isCrossMode ? 'cross' : 'single');
+
+                // Load source image info (might be deleted but we continue anyway)
+                let sourceImageDeleted = false;
+                if (imageId) {
+                    try {
+                        const img = await api.get(`/images/${imageId}`);
+                        setSourceImage({ id: img._id, filename: img.filename });
+                    } catch (err) {
+                        console.error('Source image no longer exists:', err);
+                        sourceImageDeleted = true;
+                    }
+                }
+
+                // Load target image for cross-mode
+                let targetImageDeleted = false;
+                if (isCrossMode && targetImageId) {
+                    try {
+                        const img = await api.get(`/images/${targetImageId}`);
+                        setTargetImage({ id: img._id, filename: img.filename });
+                    } catch (err) {
+                        console.error('Target image no longer exists:', err);
+                        targetImageDeleted = true;
+                    }
+                }
+
+                // Load result info from backend - set flags for ResultsViewer to load
+                if (analysisId) {
+                    try {
+                        setAnalysisId(analysisId);
+                        setAnalysisStatus('completed');
+
+                        // Fetch analysis to get result flags
+                        const analysisData = await api.get(`/analyses/${analysisId}`);
+                        if (analysisData.results) {
+                            // Set the results with flags that ResultsViewer expects
+                            setAnalysisResults({
+                                matches_image: analysisData.results.matches_image || true,
+                                clusters_image: analysisData.results.clusters_image || true
+                            });
+                        } else {
+                            // If no results info, assume matches and clusters exist
+                            setAnalysisResults({
+                                matches_image: true,
+                                clusters_image: true
+                            });
+                        }
+                    } catch (err) {
+                        console.error('Failed to load analysis results:', err);
+                        // Fallback: assume both images exist
+                        setAnalysisResults({
+                            matches_image: true,
+                            clusters_image: true
+                        });
+                    }
+                }
+
+                // Navigate to results step
+                setTimeout(() => {
+                    setCurrentStep(STEPS.RESULTS);
+                    showToast(t('analysisDashboard.resultsLoaded') || 'Results loaded successfully', 'success');
+
+                    if (sourceImageDeleted || targetImageDeleted) {
+                        setTimeout(() => {
+                            const message = sourceImageDeleted && targetImageDeleted
+                                ? t('copyMove.bothImagesDeleted') || 'Source and target images were deleted but cached results are available'
+                                : sourceImageDeleted
+                                    ? t('copyMove.sourceImageDeletedButResultsAvailable') || 'Source image was deleted but cached results are available'
+                                    : t('copyMove.targetImageDeletedButResultsAvailable') || 'Target image was deleted but cached results are available';
+                            showAlert(t('common.warning'), message, 'warning');
+                        }, 300);
+                    }
+                    setLoadingReproduce(false);
+                }, 500);
+            } catch (err) {
+                console.error('Failed to parse view results data:', err);
+                setLoadingReproduce(false);
+            }
+        };
+
+        loadViewResultsData();
+    }, [t]);
+
     // Fetch images with filters when on select step
     useEffect(() => {
         if (currentStep === STEPS.SELECT) {

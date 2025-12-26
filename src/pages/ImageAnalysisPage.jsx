@@ -433,6 +433,145 @@ const ImageAnalysisPage = () => {
         loadReproduceData();
     }, [t]);
 
+    // Handle view results from Analysis Dashboard (load stored result image)
+    useEffect(() => {
+        const viewResultsData = sessionStorage.getItem('viewResultsAnalysis');
+        if (!viewResultsData) return;
+
+        const loadViewResultsData = async () => {
+            setLoadingReproduce(true);
+            try {
+                const { analysisId, imageId, parameters, type, results } = JSON.parse(viewResultsData);
+                sessionStorage.removeItem('viewResultsAnalysis'); // Clear after reading
+
+                // Only handle external analysis type
+                if (type !== 'external') {
+                    setLoadingReproduce(false);
+                    return;
+                }
+
+                // Load source image info (might be deleted but we continue anyway)
+                let sourceImageDeleted = false;
+                if (imageId) {
+                    try {
+                        const img = await api.get(`/images/${imageId}`);
+                        const transformedImage = {
+                            id: img._id,
+                            filename: img.filename,
+                            fileSize: img.file_size,
+                            sourceType: img.source_type,
+                            mimeType: img.mime_type || 'image/jpeg',
+                            exifMetadata: img.exifMetadata || img.exif_metadata || null
+                        };
+                        setSelectedImage(transformedImage);
+
+                        // Load the image URL
+                        const blob = await api.download(`/images/${img._id}/download`);
+                        const url = URL.createObjectURL(blob);
+                        setImageUrls(prev => ({ ...prev, [img._id]: url }));
+                    } catch (err) {
+                        console.error('Source image no longer exists:', err);
+                        sourceImageDeleted = true;
+                    }
+                }
+
+                // Apply parameters (analysis subtype is the tool used)
+                if (parameters) {
+                    const toolType = parameters.analysis_subtype;
+                    if (toolType && ANALYSIS_TOOLS[toolType]) {
+                        setSelectedTool(toolType);
+
+                        // Restore tool-specific parameters
+                        const newParams = {};
+                        switch (toolType) {
+                            case 'ela':
+                                if (parameters.quality !== undefined) newParams.elaQuality = parameters.quality;
+                                if (parameters.scale !== undefined) newParams.elaScale = parameters.scale;
+                                if (parameters.opacity !== undefined) newParams.elaOpacity = parameters.opacity;
+                                break;
+                            case 'noise':
+                                if (parameters.amplitude !== undefined) newParams.noiseAmplitude = parameters.amplitude;
+                                if (parameters.equalize !== undefined) newParams.noiseEqualize = parameters.equalize;
+                                if (parameters.opacity !== undefined) newParams.noiseOpacity = parameters.opacity;
+                                break;
+                            case 'gradient':
+                                if (parameters.intensity !== undefined) newParams.gradientIntensity = parameters.intensity;
+                                if (parameters.opacity !== undefined) newParams.gradientOpacity = parameters.opacity;
+                                if (parameters.normalize !== undefined) newParams.gradientNormalize = parameters.normalize;
+                                if (parameters.equalize !== undefined) newParams.gradientEqualize = parameters.equalize;
+                                break;
+                            case 'levelSweep':
+                                if (parameters.position !== undefined) newParams.sweepPosition = parameters.position;
+                                if (parameters.width !== undefined) newParams.sweepWidth = parameters.width;
+                                if (parameters.opacity !== undefined) newParams.sweepOpacity = parameters.opacity;
+                                break;
+                            case 'cloneDetection':
+                                if (parameters.minSimilarity !== undefined) newParams.cloneMinSimilarity = parameters.minSimilarity;
+                                if (parameters.minDetail !== undefined) newParams.cloneMinDetail = parameters.minDetail;
+                                if (parameters.minClusterSize !== undefined) newParams.cloneMinClusterSize = parameters.minClusterSize;
+                                if (parameters.blockSize !== undefined) newParams.cloneBlockSize = parameters.blockSize;
+                                if (parameters.maxImageSize !== undefined) newParams.cloneMaxImageSize = parameters.maxImageSize;
+                                if (parameters.showQuantized !== undefined) newParams.cloneShowQuantized = parameters.showQuantized;
+                                break;
+                            default:
+                                break;
+                        }
+
+                        // Apply the restored parameters
+                        if (Object.keys(newParams).length > 0) {
+                            setParams(prev => ({ ...prev, ...newParams }));
+                        }
+                    }
+                }
+
+                // Load and display the saved result image
+                if (analysisId) {
+                    try {
+                        const resultBlob = await api.download(`/analyses/${analysisId}/results/result_image/download`);
+                        const resultUrl = URL.createObjectURL(resultBlob);
+
+                        // Create an image element to draw on canvas
+                        const resultImg = new Image();
+                        resultImg.onload = () => {
+                            // Create a canvas with the result image
+                            const canvas = document.createElement('canvas');
+                            canvas.width = resultImg.width;
+                            canvas.height = resultImg.height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(resultImg, 0, 0);
+                            setResultCanvas(canvas);
+                            URL.revokeObjectURL(resultUrl);
+                        };
+                        resultImg.src = resultUrl;
+                    } catch (err) {
+                        console.error('Failed to load result image:', err);
+                    }
+                }
+
+                // Navigate complete
+                setTimeout(() => {
+                    showToast(t('analysisDashboard.resultsLoaded') || 'Results loaded successfully', 'success');
+
+                    if (sourceImageDeleted) {
+                        setTimeout(() => {
+                            showAlert(
+                                t('common.warning'),
+                                t('analysis.sourceImageDeletedButResultsAvailable') || 'Source image was deleted but cached results are available',
+                                'warning'
+                            );
+                        }, 300);
+                    }
+                    setLoadingReproduce(false);
+                }, 500);
+            } catch (err) {
+                console.error('Failed to parse view results data:', err);
+                setLoadingReproduce(false);
+            }
+        };
+
+        loadViewResultsData();
+    }, [t]);
+
     // Handle wheel zoom with non-passive listener to prevent scroll
     useEffect(() => {
         const container = zoomContainerRef.current;

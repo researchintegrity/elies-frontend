@@ -30,6 +30,7 @@ import {
     FiDownload,
     FiEye,
     FiRepeat,
+    FiPlay,
     FiExternalLink,
     FiChevronDown,
     FiTag,
@@ -316,7 +317,7 @@ const FilterPanel = ({ filters, onFilterChange, onReset, t }) => {
 };
 
 // Analysis Row
-const AnalysisRow = ({ analysis, onViewDetails, onReproduce, t, locale, batchMode, isSelected, onToggleSelect }) => {
+const AnalysisRow = ({ analysis, onViewDetails, onReproduce, onViewResults, onFilterByImage, t, locale, batchMode, isSelected, onToggleSelect }) => {
     const [imageUrl, setImageUrl] = useState(null);
     const [loadingImage, setLoadingImage] = useState(true);
 
@@ -369,8 +370,12 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, t, locale, batchMod
                         </div>
                     </div>
                 )}
-                {/* Thumbnail */}
-                <div className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 bg-gray-100 dark:bg-gray-900 overflow-hidden">
+                {/* Thumbnail - Clickable to filter by source image */}
+                <div
+                    className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 bg-gray-100 dark:bg-gray-900 overflow-hidden cursor-pointer hover:ring-2 hover:ring-indigo-500 transition-all"
+                    onClick={() => onFilterByImage && onFilterByImage(analysis.source_image_id)}
+                    title={t('analysisDashboard.filterByImage') || 'Click to filter by this image'}
+                >
                     {loadingImage ? (
                         <div className="w-full h-full animate-pulse bg-gray-200 dark:bg-gray-700" />
                     ) : imageUrl ? (
@@ -420,6 +425,15 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, t, locale, batchMod
                                     title={t('analysisDashboard.reproduce')}
                                 >
                                     <FiRepeat size={16} />
+                                </button>
+                            )}
+                            {analysis.status === 'completed' && (
+                                <button
+                                    onClick={() => onViewResults(analysis)}
+                                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                    title={t('analysisDashboard.viewResults') || 'View Results'}
+                                >
+                                    <FiPlay size={16} />
                                 </button>
                             )}
                         </div>
@@ -986,6 +1000,7 @@ const AnalysisDashboardPage = () => {
 
             if (filters.type) params.type = filters.type;
             if (filters.status) params.status = filters.status;
+            if (filters.source_image_id) params.source_image_id = filters.source_image_id;
             if (filters.date_from) params.date_from = new Date(filters.date_from).toISOString();
             if (filters.date_to) params.date_to = new Date(filters.date_to).toISOString();
 
@@ -1013,19 +1028,22 @@ const AnalysisDashboardPage = () => {
         fetchAnalyses();
     }, [fetchAnalyses]);
 
-    // Calculate statistics from analyses
-    useEffect(() => {
-        if (analyses.length > 0) {
-            const newStats = {
-                total: totalItems,
-                completed: analyses.filter(a => a.status === 'completed').length,
-                processing: analyses.filter(a => a.status === 'processing').length,
-                pending: analyses.filter(a => a.status === 'pending').length,
-                failed: analyses.filter(a => a.status === 'failed').length
-            };
-            setStats(newStats);
+    // Fetch global statistics from API (not just current page)
+    const fetchStats = useCallback(async () => {
+        try {
+            const response = await api.get('/analyses/stats');
+            if (response.success) {
+                setStats(response.data);
+            }
+        } catch (err) {
+            console.error('Failed to fetch stats:', err);
         }
-    }, [analyses, totalItems]);
+    }, []);
+
+    // Fetch stats on mount and when analyses change
+    useEffect(() => {
+        fetchStats();
+    }, [fetchStats, analyses]);
 
     // Auto-refresh for processing analyses
     useEffect(() => {
@@ -1049,11 +1067,17 @@ const AnalysisDashboardPage = () => {
         setFilters({
             type: null,
             status: null,
+            source_image_id: null,
             date_from: null,
             date_to: null
         });
         setCurrentPage(1);
     }, []);
+
+    const handleFilterByImage = useCallback((imageId) => {
+        handleFilterChange('source_image_id', imageId);
+        showToast(t('analysisDashboard.filteringByImage') || 'Filtering by this source image', 'info');
+    }, [handleFilterChange, t]);
 
     const handlePageChange = useCallback((page) => {
         setCurrentPage(page);
@@ -1102,6 +1126,39 @@ const AnalysisDashboardPage = () => {
             const params = JSON.stringify(analysis.parameters, null, 2);
             navigator.clipboard.writeText(params);
             showToast(t('analysisDashboard.parametersCopied'), 'success');
+        }
+    }, [t]);
+
+    // View stored results without re-running the analysis
+    const handleViewResults = useCallback((analysis) => {
+        // Map analysis types to page keys (matches PAGES in AppLayout)
+        const typeToPageKey = {
+            'trufor': 'manipulationDetection',
+            'single_image_copy_move': 'copyMove',
+            'cross_image_copy_move': 'copyMove',
+            'provenance': 'provenance',
+            'cbir_search': 'cbirSearch',
+            'external': 'imageAnalysis'
+        };
+
+        const pageKey = typeToPageKey[analysis.type];
+        if (pageKey && analysis.status === 'completed') {
+            // Store analysis data for viewing results
+            const viewResultsData = {
+                analysisId: analysis._id,
+                imageId: analysis.source_image_id,
+                targetImageId: analysis.target_image_id || null,
+                parameters: analysis.parameters,
+                type: analysis.type,
+                results: analysis.results || {},
+                targetPage: pageKey
+            };
+            sessionStorage.setItem('viewResultsAnalysis', JSON.stringify(viewResultsData));
+            // Navigate by refreshing - AppLayout will read from sessionStorage
+            window.location.reload();
+            showToast(t('analysisDashboard.loadingResults') || 'Loading results...', 'success');
+        } else {
+            showToast(t('analysisDashboard.noResultsAvailable') || 'No results available for this analysis', 'warning');
         }
     }, [t]);
 
@@ -1403,34 +1460,93 @@ const AnalysisDashboardPage = () => {
                 />
             )}
 
-            {/* Statistics Summary Bar */}
-            {!loading && analyses.length > 0 && (
-                <div className="flex flex-wrap gap-4 mb-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 rounded-lg">
+            {/* Statistics Summary Bar - Clickable Filters */}
+            {!loading && (
+                <div className="flex flex-wrap gap-3 mb-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                    {/* Clear Image Filter Badge */}
+                    {filters.source_image_id && (
+                        <button
+                            onClick={() => handleFilterChange('source_image_id', null)}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors group"
+                            title={t('analysisDashboard.clearImageFilter')}
+                        >
+                            <span className="text-sm font-medium">
+                                {t('analysisDashboard.filteringByImage')}
+                            </span>
+                            <FiX size={14} className="group-hover:scale-110 transition-transform" />
+                        </button>
+                    )}
+
+                    {/* All / Total */}
+                    <button
+                        onClick={() => handleFilterChange('status', null)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${!filters.status
+                            ? 'bg-gray-200 dark:bg-gray-700 ring-2 ring-gray-400 dark:ring-gray-500'
+                            : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+                            }`}
+                    >
+                        <FiDatabase className="text-gray-600 dark:text-gray-400" size={14} />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-400">
+                            {stats.total || 0} {t('analysisDashboard.total') || 'Total'}
+                        </span>
+                    </button>
+
+                    {/* Completed */}
+                    <button
+                        onClick={() => handleFilterChange('status', filters.status === 'completed' ? null : 'completed')}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${filters.status === 'completed'
+                            ? 'bg-green-200 dark:bg-green-800/50 ring-2 ring-green-500'
+                            : 'bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-800/50'
+                            }`}
+                    >
                         <FiCheck className="text-green-600 dark:text-green-400" size={14} />
                         <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                            {stats.completed} {t('analysisDashboard.status.completed')}
+                            {stats.completed || 0} {t('analysisDashboard.status.completed')}
                         </span>
-                    </div>
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                        <FiLoader className="text-blue-600 dark:text-blue-400 animate-spin" size={14} />
+                    </button>
+
+                    {/* Processing */}
+                    <button
+                        onClick={() => handleFilterChange('status', filters.status === 'processing' ? null : 'processing')}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${filters.status === 'processing'
+                            ? 'bg-blue-200 dark:bg-blue-800/50 ring-2 ring-blue-500'
+                            : 'bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-800/50'
+                            }`}
+                    >
+                        <FiLoader className={`text-blue-600 dark:text-blue-400 ${stats.processing > 0 ? 'animate-spin' : ''}`} size={14} />
                         <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
-                            {stats.processing} {t('analysisDashboard.status.processing')}
+                            {stats.processing || 0} {t('analysisDashboard.status.processing')}
                         </span>
-                    </div>
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                    </button>
+
+                    {/* Pending */}
+                    <button
+                        onClick={() => handleFilterChange('status', filters.status === 'pending' ? null : 'pending')}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${filters.status === 'pending'
+                            ? 'bg-yellow-200 dark:bg-yellow-800/50 ring-2 ring-yellow-500'
+                            : 'bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-200 dark:hover:bg-yellow-800/50'
+                            }`}
+                    >
                         <FiClock className="text-yellow-600 dark:text-yellow-400" size={14} />
                         <span className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
-                            {stats.pending} {t('analysisDashboard.status.pending')}
+                            {stats.pending || 0} {t('analysisDashboard.status.pending')}
                         </span>
-                    </div>
-                    {stats.failed > 0 && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                    </button>
+
+                    {/* Failed */}
+                    {(stats.failed > 0 || filters.status === 'failed') && (
+                        <button
+                            onClick={() => handleFilterChange('status', filters.status === 'failed' ? null : 'failed')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${filters.status === 'failed'
+                                ? 'bg-red-200 dark:bg-red-800/50 ring-2 ring-red-500'
+                                : 'bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-800/50'
+                                }`}
+                        >
                             <FiX className="text-red-600 dark:text-red-400" size={14} />
                             <span className="text-sm font-medium text-red-700 dark:text-red-400">
-                                {stats.failed} {t('analysisDashboard.status.failed')}
+                                {stats.failed || 0} {t('analysisDashboard.status.failed')}
                             </span>
-                        </div>
+                        </button>
                     )}
                 </div>
             )}
@@ -1498,6 +1614,8 @@ const AnalysisDashboardPage = () => {
                                             analysis={analysis}
                                             onViewDetails={handleViewDetails}
                                             onReproduce={handleReproduce}
+                                            onViewResults={handleViewResults}
+                                            onFilterByImage={handleFilterByImage}
                                             t={t}
                                             locale={locale}
                                             batchMode={batchMode}
