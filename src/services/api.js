@@ -301,5 +301,124 @@ export const api = {
             image_id: imageId,
             save_noiseprint: options.save_noiseprint || false
         });
+    },
+
+    // --- Analysis Dashboard ---
+
+    /**
+     * List all analyses with pagination and filtering
+     * @param {Object} params - Query parameters
+     * @param {number} params.page - Page number (default: 1)
+     * @param {number} params.per_page - Items per page (default: 10)
+     * @param {string} params.type - Filter by analysis type
+     * @param {string} params.status - Filter by status (pending, processing, completed, failed)
+     * @param {string} params.source_image_id - Filter by source image ID
+     * @param {string} params.date_from - Filter by start date (ISO string)
+     * @param {string} params.date_to - Filter by end date (ISO string)
+     * @returns {Promise<{success: boolean, data: Array, pagination: Object}>}
+     */
+    listAnalyses: async (params = {}) => {
+        return api.get('/analyses', params);
+    },
+
+    /**
+     * Save an external analysis result
+     * Allows storing results from external tools with optional file upload
+     * @param {Object} data - Analysis data
+     * @param {string} data.source_image_id - Source image ID (required)
+     * @param {string} data.tool_name - Name of the external tool (required)
+     * @param {string} data.tool_version - Version of the external tool
+     * @param {string} data.description - Description of the analysis
+     * @param {Object} data.parameters - Parameters used for the analysis
+     * @param {Object} data.metrics - Analysis metrics/results
+     * @param {File} data.result_file - Optional result file to upload
+     * @returns {Promise<{success: boolean, message: string, analysis_id: string}>}
+     */
+    saveExternalAnalysis: async (data) => {
+        const formData = new FormData();
+        formData.append('source_image_id', data.source_image_id);
+        formData.append('tool_name', data.tool_name);
+        
+        if (data.tool_version) {
+            formData.append('tool_version', data.tool_version);
+        }
+        if (data.description) {
+            formData.append('description', data.description);
+        }
+        if (data.parameters) {
+            formData.append('parameters', JSON.stringify(data.parameters));
+        }
+        if (data.metrics) {
+            formData.append('metrics', JSON.stringify(data.metrics));
+        }
+        if (data.result_file) {
+            formData.append('result_file', data.result_file);
+        }
+        
+        // Use getHeaders(true) for multipart form data (no Content-Type header)
+        const headers = getHeaders(true);
+        
+        const response = await fetch(`${API_BASE_URL}/analyses/external`, {
+            method: 'POST',
+            headers,
+            body: formData
+        });
+        
+        return response.json();
+    },
+
+    /**
+     * Save an image analysis result (from ImageAnalysisPage client-side tools)
+     * @param {Object} data - Analysis data
+     * @param {string} data.image_id - Image ID that was analyzed
+     * @param {string} data.analysis_subtype - Subtype/tool name (e.g., 'ela', 'noise', 'gradient')
+     * @param {Object} data.parameters - Parameters used for the analysis
+     * @param {string} data.notes - Optional notes about the analysis
+     * @param {Blob|File} data.result_image - Optional result image blob to upload
+     * @returns {Promise<Object>} The created analysis document
+     */
+    saveImageAnalysis: async (data) => {
+        const formData = new FormData();
+        formData.append('image_id', data.image_id);
+        formData.append('analysis_subtype', data.analysis_subtype);
+        formData.append('parameters', JSON.stringify(data.parameters || {}));
+        
+        if (data.notes) {
+            formData.append('notes', data.notes);
+        }
+        if (data.result_image) {
+            // Convert blob to file if needed
+            const filename = `${data.analysis_subtype}_result.png`;
+            const file = data.result_image instanceof File 
+                ? data.result_image 
+                : new File([data.result_image], filename, { type: 'image/png' });
+            formData.append('result_image', file);
+        }
+        
+        // Use getHeaders(true) for multipart form data (no Content-Type header)
+        const headers = getHeaders(true);
+        
+        const response = await fetch(`${API_BASE_URL}/analyses/external`, {
+            method: 'POST',
+            headers,
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Failed to save analysis' }));
+            throw new Error(error.detail || 'Failed to save analysis');
+        }
+        
+        return response.json();
+    },
+
+    /**
+     * Download analysis result image
+     * @param {string} analysisId - Analysis ID
+     * @param {string} resultType - Result type (pred_map, conf_map, noiseprint, matches, clusters, result)
+     * @returns {Promise<Blob>} Result image blob
+     */
+    downloadAnalysisResult: async (analysisId, resultType) => {
+        return api.download(`/analyses/${analysisId}/results/${resultType}/download`);
     }
 };

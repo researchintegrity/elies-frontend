@@ -17,6 +17,7 @@ const ImageAnalysisPage = lazy(() => import('./pages/ImageAnalysisPage'));
 const ProvenancePage = lazy(() => import('./pages/ProvenancePage'));
 const CopyMovePage = lazy(() => import('./pages/CopyMovePage'));
 const ManipulationDetectionPage = lazy(() => import('./pages/ManipulationDetectionPage'));
+const AnalysisDashboardPage = lazy(() => import('./pages/AnalysisDashboardPage'));
 
 // Admin pages
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -36,6 +37,7 @@ const PAGES = {
   PROVENANCE: 'provenance',
   COPY_MOVE: 'copyMove',
   MANIPULATION_DETECTION: 'manipulationDetection',
+  ANALYSIS_DASHBOARD: 'analysisDashboard',
   // Admin pages
   ADMIN_DASHBOARD: 'adminDashboard',
   ADMIN_USERS: 'adminUsers',
@@ -73,6 +75,8 @@ function AppLayout() {
         return <CopyMovePage />;
       case PAGES.MANIPULATION_DETECTION:
         return <ManipulationDetectionPage />;
+      case PAGES.ANALYSIS_DASHBOARD:
+        return <AnalysisDashboardPage />;
       // Admin pages
       case PAGES.ADMIN_DASHBOARD:
         return <AdminDashboard />;

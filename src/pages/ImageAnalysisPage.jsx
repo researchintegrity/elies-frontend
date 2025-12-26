@@ -273,6 +273,9 @@ const ImageAnalysisPage = () => {
     const [selectedAnnotationId, setSelectedAnnotationId] = useState(null);
     const [copiedAnnotation, setCopiedAnnotation] = useState(null);
 
+    // Save Analysis State
+    const [savingAnalysis, setSavingAnalysis] = useState(false);
+
     // Helpers
     const getGroupColor = (type, id) => {
         if (type !== 'copy-move') return '#EF4444'; // Red for general manipulation
@@ -1043,6 +1046,78 @@ const ImageAnalysisPage = () => {
         setShowAnnotationModal(true);
     };
 
+    // Save analysis to dashboard
+    const handleSaveAnalysisToDashboard = async () => {
+        if (!selectedImage || !resultCanvas) {
+            showToast(t('analysis.selectImageFirst') || 'Select an image first', 'warning');
+            return;
+        }
+
+        setSavingAnalysis(true);
+
+        try {
+            // Convert canvas to blob
+            const blob = await new Promise((resolve) => {
+                resultCanvas.toBlob(resolve, 'image/png');
+            });
+
+            // Get the current tool's parameters
+            const toolParams = {};
+            const tool = ANALYSIS_TOOLS[selectedTool];
+            
+            switch (selectedTool) {
+                case 'ela':
+                    toolParams.quality = params.elaQuality;
+                    toolParams.scale = params.elaScale;
+                    toolParams.opacity = params.elaOpacity;
+                    break;
+                case 'noise':
+                    toolParams.amplitude = params.noiseAmplitude;
+                    toolParams.equalize = params.noiseEqualize;
+                    toolParams.opacity = params.noiseOpacity;
+                    break;
+                case 'gradient':
+                    toolParams.intensity = params.gradientIntensity;
+                    toolParams.opacity = params.gradientOpacity;
+                    toolParams.normalize = params.gradientNormalize;
+                    toolParams.equalize = params.gradientEqualize;
+                    break;
+                case 'levelSweep':
+                    toolParams.position = params.sweepPosition;
+                    toolParams.width = params.sweepWidth;
+                    toolParams.opacity = params.sweepOpacity;
+                    break;
+                case 'cloneDetection':
+                    toolParams.minSimilarity = params.cloneMinSimilarity;
+                    toolParams.minDetail = params.cloneMinDetail;
+                    toolParams.minClusterSize = params.cloneMinClusterSize;
+                    toolParams.blockSize = params.cloneBlockSize;
+                    toolParams.maxImageSize = params.cloneMaxImageSize;
+                    toolParams.showQuantized = params.cloneShowQuantized;
+                    break;
+                default:
+                    break;
+            }
+
+            // Save the analysis
+            const result = await api.saveImageAnalysis({
+                image_id: selectedImage.id,
+                analysis_subtype: selectedTool,
+                parameters: toolParams,
+                notes: `${tool?.name || selectedTool} analysis of ${selectedImage.filename}`,
+                result_image: blob
+            });
+
+            showToast(t('analysis.savedToDashboard') || 'Analysis saved to dashboard!', 'success');
+            console.log('Saved analysis:', result);
+        } catch (err) {
+            console.error('Error saving analysis:', err);
+            showToast(t('analysis.saveError') || 'Failed to save analysis', 'error');
+        } finally {
+            setSavingAnalysis(false);
+        }
+    };
+
     return (
         <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 overflow-hidden">
             {/* Top Bar: Tools */}
@@ -1440,6 +1515,23 @@ const ImageAnalysisPage = () => {
                                 </div>
 
                                 <div className="flex items-center gap-3">
+                                    {/* Save to Dashboard */}
+                                    {resultCanvas && (
+                                        <button
+                                            onClick={handleSaveAnalysisToDashboard}
+                                            disabled={savingAnalysis}
+                                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-colors"
+                                            title={t('analysis.saveToDashboard') || 'Save to Dashboard'}
+                                        >
+                                            {savingAnalysis ? (
+                                                <FiRefreshCw size={14} className="animate-spin" />
+                                            ) : (
+                                                <FiSave size={14} />
+                                            )}
+                                            <span>{savingAnalysis ? (t('common.saving') || 'Saving...') : (t('analysis.saveToDashboard') || 'Save to Dashboard')}</span>
+                                        </button>
+                                    )}
+
                                     {/* Download */}
                                     {resultCanvas && (
                                         <button
