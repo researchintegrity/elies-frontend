@@ -36,7 +36,13 @@ import {
     FiSliders,
     FiZap,
     FiSun,
-    FiLayers
+    FiLayers,
+    FiGrid,
+    FiList,
+    FiColumns,
+    FiBarChart2,
+    FiTrash2,
+    FiFileText
 } from 'react-icons/fi';
 import { useLanguage } from '../context/LanguageContext';
 import { api } from '../services/api';
@@ -44,6 +50,7 @@ import { showAlert, showToast } from '../utils/alert';
 import { SkeletonCard, EmptyState } from '../components/common';
 
 // --- Constants ---
+const AUTO_REFRESH_INTERVAL = 5000; // 5 seconds for processing analyses
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
@@ -160,10 +167,10 @@ const TypeBadge = ({ type, subtype, t }) => {
             </span>
         );
     }
-    
+
     const config = ANALYSIS_TYPE_CONFIG[type] || ANALYSIS_TYPE_CONFIG.external;
     const Icon = config.icon;
-    
+
     return (
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${COLOR_CLASSES[config.color]}`}>
             <Icon size={12} />
@@ -176,7 +183,7 @@ const TypeBadge = ({ type, subtype, t }) => {
 const StatusBadge = ({ status, t }) => {
     const config = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
     const Icon = config.icon;
-    
+
     return (
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${COLOR_CLASSES[config.color]}`}>
             <Icon size={12} className={config.animate ? 'animate-spin' : ''} />
@@ -188,14 +195,14 @@ const StatusBadge = ({ status, t }) => {
 // Parameters Display (expandable)
 const ParametersDisplay = ({ parameters, t }) => {
     const [expanded, setExpanded] = useState(false);
-    
+
     if (!parameters || Object.keys(parameters).length === 0) {
         return <span className="text-gray-400 text-xs">{t('analysisDashboard.noParameters')}</span>;
     }
-    
+
     const entries = Object.entries(parameters).filter(([key]) => key !== 'analysis_subtype');
     const displayEntries = expanded ? entries : entries.slice(0, 2);
-    
+
     return (
         <div className="space-y-1">
             {displayEntries.map(([key, value]) => (
@@ -222,7 +229,7 @@ const ParametersDisplay = ({ parameters, t }) => {
 // Filter Panel
 const FilterPanel = ({ filters, onFilterChange, onReset, t }) => {
     const [showDateRange, setShowDateRange] = useState(false);
-    
+
     return (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-4">
             <div className="flex items-center justify-between">
@@ -238,7 +245,7 @@ const FilterPanel = ({ filters, onFilterChange, onReset, t }) => {
                     {t('analysisDashboard.clearFilters')}
                 </button>
             </div>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Type Filter */}
                 <div>
@@ -259,7 +266,7 @@ const FilterPanel = ({ filters, onFilterChange, onReset, t }) => {
                         <option value="external">{t('analysisDashboard.types.external')}</option>
                     </select>
                 </div>
-                
+
                 {/* Status Filter */}
                 <div>
                     <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
@@ -277,7 +284,7 @@ const FilterPanel = ({ filters, onFilterChange, onReset, t }) => {
                         <option value="failed">{t('analysisDashboard.status.failed')}</option>
                     </select>
                 </div>
-                
+
                 {/* Date From */}
                 <div>
                     <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
@@ -290,7 +297,7 @@ const FilterPanel = ({ filters, onFilterChange, onReset, t }) => {
                         className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     />
                 </div>
-                
+
                 {/* Date To */}
                 <div>
                     <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
@@ -309,10 +316,10 @@ const FilterPanel = ({ filters, onFilterChange, onReset, t }) => {
 };
 
 // Analysis Row
-const AnalysisRow = ({ analysis, onViewDetails, onReproduce, t, locale }) => {
+const AnalysisRow = ({ analysis, onViewDetails, onReproduce, t, locale, batchMode, isSelected, onToggleSelect }) => {
     const [imageUrl, setImageUrl] = useState(null);
     const [loadingImage, setLoadingImage] = useState(true);
-    
+
     // Load thumbnail for source image
     useEffect(() => {
         let isMounted = true;
@@ -338,14 +345,30 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, t, locale }) => {
             if (imageUrl) URL.revokeObjectURL(imageUrl);
         };
     }, [analysis.source_image_id]);
-    
+
     const createdDate = new Date(analysis.created_at);
     const typeConfig = ANALYSIS_TYPE_CONFIG[analysis.type] || ANALYSIS_TYPE_CONFIG.external;
     const TypeIcon = typeConfig.icon;
-    
+
     return (
         <div className="group bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-md transition-all duration-200 overflow-hidden">
             <div className="flex items-stretch">
+                {/* Checkbox for batch mode */}
+                {batchMode && (
+                    <div
+                        className="flex items-center justify-center px-3 border-r border-gray-200 dark:border-gray-700 cursor-pointer"
+                        onClick={(e) => { e.stopPropagation(); onToggleSelect(analysis._id); }}
+                    >
+                        <div
+                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors shadow-sm ${isSelected
+                                    ? 'bg-indigo-600 border-indigo-600 text-white'
+                                    : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 hover:border-indigo-500'
+                                }`}
+                        >
+                            {isSelected && <FiCheck size={14} strokeWidth={3} />}
+                        </div>
+                    </div>
+                )}
                 {/* Thumbnail */}
                 <div className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 bg-gray-100 dark:bg-gray-900 overflow-hidden">
                     {loadingImage ? (
@@ -362,16 +385,16 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, t, locale }) => {
                         </div>
                     )}
                 </div>
-                
+
                 {/* Content */}
                 <div className="flex-1 p-3 sm:p-4 flex flex-col justify-between min-w-0">
                     <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <TypeBadge 
-                                    type={analysis.type} 
-                                    subtype={analysis.parameters?.analysis_subtype} 
-                                    t={t} 
+                                <TypeBadge
+                                    type={analysis.type}
+                                    subtype={analysis.parameters?.analysis_subtype}
+                                    t={t}
                                 />
                                 <StatusBadge status={analysis.status} t={t} />
                             </div>
@@ -380,7 +403,7 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, t, locale }) => {
                                 {createdDate.toLocaleString(locale)}
                             </p>
                         </div>
-                        
+
                         {/* Actions */}
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
@@ -401,7 +424,7 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, t, locale }) => {
                             )}
                         </div>
                     </div>
-                    
+
                     {/* Parameters Preview */}
                     {analysis.parameters && Object.keys(analysis.parameters).length > 0 && (
                         <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
@@ -410,7 +433,7 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, t, locale }) => {
                     )}
                 </div>
             </div>
-            
+
             {/* Error message for failed analyses */}
             {analysis.status === 'failed' && analysis.error && (
                 <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border-t border-red-100 dark:border-red-900/30">
@@ -424,6 +447,169 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, t, locale }) => {
     );
 };
 
+// Analysis Card for Grid View
+const AnalysisCard = ({ analysis, onViewDetails, onReproduce, isActive, t, locale, batchMode, isSelected, onToggleSelect }) => {
+    const [imageUrl, setImageUrl] = useState(null);
+    const [loadingImage, setLoadingImage] = useState(true);
+
+    useEffect(() => {
+        let isMounted = true;
+        const loadImage = async () => {
+            if (!analysis.source_image_id) {
+                setLoadingImage(false);
+                return;
+            }
+            try {
+                const blob = await api.download(`/images/${analysis.source_image_id}/download`);
+                if (isMounted) {
+                    setImageUrl(URL.createObjectURL(blob));
+                }
+            } catch (err) {
+                console.error('Failed to load thumbnail:', err);
+            } finally {
+                if (isMounted) setLoadingImage(false);
+            }
+        };
+        loadImage();
+        return () => {
+            isMounted = false;
+            if (imageUrl) URL.revokeObjectURL(imageUrl);
+        };
+    }, [analysis.source_image_id]);
+
+    const createdDate = new Date(analysis.created_at);
+    const typeConfig = ANALYSIS_TYPE_CONFIG[analysis.type] || ANALYSIS_TYPE_CONFIG.external;
+    const TypeIcon = typeConfig.icon;
+
+    return (
+        <div
+            className={`group relative bg-white dark:bg-gray-800 border rounded-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-xl flex flex-col cursor-pointer ${isActive
+                ? 'border-indigo-500 ring-2 ring-indigo-500/20'
+                : 'border-gray-200 dark:border-gray-700 hover:border-indigo-500/50'
+                }`}
+            onClick={() => onViewDetails(analysis)}
+        >
+            {/* Thumbnail */}
+            <div className="relative w-full pt-[65%] bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 rounded-t-xl overflow-hidden">
+                {loadingImage ? (
+                    <div className="absolute inset-0 animate-pulse bg-gray-200 dark:bg-gray-700" />
+                ) : imageUrl ? (
+                    <img src={imageUrl} alt="Source" className="absolute inset-0 w-full h-full object-cover" />
+                ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                        <TypeIcon size={40} />
+                    </div>
+                )}
+
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-3">
+                    <button
+                        className="p-3 rounded-full bg-white/20 hover:bg-indigo-600 text-white backdrop-blur-md transition-all hover:scale-110 shadow-lg border border-white/10"
+                        onClick={(e) => { e.stopPropagation(); onViewDetails(analysis); }}
+                        title={t('analysisDashboard.viewDetails')}
+                    >
+                        <FiEye className="text-xl" />
+                    </button>
+                    {analysis.status === 'completed' && analysis.parameters && (
+                        <button
+                            className="p-3 rounded-full bg-white/20 hover:bg-green-600 text-white backdrop-blur-md transition-all hover:scale-110 shadow-lg border border-white/10"
+                            onClick={(e) => { e.stopPropagation(); onReproduce(analysis); }}
+                            title={t('analysisDashboard.reproduce')}
+                        >
+                            <FiRepeat className="text-xl" />
+                        </button>
+                    )}
+                </div>
+
+                {/* Status badge overlay */}
+                <div className="absolute top-2 right-2">
+                    <StatusBadge status={analysis.status} t={t} />
+                </div>
+
+                {/* Checkbox for batch mode */}
+                {batchMode && (
+                    <div
+                        className="absolute top-2 left-2 z-10 cursor-pointer"
+                        onClick={(e) => { e.stopPropagation(); onToggleSelect(analysis._id); }}
+                    >
+                        <div
+                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors shadow-sm ${isSelected
+                                    ? 'bg-indigo-600 border-indigo-600 text-white'
+                                    : 'bg-white/80 dark:bg-black/50 border-white/50 dark:border-gray-400 hover:border-indigo-500'
+                                }`}
+                        >
+                            {isSelected && <FiCheck size={14} strokeWidth={3} />}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Content */}
+            <div className="p-4 flex-1 flex flex-col gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <TypeBadge type={analysis.type} subtype={analysis.parameters?.analysis_subtype} t={t} />
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                    <FiCalendar size={12} />
+                    {createdDate.toLocaleDateString(locale)}
+                </p>
+                {analysis.status === 'failed' && analysis.error && (
+                    <p className="text-xs text-red-500 truncate mt-1" title={analysis.error}>
+                        <FiAlertCircle className="inline mr-1" size={12} />
+                        {analysis.error}
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// Compact List Row for Split View
+const AnalysisListRowCompact = ({ analysis, isActive, onClick, t, locale, batchMode, isSelected, onToggleSelect }) => {
+    const typeConfig = ANALYSIS_TYPE_CONFIG[analysis.type] || ANALYSIS_TYPE_CONFIG.external;
+    const TypeIcon = typeConfig.icon;
+    const createdDate = new Date(analysis.created_at);
+
+    return (
+        <div
+            className={`group flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 transition-all cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 ${isActive
+                ? 'bg-indigo-50 dark:bg-indigo-900/20 border-l-4 border-l-indigo-500 pl-[calc(1rem-4px)]'
+                : 'border-l-4 border-l-transparent'
+                }`}
+            onClick={() => onClick(analysis)}
+        >
+            {/* Checkbox for batch mode */}
+            {batchMode && (
+                <div
+                    className="cursor-pointer flex-shrink-0"
+                    onClick={(e) => { e.stopPropagation(); onToggleSelect(analysis._id); }}
+                >
+                    <div
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors shadow-sm ${isSelected
+                                ? 'bg-indigo-600 border-indigo-600 text-white'
+                                : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 hover:border-indigo-500'
+                            }`}
+                    >
+                        {isSelected && <FiCheck size={12} strokeWidth={3} />}
+                    </div>
+                </div>
+            )}
+            <div className={`text-gray-400 group-hover:text-indigo-500 ${COLOR_CLASSES[typeConfig.color].split(' ')[0]} p-2 rounded-lg`}>
+                <TypeIcon size={16} />
+            </div>
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                    <TypeBadge type={analysis.type} subtype={analysis.parameters?.analysis_subtype} t={t} />
+                    <StatusBadge status={analysis.status} t={t} />
+                </div>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {createdDate.toLocaleDateString(locale)}
+                </span>
+            </div>
+        </div>
+    );
+};
+
 // Pagination Component
 const Pagination = ({ currentPage, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange, t }) => {
     const pages = useMemo(() => {
@@ -431,11 +617,11 @@ const Pagination = ({ currentPage, totalPages, totalItems, pageSize, onPageChang
         const delta = 2;
         const left = Math.max(1, currentPage - delta);
         const right = Math.min(totalPages, currentPage + delta);
-        
+
         for (let i = left; i <= right; i++) {
             range.push(i);
         }
-        
+
         if (left > 1) {
             range.unshift(1);
             if (left > 2) range.splice(1, 0, '...');
@@ -444,10 +630,10 @@ const Pagination = ({ currentPage, totalPages, totalItems, pageSize, onPageChang
             if (right < totalPages - 1) range.push('...');
             range.push(totalPages);
         }
-        
+
         return range;
     }, [currentPage, totalPages]);
-    
+
     return (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
             {/* Page size selector */}
@@ -464,7 +650,7 @@ const Pagination = ({ currentPage, totalPages, totalItems, pageSize, onPageChang
                 </select>
                 <span>{t('analysisDashboard.of')} {totalItems} {t('analysisDashboard.analyses')}</span>
             </div>
-            
+
             {/* Page navigation */}
             <div className="flex items-center gap-1">
                 <button
@@ -474,7 +660,7 @@ const Pagination = ({ currentPage, totalPages, totalItems, pageSize, onPageChang
                 >
                     <FiChevronLeft size={16} />
                 </button>
-                
+
                 {pages.map((page, index) => (
                     page === '...' ? (
                         <span key={`ellipsis-${index}`} className="px-2 text-gray-400">...</span>
@@ -482,17 +668,16 @@ const Pagination = ({ currentPage, totalPages, totalItems, pageSize, onPageChang
                         <button
                             key={page}
                             onClick={() => onPageChange(page)}
-                            className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                                currentPage === page
-                                    ? 'bg-indigo-600 text-white'
-                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                            }`}
+                            className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${currentPage === page
+                                ? 'bg-indigo-600 text-white'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                }`}
                         >
                             {page}
                         </button>
                     )
                 ))}
-                
+
                 <button
                     onClick={() => onPageChange(currentPage + 1)}
                     disabled={currentPage === totalPages}
@@ -509,36 +694,36 @@ const Pagination = ({ currentPage, totalPages, totalItems, pageSize, onPageChang
 const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale }) => {
     const [resultImages, setResultImages] = useState({});
     const [loadingResults, setLoadingResults] = useState(true);
-    
+
     useEffect(() => {
         if (!analysis) return;
-        
+
         const handleEsc = (e) => {
             if (e.key === 'Escape') onClose();
         };
         window.addEventListener('keydown', handleEsc);
         return () => window.removeEventListener('keydown', handleEsc);
     }, [analysis, onClose]);
-    
+
     useEffect(() => {
         if (!analysis?.results) {
             setLoadingResults(false);
             return;
         }
-        
+
         const loadResults = async () => {
             const images = {};
             // Map of result keys to API endpoint types
             // Backend expects: matches, clusters, pred_map, conf_map, noiseprint, result_image
             const resultTypeMapping = {
                 'pred_map': 'pred_map',
-                'conf_map': 'conf_map', 
+                'conf_map': 'conf_map',
                 'noiseprint': 'noiseprint',
                 'matches_image': 'matches',      // Copy-move: stored as matches_image, API expects 'matches'
                 'clusters_image': 'clusters',    // Copy-move: stored as clusters_image, API expects 'clusters'
                 'result_image': 'result_image'   // External: stored and API both use 'result_image'
             };
-            
+
             for (const [resultKey, apiType] of Object.entries(resultTypeMapping)) {
                 if (analysis.results[resultKey]) {
                     try {
@@ -549,23 +734,23 @@ const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale })
                     }
                 }
             }
-            
+
             setResultImages(images);
             setLoadingResults(false);
         };
-        
+
         loadResults();
-        
+
         return () => {
             Object.values(resultImages).forEach(url => URL.revokeObjectURL(url));
         };
     }, [analysis?._id]);
-    
+
     if (!analysis) return null;
-    
+
     const createdDate = new Date(analysis.created_at);
     const updatedDate = new Date(analysis.updated_at);
-    
+
     return (
         <div
             className="fixed inset-0 bg-black/60 z-[1000] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200"
@@ -597,7 +782,7 @@ const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale })
                         <FiX size={20} />
                     </button>
                 </div>
-                
+
                 {/* Content */}
                 <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -607,15 +792,15 @@ const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale })
                                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
                                     {t('analysisDashboard.generalInfo')}
                                 </h3>
-                                
+
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <span className="text-xs text-gray-500 dark:text-gray-400">{t('analysisDashboard.filterType')}</span>
                                         <div className="mt-1">
-                                            <TypeBadge 
-                                                type={analysis.type} 
-                                                subtype={analysis.parameters?.analysis_subtype} 
-                                                t={t} 
+                                            <TypeBadge
+                                                type={analysis.type}
+                                                subtype={analysis.parameters?.analysis_subtype}
+                                                t={t}
                                             />
                                         </div>
                                     </div>
@@ -633,7 +818,7 @@ const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale })
                                     </div>
                                 </div>
                             </div>
-                            
+
                             {/* Parameters */}
                             {analysis.parameters && Object.keys(analysis.parameters).length > 0 && (
                                 <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4">
@@ -653,7 +838,7 @@ const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale })
                                     </div>
                                 </div>
                             )}
-                            
+
                             {/* Error */}
                             {analysis.error && (
                                 <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 border border-red-200 dark:border-red-900/30">
@@ -665,14 +850,14 @@ const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale })
                                 </div>
                             )}
                         </div>
-                        
+
                         {/* Results Section */}
                         <div className="space-y-4">
                             <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                                 <FiImage size={14} />
                                 {t('analysisDashboard.results')}
                             </h3>
-                            
+
                             {loadingResults ? (
                                 <div className="flex items-center justify-center h-48 bg-gray-100 dark:bg-gray-800 rounded-xl">
                                     <FiLoader className="animate-spin text-indigo-600" size={24} />
@@ -687,7 +872,7 @@ const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale })
                                             'result_image': 'result_image'
                                         };
                                         const apiType = apiTypeMap[type] || type;
-                                        
+
                                         return (
                                             <div key={type} className="relative group">
                                                 <img
@@ -721,7 +906,7 @@ const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale })
                         </div>
                     </div>
                 </div>
-                
+
                 {/* Footer */}
                 <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
                     <button
@@ -739,19 +924,28 @@ const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale })
 // --- Main Component ---
 const AnalysisDashboardPage = () => {
     const { t, locale } = useLanguage();
-    
+
     // State
     const [analyses, setAnalyses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState(null);
-    
+
+    // Statistics state
+    const [stats, setStats] = useState({
+        total: 0,
+        completed: 0,
+        processing: 0,
+        pending: 0,
+        failed: 0
+    });
+
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
     const [totalItems, setTotalItems] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
-    
+
     // Filter state
     const [filters, setFilters] = useState({
         type: null,
@@ -760,10 +954,20 @@ const AnalysisDashboardPage = () => {
         date_to: null
     });
     const [showFilters, setShowFilters] = useState(false);
-    
+
+    // View mode state (like ViewPDFPage)
+    const [viewMode, setViewMode] = useState('list'); // 'list' or 'grid'
+    const [isSplitView, setIsSplitView] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+
     // Modal state
     const [selectedAnalysis, setSelectedAnalysis] = useState(null);
-    
+
+    // Batch selection state
+    const [batchMode, setBatchMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState(new Set());
+    const [showExportMenu, setShowExportMenu] = useState(false);
+
     // Fetch analyses
     const fetchAnalyses = useCallback(async (isRefresh = false) => {
         try {
@@ -773,20 +977,20 @@ const AnalysisDashboardPage = () => {
                 setLoading(true);
             }
             setError(null);
-            
+
             // Build query params
             const params = {
                 page: currentPage,
                 per_page: pageSize
             };
-            
+
             if (filters.type) params.type = filters.type;
             if (filters.status) params.status = filters.status;
             if (filters.date_from) params.date_from = new Date(filters.date_from).toISOString();
             if (filters.date_to) params.date_to = new Date(filters.date_to).toISOString();
-            
+
             const response = await api.get('/analyses', params);
-            
+
             if (response.success) {
                 setAnalyses(response.data);
                 setTotalItems(response.pagination.total_items);
@@ -797,24 +1001,50 @@ const AnalysisDashboardPage = () => {
         } catch (err) {
             console.error('Failed to fetch analyses:', err);
             setError(err.message);
-            showToast('error', t('analysisDashboard.fetchError'));
+            showToast(t('analysisDashboard.fetchError'), 'error');
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
     }, [currentPage, pageSize, filters, t]);
-    
+
     // Initial fetch and refetch on dependency changes
     useEffect(() => {
         fetchAnalyses();
     }, [fetchAnalyses]);
-    
+
+    // Calculate statistics from analyses
+    useEffect(() => {
+        if (analyses.length > 0) {
+            const newStats = {
+                total: totalItems,
+                completed: analyses.filter(a => a.status === 'completed').length,
+                processing: analyses.filter(a => a.status === 'processing').length,
+                pending: analyses.filter(a => a.status === 'pending').length,
+                failed: analyses.filter(a => a.status === 'failed').length
+            };
+            setStats(newStats);
+        }
+    }, [analyses, totalItems]);
+
+    // Auto-refresh for processing analyses
+    useEffect(() => {
+        const hasProcessing = analyses.some(a => a.status === 'processing' || a.status === 'pending');
+        if (!hasProcessing) return;
+
+        const intervalId = setInterval(() => {
+            fetchAnalyses(true); // Silent refresh
+        }, AUTO_REFRESH_INTERVAL);
+
+        return () => clearInterval(intervalId);
+    }, [analyses, fetchAnalyses]);
+
     // Handlers
     const handleFilterChange = useCallback((key, value) => {
         setFilters(prev => ({ ...prev, [key]: value }));
         setCurrentPage(1); // Reset to first page on filter change
     }, []);
-    
+
     const handleResetFilters = useCallback(() => {
         setFilters({
             type: null,
@@ -824,31 +1054,52 @@ const AnalysisDashboardPage = () => {
         });
         setCurrentPage(1);
     }, []);
-    
+
     const handlePageChange = useCallback((page) => {
         setCurrentPage(page);
     }, []);
-    
+
     const handlePageSizeChange = useCallback((size) => {
         setPageSize(size);
         setCurrentPage(1);
     }, []);
-    
+
     const handleViewDetails = useCallback((analysis) => {
         setSelectedAnalysis(analysis);
     }, []);
-    
+
     const handleCloseDetails = useCallback(() => {
         setSelectedAnalysis(null);
     }, []);
-    
+
     const handleReproduce = useCallback((analysis) => {
-        // Copy parameters to clipboard or navigate to the appropriate tool
-        const params = JSON.stringify(analysis.parameters, null, 2);
-        navigator.clipboard.writeText(params);
-        showToast('success', t('analysisDashboard.parametersCopied'));
+        // Navigate to the appropriate tool page with parameters
+        const typeToRoute = {
+            'trufor': '/manipulation-detection',
+            'single_image_copy_move': '/copy-move',
+            'cross_image_copy_move': '/copy-move',
+            'provenance': '/provenance',
+            'cbir_search': '/cbir-search'
+        };
+
+        const route = typeToRoute[analysis.type];
+        if (route && analysis.source_image_id) {
+            // Store parameters in sessionStorage for the target page to pick up
+            sessionStorage.setItem('reproduceAnalysis', JSON.stringify({
+                imageId: analysis.source_image_id,
+                parameters: analysis.parameters,
+                type: analysis.type
+            }));
+            window.location.href = route;
+            showToast(t('analysisDashboard.navigatingToTool'), 'success');
+        } else {
+            // Fallback: copy parameters to clipboard
+            const params = JSON.stringify(analysis.parameters, null, 2);
+            navigator.clipboard.writeText(params);
+            showToast(t('analysisDashboard.parametersCopied'), 'success');
+        }
     }, [t]);
-    
+
     const handleDownloadResult = useCallback(async (analysisId, resultType) => {
         try {
             const blob = await api.download(`/analyses/${analysisId}/results/${resultType}/download`);
@@ -860,59 +1111,283 @@ const AnalysisDashboardPage = () => {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            showToast('success', t('analysisDashboard.downloadSuccess'));
+            showToast(t('analysisDashboard.downloadSuccess'), 'success');
         } catch (err) {
             console.error('Download failed:', err);
-            showToast('error', t('analysisDashboard.downloadError'));
+            showToast(t('analysisDashboard.downloadError'), 'error');
         }
     }, [t]);
-    
+
+    // Export handlers
+    const handleExport = useCallback((format) => {
+        const dataToExport = batchMode && selectedIds.size > 0
+            ? analyses.filter(a => selectedIds.has(a._id))
+            : analyses;
+
+        if (dataToExport.length === 0) {
+            showToast(t('analysisDashboard.noDataToExport'), 'error');
+            return;
+        }
+
+        const exportData = dataToExport.map(a => ({
+            id: a._id,
+            type: a.type,
+            status: a.status,
+            created_at: a.created_at,
+            updated_at: a.updated_at,
+            parameters: a.parameters,
+            error: a.error || null
+        }));
+
+        let content, filename, mimeType;
+        if (format === 'json') {
+            content = JSON.stringify(exportData, null, 2);
+            filename = `analyses_export_${new Date().toISOString().split('T')[0]}.json`;
+            mimeType = 'application/json';
+        } else {
+            // CSV format
+            const headers = ['id', 'type', 'status', 'created_at', 'updated_at', 'parameters', 'error'];
+            const csvRows = [headers.join(',')];
+            exportData.forEach(a => {
+                csvRows.push([
+                    a.id,
+                    a.type,
+                    a.status,
+                    a.created_at,
+                    a.updated_at,
+                    `"${JSON.stringify(a.parameters || {}).replace(/"/g, '""')}"`,
+                    a.error || ''
+                ].join(','));
+            });
+            content = csvRows.join('\n');
+            filename = `analyses_export_${new Date().toISOString().split('T')[0]}.csv`;
+            mimeType = 'text/csv';
+        }
+
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setShowExportMenu(false);
+        showToast(t('analysisDashboard.exportSuccess'), 'success');
+    }, [analyses, batchMode, selectedIds, t]);
+
+    // Batch selection handlers
+    const handleToggleSelect = useCallback((id) => {
+        setSelectedIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(id)) {
+                newSet.delete(id);
+            } else {
+                newSet.add(id);
+            }
+            return newSet;
+        });
+    }, []);
+
+    const handleSelectAll = useCallback(() => {
+        if (selectedIds.size === analyses.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(analyses.map(a => a._id)));
+        }
+    }, [analyses, selectedIds.size]);
+
+    const handleBatchDelete = useCallback(async () => {
+        if (selectedIds.size === 0) return;
+
+        const confirmed = await showAlert(
+            t('analysisDashboard.confirmBatchDelete'),
+            `${t('analysisDashboard.deleteConfirmMessage')} ${selectedIds.size} ${t('analysisDashboard.analyses')}?`,
+            'warning'
+        );
+
+        if (!confirmed) return;
+
+        try {
+            // Delete each selected analysis
+            const deletePromises = Array.from(selectedIds).map(id =>
+                api.delete(`/analyses/${id}`)
+            );
+            await Promise.all(deletePromises);
+
+            showToast(`${selectedIds.size} ${t('analysisDashboard.deletedSuccessfully')}`, 'success');
+            setSelectedIds(new Set());
+            setBatchMode(false);
+            fetchAnalyses();
+        } catch (err) {
+            console.error('Batch delete failed:', err);
+            showToast(t('analysisDashboard.deleteError'), 'error');
+        }
+    }, [selectedIds, t, fetchAnalyses]);
+
     // Check if any filters are active
     const hasActiveFilters = Object.values(filters).some(v => v !== null);
-    
+
     return (
-        <div className="space-y-6 pb-8">
-            {/* Page Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="w-full h-full flex flex-col p-6 md:p-8 overflow-hidden relative text-gray-900 dark:text-gray-100 transition-colors duration-300">
+            {/* Header & Toolbar */}
+            <header className="flex flex-wrap justify-between items-center mb-6 gap-4 pb-4 border-b border-gray-200 dark:border-gray-800">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight flex items-center gap-3 mb-1">
                         <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl">
                             <FiActivity className="text-indigo-600 dark:text-indigo-400" size={24} />
                         </div>
                         {t('analysisDashboard.title')}
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-1">
-                        {t('analysisDashboard.subtitle')}
-                    </p>
+                    <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium">
+                        {loading ? t('common.loading') : `${totalItems} ${t('analysisDashboard.analyses')}`}
+                    </span>
                 </div>
-                
-                <div className="flex items-center gap-2">
+
+                <div className="flex flex-wrap gap-2 sm:gap-3 flex-1 justify-end items-center">
+                    {/* Search */}
+                    <div className="relative flex-1 min-w-[120px] max-w-xs group">
+                        <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
+                        <input
+                            type="text"
+                            className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg pl-10 pr-4 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-gray-400 text-sm"
+                            placeholder={t('analysisDashboard.searchPlaceholder') || 'Search...'}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+
+                    {/* Filter Button */}
                     <button
                         onClick={() => setShowFilters(!showFilters)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                            showFilters || hasActiveFilters
-                                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
-                                : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                        }`}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${showFilters || hasActiveFilters
+                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+                            : 'bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`}
                     >
                         <FiFilter size={16} />
-                        {t('common.filters')}
+                        <span className="hidden sm:inline">{t('common.filters')}</span>
                         {hasActiveFilters && (
                             <span className="w-2 h-2 rounded-full bg-indigo-600 dark:bg-indigo-400" />
                         )}
                     </button>
-                    
+
+                    {/* View Mode Toggle */}
+                    <div className="flex bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg p-1">
+                        <button
+                            className={`p-2 rounded transition-colors ${viewMode === 'list' && !isSplitView ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
+                            onClick={() => { setViewMode('list'); setIsSplitView(false); }}
+                            title={t('analysisDashboard.listView') || 'List View'}
+                        >
+                            <FiList size={16} />
+                        </button>
+                        <button
+                            className={`p-2 rounded transition-colors ${viewMode === 'grid' && !isSplitView ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
+                            onClick={() => { setViewMode('grid'); setIsSplitView(false); }}
+                            title={t('analysisDashboard.gridView') || 'Grid View'}
+                        >
+                            <FiGrid size={16} />
+                        </button>
+                        <div className="w-px bg-gray-200 dark:bg-gray-700 mx-1 my-1"></div>
+                        <button
+                            className={`p-2 rounded transition-colors ${isSplitView ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
+                            onClick={() => setIsSplitView(!isSplitView)}
+                            title={t('analysisDashboard.splitView') || 'Split View'}
+                        >
+                            <FiColumns size={16} />
+                        </button>
+                    </div>
+
+                    {/* Refresh Button */}
                     <button
                         onClick={() => fetchAnalyses(true)}
                         disabled={refreshing}
-                        className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                        className="p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-500 hover:text-indigo-600 hover:border-indigo-500 rounded-lg transition-all disabled:opacity-50"
+                        title={t('common.refresh')}
                     >
                         <FiRefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
-                        {t('common.refresh')}
+                    </button>
+
+                    {/* Export Dropdown */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowExportMenu(!showExportMenu)}
+                            className="flex items-center gap-1 p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-500 hover:text-indigo-600 hover:border-indigo-500 rounded-lg transition-all"
+                            title={t('analysisDashboard.export')}
+                        >
+                            <FiDownload size={16} />
+                            <FiChevronDown size={12} />
+                        </button>
+                        {showExportMenu && (
+                            <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+                                <button
+                                    onClick={() => handleExport('csv')}
+                                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg"
+                                >
+                                    <FiFileText size={14} />
+                                    {t('analysisDashboard.exportCSV')}
+                                </button>
+                                <button
+                                    onClick={() => handleExport('json')}
+                                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg"
+                                >
+                                    <FiFileText size={14} />
+                                    {t('analysisDashboard.exportJSON')}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Batch Mode Toggle */}
+                    <button
+                        onClick={() => { setBatchMode(!batchMode); setSelectedIds(new Set()); }}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${batchMode
+                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+                            : 'bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`}
+                        title={t('analysisDashboard.batchMode')}
+                    >
+                        <FiLayers size={16} />
+                        <span className="hidden sm:inline">{t('analysisDashboard.batch')}</span>
                     </button>
                 </div>
-            </div>
-            
+            </header>
+
+            {/* Batch Actions Bar */}
+            {batchMode && (
+                <div className="flex items-center gap-4 mb-4 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-800">
+                    <button
+                        onClick={handleSelectAll}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                        <FiCheck size={14} />
+                        {selectedIds.size === analyses.length ? t('analysisDashboard.deselectAll') : t('analysisDashboard.selectAll')}
+                    </button>
+                    <span className="text-sm text-indigo-700 dark:text-indigo-300">
+                        {selectedIds.size} {t('analysisDashboard.selected')}
+                    </span>
+                    {selectedIds.size > 0 && (
+                        <>
+                            <button
+                                onClick={() => handleExport('csv')}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
+                            >
+                                <FiDownload size={14} />
+                                {t('analysisDashboard.exportSelected')}
+                            </button>
+                            <button
+                                onClick={handleBatchDelete}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
+                            >
+                                <FiTrash2 size={14} />
+                                {t('analysisDashboard.deleteSelected')}
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
+
             {/* Filter Panel */}
             {showFilters && (
                 <FilterPanel
@@ -922,71 +1397,284 @@ const AnalysisDashboardPage = () => {
                     t={t}
                 />
             )}
-            
-            {/* Content */}
-            {loading ? (
-                <div className="space-y-3">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                        <SkeletonRow key={i} />
-                    ))}
-                </div>
-            ) : error ? (
-                <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-8 text-center">
-                    <FiAlertCircle className="mx-auto text-red-500 mb-3" size={32} />
-                    <p className="text-red-600 dark:text-red-400 font-medium">{error}</p>
-                    <button
-                        onClick={() => fetchAnalyses()}
-                        className="mt-4 px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg text-sm font-medium hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
-                    >
-                        {t('common.tryAgain')}
-                    </button>
-                </div>
-            ) : analyses.length === 0 ? (
-                <EmptyState
-                    title={t('analysisDashboard.noAnalyses')}
-                    description={hasActiveFilters ? t('analysisDashboard.noMatchingAnalyses') : t('analysisDashboard.noAnalysesDescription')}
-                    icon="search"
-                    actionLabel={hasActiveFilters ? t('analysisDashboard.clearFilters') : null}
-                    onAction={hasActiveFilters ? handleResetFilters : null}
-                    showAction={hasActiveFilters}
-                />
-            ) : (
-                <>
-                    {/* Analysis List */}
-                    <div className="space-y-3">
-                        {analyses.map(analysis => (
-                            <AnalysisRow
-                                key={analysis._id}
-                                analysis={analysis}
-                                onViewDetails={handleViewDetails}
-                                onReproduce={handleReproduce}
-                                t={t}
-                                locale={locale}
-                            />
-                        ))}
+
+            {/* Statistics Summary Bar */}
+            {!loading && analyses.length > 0 && (
+                <div className="flex flex-wrap gap-4 mb-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                        <FiCheck className="text-green-600 dark:text-green-400" size={14} />
+                        <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                            {stats.completed} {t('analysisDashboard.status.completed')}
+                        </span>
                     </div>
-                    
-                    {/* Pagination */}
-                    <Pagination
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        totalItems={totalItems}
-                        pageSize={pageSize}
-                        onPageChange={handlePageChange}
-                        onPageSizeChange={handlePageSizeChange}
-                        t={t}
-                    />
-                </>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                        <FiLoader className="text-blue-600 dark:text-blue-400 animate-spin" size={14} />
+                        <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                            {stats.processing} {t('analysisDashboard.status.processing')}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                        <FiClock className="text-yellow-600 dark:text-yellow-400" size={14} />
+                        <span className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                            {stats.pending} {t('analysisDashboard.status.pending')}
+                        </span>
+                    </div>
+                    {stats.failed > 0 && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                            <FiX className="text-red-600 dark:text-red-400" size={14} />
+                            <span className="text-sm font-medium text-red-700 dark:text-red-400">
+                                {stats.failed} {t('analysisDashboard.status.failed')}
+                            </span>
+                        </div>
+                    )}
+                </div>
             )}
-            
-            {/* Detail Modal */}
-            <AnalysisDetailModal
-                analysis={selectedAnalysis}
-                onClose={handleCloseDetails}
-                onDownloadResult={handleDownloadResult}
-                t={t}
-                locale={locale}
-            />
+
+            {/* Main Content Area */}
+            <div className={`flex-1 overflow-hidden relative flex gap-6 min-h-0 ${showFilters ? 'mt-4' : ''}`}>
+
+                {/* Document List/Grid Side */}
+                <div className={`transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden ${isSplitView ? 'w-[400px] flex-shrink-0 border-r border-gray-200 dark:border-gray-800 pr-4' : 'w-full'
+                    }`}>
+                    {loading ? (
+                        <div className={viewMode === 'grid' && !isSplitView ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6' : 'space-y-3'}>
+                            {[...Array(6)].map((_, i) => <SkeletonRow key={i} />)}
+                        </div>
+                    ) : error ? (
+                        <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-8 text-center">
+                            <FiAlertCircle className="mx-auto text-red-500 mb-3" size={32} />
+                            <p className="text-red-600 dark:text-red-400 font-medium">{error}</p>
+                            <button
+                                onClick={() => fetchAnalyses()}
+                                className="mt-4 px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg text-sm font-medium hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                            >
+                                {t('common.tryAgain')}
+                            </button>
+                        </div>
+                    ) : analyses.length === 0 ? (
+                        <EmptyState
+                            title={t('analysisDashboard.noAnalyses')}
+                            description={hasActiveFilters || searchQuery ? t('analysisDashboard.noMatchingAnalyses') : t('analysisDashboard.noAnalysesDescription')}
+                            icon="search"
+                            actionLabel={(hasActiveFilters || searchQuery) ? t('analysisDashboard.clearFilters') : null}
+                            onAction={(hasActiveFilters || searchQuery) ? () => { handleResetFilters(); setSearchQuery(''); } : null}
+                            showAction={hasActiveFilters || !!searchQuery}
+                        />
+                    ) : (
+                        <div className={
+                            viewMode === 'grid' && !isSplitView
+                                ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-6'
+                                : 'pb-6'
+                        }>
+                            {/* Grid View */}
+                            {viewMode === 'grid' && !isSplitView && (
+                                analyses.map(analysis => (
+                                    <AnalysisCard
+                                        key={analysis._id}
+                                        analysis={analysis}
+                                        onViewDetails={handleViewDetails}
+                                        onReproduce={handleReproduce}
+                                        isActive={selectedAnalysis?._id === analysis._id}
+                                        t={t}
+                                        locale={locale}
+                                        batchMode={batchMode}
+                                        isSelected={selectedIds.has(analysis._id)}
+                                        onToggleSelect={handleToggleSelect}
+                                    />
+                                ))
+                            )}
+
+                            {/* List View (full) */}
+                            {viewMode === 'list' && !isSplitView && (
+                                <div className="space-y-3">
+                                    {analyses.map(analysis => (
+                                        <AnalysisRow
+                                            key={analysis._id}
+                                            analysis={analysis}
+                                            onViewDetails={handleViewDetails}
+                                            onReproduce={handleReproduce}
+                                            t={t}
+                                            locale={locale}
+                                            batchMode={batchMode}
+                                            isSelected={selectedIds.has(analysis._id)}
+                                            onToggleSelect={handleToggleSelect}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Split View (compact list) */}
+                            {isSplitView && (
+                                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                                    {analyses.map(analysis => (
+                                        <AnalysisListRowCompact
+                                            key={analysis._id}
+                                            analysis={analysis}
+                                            isActive={selectedAnalysis?._id === analysis._id}
+                                            onClick={handleViewDetails}
+                                            t={t}
+                                            locale={locale}
+                                            batchMode={batchMode}
+                                            isSelected={selectedIds.has(analysis._id)}
+                                            onToggleSelect={handleToggleSelect}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Pagination - only show when not in split view or no selection */}
+                    {!loading && !error && analyses.length > 0 && !isSplitView && (
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            totalItems={totalItems}
+                            pageSize={pageSize}
+                            onPageChange={handlePageChange}
+                            onPageSizeChange={handlePageSizeChange}
+                            t={t}
+                        />
+                    )}
+                </div>
+
+                {/* Split View Preview Panel */}
+                {isSplitView && (
+                    <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-lg flex flex-col">
+                        {selectedAnalysis ? (
+                            <>
+                                {/* Preview Header */}
+                                <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                                    <div className="flex items-center gap-3">
+                                        <TypeBadge type={selectedAnalysis.type} subtype={selectedAnalysis.parameters?.analysis_subtype} t={t} />
+                                        <StatusBadge status={selectedAnalysis.status} t={t} />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {selectedAnalysis.status === 'completed' && selectedAnalysis.parameters && (
+                                            <button
+                                                onClick={() => handleReproduce(selectedAnalysis)}
+                                                className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                                title={t('analysisDashboard.reproduce')}
+                                            >
+                                                <FiRepeat size={16} />
+                                            </button>
+                                        )}
+                                        <button onClick={() => setSelectedAnalysis(null)} className="text-gray-400 hover:text-red-500">
+                                            <FiX size={20} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Preview Content */}
+                                <div className="flex-1 overflow-y-auto p-6">
+                                    {/* Info */}
+                                    <div className="mb-6">
+                                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                                            <FiCalendar size={14} />
+                                            {t('analysisDashboard.generalInfo')}
+                                        </h4>
+                                        <div className="grid grid-cols-2 gap-3 text-sm">
+                                            <div>
+                                                <span className="text-gray-500 dark:text-gray-400">{t('analysisDashboard.created')}</span>
+                                                <p className="text-gray-900 dark:text-white">{new Date(selectedAnalysis.created_at).toLocaleString(locale)}</p>
+                                            </div>
+                                            <div>
+                                                <span className="text-gray-500 dark:text-gray-400">{t('analysisDashboard.updated')}</span>
+                                                <p className="text-gray-900 dark:text-white">{new Date(selectedAnalysis.updated_at).toLocaleString(locale)}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Parameters */}
+                                    {selectedAnalysis.parameters && Object.keys(selectedAnalysis.parameters).length > 0 && (
+                                        <div className="mb-6">
+                                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                                                <FiSliders size={14} />
+                                                {t('analysisDashboard.parameters')}
+                                            </h4>
+                                            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 space-y-2">
+                                                {Object.entries(selectedAnalysis.parameters).map(([key, value]) => (
+                                                    <div key={key} className="flex justify-between text-sm">
+                                                        <span className="text-gray-500 dark:text-gray-400">{key}</span>
+                                                        <span className="text-gray-900 dark:text-white font-medium">
+                                                            {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Result Images */}
+                                    {selectedAnalysis.status === 'completed' && selectedAnalysis.results && (
+                                        <div className="mb-6">
+                                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                                                <FiImage size={14} />
+                                                {t('analysisDashboard.results') || 'Results'}
+                                            </h4>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {['pred_map', 'conf_map', 'matches_image', 'clusters_image', 'result_image'].map(key => {
+                                                    if (!selectedAnalysis.results[key]) return null;
+                                                    const resultLabels = {
+                                                        pred_map: t('manipulationDetection.predictionMap') || 'Prediction Map',
+                                                        conf_map: t('manipulationDetection.confidenceMap') || 'Confidence Map',
+                                                        matches_image: t('copyMove.results.matches') || 'Matches',
+                                                        clusters_image: t('copyMove.results.clusters') || 'Clusters',
+                                                        result_image: t('analysisDashboard.resultImage') || 'Result'
+                                                    };
+                                                    return (
+                                                        <div key={key} className="group relative">
+                                                            <button
+                                                                onClick={() => handleDownloadResult(selectedAnalysis._id, key)}
+                                                                className="w-full aspect-video bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-indigo-500 transition-colors"
+                                                                title={`${t('common.download')} ${resultLabels[key]}`}
+                                                            >
+                                                                <div className="w-full h-full flex items-center justify-center text-gray-400 group-hover:text-indigo-500">
+                                                                    <FiDownload size={24} />
+                                                                </div>
+                                                            </button>
+                                                            <span className="block text-xs text-gray-500 dark:text-gray-400 text-center mt-1">
+                                                                {resultLabels[key]}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Error */}
+                                    {selectedAnalysis.status === 'failed' && selectedAnalysis.error && (
+                                        <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 border border-red-200 dark:border-red-900/30">
+                                            <h4 className="text-sm font-semibold text-red-700 dark:text-red-400 mb-2 flex items-center gap-2">
+                                                <FiAlertCircle size={14} />
+                                                {t('analysisDashboard.error')}
+                                            </h4>
+                                            <p className="text-sm text-red-600 dark:text-red-400">{selectedAnalysis.error}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                                <FiColumns size={48} className="mb-4 opacity-50" />
+                                <p>{t('analysisDashboard.selectAnalysis') || 'Select an analysis to preview'}</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Detail Modal (only show when not in split view) */}
+            {!isSplitView && (
+                <AnalysisDetailModal
+                    analysis={selectedAnalysis}
+                    onClose={handleCloseDetails}
+                    onDownloadResult={handleDownloadResult}
+                    t={t}
+                    locale={locale}
+                />
+            )}
         </div>
     );
 };
