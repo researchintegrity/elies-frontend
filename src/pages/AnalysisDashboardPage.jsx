@@ -361,8 +361,8 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, t, locale, batchMod
                     >
                         <div
                             className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors shadow-sm ${isSelected
-                                    ? 'bg-indigo-600 border-indigo-600 text-white'
-                                    : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 hover:border-indigo-500'
+                                ? 'bg-indigo-600 border-indigo-600 text-white'
+                                : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 hover:border-indigo-500'
                                 }`}
                         >
                             {isSelected && <FiCheck size={14} strokeWidth={3} />}
@@ -534,8 +534,8 @@ const AnalysisCard = ({ analysis, onViewDetails, onReproduce, isActive, t, local
                     >
                         <div
                             className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors shadow-sm ${isSelected
-                                    ? 'bg-indigo-600 border-indigo-600 text-white'
-                                    : 'bg-white/80 dark:bg-black/50 border-white/50 dark:border-gray-400 hover:border-indigo-500'
+                                ? 'bg-indigo-600 border-indigo-600 text-white'
+                                : 'bg-white/80 dark:bg-black/50 border-white/50 dark:border-gray-400 hover:border-indigo-500'
                                 }`}
                         >
                             {isSelected && <FiCheck size={14} strokeWidth={3} />}
@@ -586,8 +586,8 @@ const AnalysisListRowCompact = ({ analysis, isActive, onClick, t, locale, batchM
                 >
                     <div
                         className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors shadow-sm ${isSelected
-                                ? 'bg-indigo-600 border-indigo-600 text-white'
-                                : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 hover:border-indigo-500'
+                            ? 'bg-indigo-600 border-indigo-600 text-white'
+                            : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 hover:border-indigo-500'
                             }`}
                     >
                         {isSelected && <FiCheck size={12} strokeWidth={3} />}
@@ -1073,24 +1073,29 @@ const AnalysisDashboardPage = () => {
     }, []);
 
     const handleReproduce = useCallback((analysis) => {
-        // Navigate to the appropriate tool page with parameters
-        const typeToRoute = {
-            'trufor': '/manipulation-detection',
-            'single_image_copy_move': '/copy-move',
-            'cross_image_copy_move': '/copy-move',
-            'provenance': '/provenance',
-            'cbir_search': '/cbir-search'
+        // Map analysis types to page keys (matches PAGES in AppLayout)
+        const typeToPageKey = {
+            'trufor': 'manipulationDetection',
+            'single_image_copy_move': 'copyMove',
+            'cross_image_copy_move': 'copyMove',
+            'provenance': 'provenance',
+            'cbir_search': 'cbirSearch',
+            'external': 'imageAnalysis'
         };
 
-        const route = typeToRoute[analysis.type];
-        if (route && analysis.source_image_id) {
-            // Store parameters in sessionStorage for the target page to pick up
-            sessionStorage.setItem('reproduceAnalysis', JSON.stringify({
+        const pageKey = typeToPageKey[analysis.type];
+        if (pageKey && analysis.source_image_id) {
+            // Store parameters and target page in sessionStorage
+            const reproduceData = {
                 imageId: analysis.source_image_id,
+                targetImageId: analysis.target_image_id || null,
                 parameters: analysis.parameters,
-                type: analysis.type
-            }));
-            window.location.href = route;
+                type: analysis.type,
+                targetPage: pageKey
+            };
+            sessionStorage.setItem('reproduceAnalysis', JSON.stringify(reproduceData));
+            // Navigate by refreshing - AppLayout will read from sessionStorage
+            window.location.reload();
             showToast(t('analysisDashboard.navigatingToTool'), 'success');
         } else {
             // Fallback: copy parameters to clipboard

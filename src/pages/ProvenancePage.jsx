@@ -21,6 +21,7 @@ import {
     FiSearch,
     FiArrowRight,
     FiArrowLeft,
+    FiImage,
 } from 'react-icons/fi';
 import { api } from '../services/api';
 import { showAlert, showToast } from '../utils/alert';
@@ -318,6 +319,7 @@ const ProvenancePage = () => {
     const [analysisId, setAnalysisId] = useState(null);
     const [analysisStatus, setAnalysisStatus] = useState(null);
     const [analysisResults, setAnalysisResults] = useState(null);
+    const [loadingReproduce, setLoadingReproduce] = useState(false);
 
     // Service Health
     const [serviceHealthy, setServiceHealthy] = useState(null);
@@ -394,6 +396,108 @@ const ProvenancePage = () => {
         };
         fetchCategories();
     }, []);
+
+    // Handle reproduce analysis from Analysis Dashboard
+    useEffect(() => {
+        const reproduceData = sessionStorage.getItem('reproduceAnalysis');
+        if (!reproduceData) return;
+
+        const loadReproduceData = async () => {
+            setLoadingReproduce(true); // Show loading indicator
+            try {
+                const { imageId, parameters, type } = JSON.parse(reproduceData);
+                sessionStorage.removeItem('reproduceAnalysis'); // Clear after reading
+
+                // Only handle provenance type
+                if (type !== 'provenance') {
+                    setLoadingReproduce(false);
+                    return;
+                }
+
+                // Load source image info
+                if (imageId) {
+                    try {
+                        const img = await api.get(`/images/${imageId}`);
+                        setSelectedImage({
+                            id: img._id,
+                            imageId: img._id,
+                            filename: img.filename,
+                            imageType: img.image_type || []
+                        });
+                    } catch (err) {
+                        console.error('Failed to load source image:', err);
+                        showAlert(
+                            t('common.warning'),
+                            t('provenance.sourceImageDeleted') || 'Source image no longer exists',
+                            'warning'
+                        );
+                        return; // Can't proceed without source image
+                    }
+                }
+
+                // Apply parameters
+                if (parameters) {
+                    if (parameters.k !== undefined) setTopK(parameters.k);
+                    if (parameters.q !== undefined) setTopQ(parameters.q);
+                    if (parameters.max_depth !== undefined) setMaxDepth(parameters.max_depth);
+                    if (parameters.descriptor_type) setDescriptorType(parameters.descriptor_type);
+
+                    // Handle search_image_ids - validate they still exist
+                    if (parameters.search_image_ids && parameters.search_image_ids.length > 0) {
+                        const validImageIds = [];
+                        let deletedCount = 0;
+
+                        // Check each image exists
+                        for (const imgId of parameters.search_image_ids) {
+                            try {
+                                await api.get(`/images/${imgId}`);
+                                validImageIds.push(imgId);
+                            } catch (err) {
+                                deletedCount++;
+                                console.warn(`Image ${imgId} no longer exists`);
+                            }
+                        }
+
+                        if (validImageIds.length > 0) {
+                            setFilterMode('manual');
+                            setManuallySelectedIds(validImageIds);
+                        }
+
+                        // Navigate to configure step after a short delay, then show warning
+                        setTimeout(() => {
+                            setCurrentStep(STEPS.CONFIGURE);
+                            showToast(t('analysisDashboard.parametersLoaded'), 'success');
+
+                            // Show warning about deleted images after the success toast
+                            if (deletedCount > 0) {
+                                setTimeout(() => {
+                                    showAlert(
+                                        t('common.warning'),
+                                        `${deletedCount} ${t('provenance.imagesDeleted') || 'image(s) from original analysis no longer exist'}`,
+                                        'warning'
+                                    );
+                                }, 300);
+                            }
+                            setLoadingReproduce(false);
+                        }, 500);
+                        return; // Already handled navigation
+                    }
+                }
+
+                // Navigate to configure step after a short delay (no search_image_ids case)
+                setTimeout(() => {
+                    setCurrentStep(STEPS.CONFIGURE);
+                    showToast(t('analysisDashboard.parametersLoaded'), 'success');
+                    setLoadingReproduce(false);
+                }, 500);
+            } catch (err) {
+                console.error('Failed to parse reproduce data:', err);
+                setLoadingReproduce(false);
+            }
+        };
+
+        loadReproduceData();
+    }, [t]);
 
     // Fetch images with filters
     useEffect(() => {
@@ -774,7 +878,23 @@ const ProvenancePage = () => {
     const totalPairsPages = Math.ceil(totalPairs / PAIRS_PER_PAGE);
 
     return (
-        <div className="flex flex-col h-full bg-bg-main dark:bg-bg-main overflow-hidden">
+        <div className="flex flex-col h-full bg-bg-main dark:bg-bg-main overflow-hidden relative">
+            {/* Loading overlay for reproduce */}
+            {loadingReproduce && (
+                <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
+                    <div className="flex flex-col items-center gap-4 p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
+                        <div className="relative">
+                            <div className="w-16 h-16 rounded-full border-4 border-emerald-100 dark:border-emerald-900/30" />
+                            <div className="absolute inset-0 w-16 h-16 rounded-full border-4 border-transparent border-t-emerald-500 animate-spin" />
+                        </div>
+                        <div className="text-center">
+                            <p className="font-semibold text-gray-900 dark:text-white">{t('provenance.loadingParameters') || 'Loading parameters...'}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('provenance.validatingImages') || 'Validating images from previous analysis'}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <header className="flex-none px-4 sm:px-6 lg:px-8 py-4 border-b border-gray-200 dark:border-gray-800 bg-bg-main dark:bg-bg-main z-30">
                 <div className="flex justify-between items-center gap-4 mb-4">

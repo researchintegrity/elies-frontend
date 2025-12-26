@@ -44,7 +44,23 @@ const PAGES = {
 };
 
 function AppLayout() {
-  const [activePage, setActivePage] = useState(PAGES.VIEW_IMAGES);
+  // Check sessionStorage for reproduce navigation
+  const getInitialPage = () => {
+    const reproduceData = sessionStorage.getItem('reproduceAnalysis');
+    if (reproduceData) {
+      try {
+        const { targetPage } = JSON.parse(reproduceData);
+        if (targetPage) {
+          return targetPage;
+        }
+      } catch (err) {
+        console.error('Failed to parse reproduce data:', err);
+      }
+    }
+    return PAGES.VIEW_IMAGES;
+  };
+
+  const [activePage, setActivePage] = useState(getInitialPage);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { t } = useLanguage();
 

@@ -443,6 +443,7 @@ const CopyMovePage = () => {
     const [analysisStatus, setAnalysisStatus] = useState(null);
     const [analysisResults, setAnalysisResults] = useState(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [loadingReproduce, setLoadingReproduce] = useState(false);
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -487,6 +488,95 @@ const CopyMovePage = () => {
         };
         fetchCategories();
     }, []);
+
+    // Handle reproduce analysis from Analysis Dashboard
+    useEffect(() => {
+        const reproduceData = sessionStorage.getItem('reproduceAnalysis');
+        if (!reproduceData) return;
+
+        const loadReproduceData = async () => {
+            setLoadingReproduce(true);
+            try {
+                const { imageId, targetImageId, parameters, type } = JSON.parse(reproduceData);
+                sessionStorage.removeItem('reproduceAnalysis'); // Clear after reading
+
+                // Only handle copy-move types
+                if (!['single_image_copy_move', 'cross_image_copy_move'].includes(type)) {
+                    setLoadingReproduce(false);
+                    return;
+                }
+
+                // Set mode based on analysis type
+                const isCrossMode = type === 'cross_image_copy_move';
+                setMode(isCrossMode ? 'cross' : 'single');
+
+                // Load source image info
+                if (imageId) {
+                    try {
+                        const img = await api.get(`/images/${imageId}`);
+                        setSourceImage({ id: img._id, filename: img.filename });
+                    } catch (err) {
+                        console.error('Failed to load source image:', err);
+                        showAlert(
+                            t('common.warning'),
+                            t('copyMove.sourceImageDeleted') || 'Source image no longer exists',
+                            'warning'
+                        );
+                        setLoadingReproduce(false);
+                        return;
+                    }
+                }
+
+                // Load target image info for cross-image mode
+                let targetDeleted = false;
+                if (isCrossMode && targetImageId) {
+                    try {
+                        const img = await api.get(`/images/${targetImageId}`);
+                        setTargetImage({ id: img._id, filename: img.filename });
+                    } catch (err) {
+                        console.error('Failed to load target image:', err);
+                        targetDeleted = true;
+                    }
+                }
+
+                // Apply parameters
+                if (parameters) {
+                    if (parameters.method) {
+                        setMethodType(parameters.method);
+                    }
+                    if (parameters.dense_method !== null && parameters.dense_method !== undefined) {
+                        setDenseMethod(parameters.dense_method);
+                    }
+                    if (parameters.descriptor) {
+                        setDescriptor(parameters.descriptor);
+                    }
+                }
+
+                // Navigate to configure step after a short delay to allow state updates
+                setTimeout(() => {
+                    setCurrentStep(STEPS.CONFIGURE);
+                    showToast(t('analysisDashboard.parametersLoaded'), 'success');
+
+                    // Show warning about deleted target image after the success toast
+                    if (targetDeleted) {
+                        setTimeout(() => {
+                            showAlert(
+                                t('common.warning'),
+                                t('copyMove.targetImageDeleted') || 'Target image no longer exists',
+                                'warning'
+                            );
+                        }, 300);
+                    }
+                    setLoadingReproduce(false);
+                }, 500);
+            } catch (err) {
+                console.error('Failed to parse reproduce data:', err);
+                setLoadingReproduce(false);
+            }
+        };
+
+        loadReproduceData();
+    }, [t]);
 
     // Fetch images with filters when on select step
     useEffect(() => {
@@ -968,7 +1058,23 @@ const CopyMovePage = () => {
     };
 
     return (
-        <div className="w-full h-full flex flex-col">
+        <div className="w-full h-full flex flex-col relative">
+            {/* Loading overlay for reproduce */}
+            {loadingReproduce && (
+                <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
+                    <div className="flex flex-col items-center gap-4 p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
+                        <div className="relative">
+                            <div className="w-16 h-16 rounded-full border-4 border-indigo-100 dark:border-indigo-900/30" />
+                            <div className="absolute inset-0 w-16 h-16 rounded-full border-4 border-transparent border-t-indigo-500 animate-spin" />
+                        </div>
+                        <div className="text-center">
+                            <p className="font-semibold text-gray-900 dark:text-white">{t('copyMove.loadingParameters') || 'Loading parameters...'}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('copyMove.validatingImages') || 'Validating images from previous analysis'}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex-shrink-0 mb-4">
                 <div className="flex items-center justify-between">

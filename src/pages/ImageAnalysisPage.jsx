@@ -39,7 +39,7 @@ import {
     FiPenTool
 } from 'react-icons/fi';
 import { api } from '../services/api';
-import { showToast } from '../utils/alert';
+import { showToast, showAlert } from '../utils/alert';
 import { useLanguage } from '../context/LanguageContext';
 import AnnotationOverlay from '../components/AnnotationOverlay';
 import { AnnotationModal } from '../components/annotation';
@@ -275,6 +275,7 @@ const ImageAnalysisPage = () => {
 
     // Save Analysis State
     const [savingAnalysis, setSavingAnalysis] = useState(false);
+    const [loadingReproduce, setLoadingReproduce] = useState(false);
 
     // Helpers
     const getGroupColor = (type, id) => {
@@ -321,6 +322,116 @@ const ImageAnalysisPage = () => {
         };
         fetchCategories();
     }, []);
+
+    // Handle reproduce analysis from Analysis Dashboard
+    useEffect(() => {
+        const reproduceData = sessionStorage.getItem('reproduceAnalysis');
+        if (!reproduceData) return;
+
+        const loadReproduceData = async () => {
+            setLoadingReproduce(true);
+            try {
+                const { imageId, parameters, type } = JSON.parse(reproduceData);
+                sessionStorage.removeItem('reproduceAnalysis'); // Clear after reading
+
+                // Only handle external analysis type
+                if (type !== 'external') {
+                    setLoadingReproduce(false);
+                    return;
+                }
+
+                // Load source image info
+                if (imageId) {
+                    try {
+                        const img = await api.get(`/images/${imageId}`);
+                        const transformedImage = {
+                            id: img._id,
+                            filename: img.filename,
+                            fileSize: img.file_size,
+                            sourceType: img.source_type,
+                            mimeType: img.mime_type || 'image/jpeg',
+                            exifMetadata: img.exifMetadata || img.exif_metadata || null
+                        };
+                        setSelectedImage(transformedImage);
+
+                        // Load the image URL
+                        const blob = await api.download(`/images/${img._id}/download`);
+                        const url = URL.createObjectURL(blob);
+                        setImageUrls(prev => ({ ...prev, [img._id]: url }));
+                    } catch (err) {
+                        console.error('Failed to load source image:', err);
+                        showAlert(
+                            t('common.warning'),
+                            t('analysis.sourceImageDeleted') || 'Source image no longer exists',
+                            'warning'
+                        );
+                        setLoadingReproduce(false);
+                        return;
+                    }
+                }
+
+                // Apply parameters (analysis subtype is the tool used)
+                if (parameters) {
+                    const toolType = parameters.analysis_subtype;
+                    if (toolType && ANALYSIS_TOOLS[toolType]) {
+                        setSelectedTool(toolType);
+
+                        // Restore tool-specific parameters
+                        const newParams = {};
+                        switch (toolType) {
+                            case 'ela':
+                                if (parameters.quality !== undefined) newParams.elaQuality = parameters.quality;
+                                if (parameters.scale !== undefined) newParams.elaScale = parameters.scale;
+                                if (parameters.opacity !== undefined) newParams.elaOpacity = parameters.opacity;
+                                break;
+                            case 'noise':
+                                if (parameters.amplitude !== undefined) newParams.noiseAmplitude = parameters.amplitude;
+                                if (parameters.equalize !== undefined) newParams.noiseEqualize = parameters.equalize;
+                                if (parameters.opacity !== undefined) newParams.noiseOpacity = parameters.opacity;
+                                break;
+                            case 'gradient':
+                                if (parameters.intensity !== undefined) newParams.gradientIntensity = parameters.intensity;
+                                if (parameters.opacity !== undefined) newParams.gradientOpacity = parameters.opacity;
+                                if (parameters.normalize !== undefined) newParams.gradientNormalize = parameters.normalize;
+                                if (parameters.equalize !== undefined) newParams.gradientEqualize = parameters.equalize;
+                                break;
+                            case 'levelSweep':
+                                if (parameters.position !== undefined) newParams.sweepPosition = parameters.position;
+                                if (parameters.width !== undefined) newParams.sweepWidth = parameters.width;
+                                if (parameters.opacity !== undefined) newParams.sweepOpacity = parameters.opacity;
+                                break;
+                            case 'cloneDetection':
+                                if (parameters.minSimilarity !== undefined) newParams.cloneMinSimilarity = parameters.minSimilarity;
+                                if (parameters.minDetail !== undefined) newParams.cloneMinDetail = parameters.minDetail;
+                                if (parameters.minClusterSize !== undefined) newParams.cloneMinClusterSize = parameters.minClusterSize;
+                                if (parameters.blockSize !== undefined) newParams.cloneBlockSize = parameters.blockSize;
+                                if (parameters.maxImageSize !== undefined) newParams.cloneMaxImageSize = parameters.maxImageSize;
+                                if (parameters.showQuantized !== undefined) newParams.cloneShowQuantized = parameters.showQuantized;
+                                break;
+                            default:
+                                break;
+                        }
+
+                        // Apply the restored parameters
+                        if (Object.keys(newParams).length > 0) {
+                            setParams(prev => ({ ...prev, ...newParams }));
+                        }
+                    }
+                }
+
+                // Navigate complete
+                setTimeout(() => {
+                    showToast(t('analysisDashboard.parametersLoaded'), 'success');
+                    setLoadingReproduce(false);
+                }, 500);
+            } catch (err) {
+                console.error('Failed to parse reproduce data:', err);
+                setLoadingReproduce(false);
+            }
+        };
+
+        loadReproduceData();
+    }, [t]);
 
     // Handle wheel zoom with non-passive listener to prevent scroll
     useEffect(() => {
@@ -1064,7 +1175,7 @@ const ImageAnalysisPage = () => {
             // Get the current tool's parameters
             const toolParams = {};
             const tool = ANALYSIS_TOOLS[selectedTool];
-            
+
             switch (selectedTool) {
                 case 'ela':
                     toolParams.quality = params.elaQuality;
@@ -1119,7 +1230,23 @@ const ImageAnalysisPage = () => {
     };
 
     return (
-        <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 overflow-hidden">
+        <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 overflow-hidden relative">
+            {/* Loading overlay for reproduce */}
+            {loadingReproduce && (
+                <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
+                    <div className="flex flex-col items-center gap-4 p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
+                        <div className="relative">
+                            <div className="w-16 h-16 rounded-full border-4 border-indigo-100 dark:border-indigo-900/30" />
+                            <div className="absolute inset-0 w-16 h-16 rounded-full border-4 border-transparent border-t-indigo-500 animate-spin" />
+                        </div>
+                        <div className="text-center">
+                            <p className="font-semibold text-gray-900 dark:text-white">{t('analysis.loadingParameters') || 'Loading parameters...'}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('analysis.validatingImage') || 'Validating image from previous analysis'}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Top Bar: Tools */}
             <header className="flex-none px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                 <div className="flex items-center justify-between gap-4">
