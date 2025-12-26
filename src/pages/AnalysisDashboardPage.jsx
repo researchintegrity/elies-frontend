@@ -9,6 +9,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import ProvenanceGraph from '../components/ProvenanceGraph';
 import {
     FiActivity,
     FiFilter,
@@ -23,6 +24,7 @@ import {
     FiLoader,
     FiAlertCircle,
     FiImage,
+    FiSliders,
     FiCopy,
     FiShield,
     FiShare2,
@@ -34,7 +36,7 @@ import {
     FiExternalLink,
     FiChevronDown,
     FiTag,
-    FiSliders,
+
     FiZap,
     FiSun,
     FiLayers,
@@ -194,30 +196,101 @@ const StatusBadge = ({ status, t }) => {
 };
 
 // Parameters Display (expandable)
-const ParametersDisplay = ({ parameters, t }) => {
-    const [expanded, setExpanded] = useState(false);
+const ParametersDisplay = ({ parameters, sourceImageId, targetImageId, t, defaultExpanded = false }) => {
+    const [expanded, setExpanded] = useState(defaultExpanded);
+    const [names, setNames] = useState({});
+
+    useEffect(() => {
+        let isMounted = true;
+        const fetchNames = async () => {
+            const idsToFetch = new Set();
+            if (sourceImageId) idsToFetch.add(sourceImageId);
+            if (targetImageId) idsToFetch.add(targetImageId);
+            if (parameters?.target_image_id) idsToFetch.add(parameters.target_image_id); // Fallback if in params
+            // Handle search_image_ids (could be string or array)
+            if (parameters?.search_image_ids) {
+                const ids = Array.isArray(parameters.search_image_ids)
+                    ? parameters.search_image_ids
+                    : String(parameters.search_image_ids).split(',').map(s => s.trim());
+                ids.forEach(id => idsToFetch.add(id));
+            }
+
+            if (idsToFetch.size === 0) return;
+
+            const newNames = {};
+            await Promise.all(Array.from(idsToFetch).map(async (id) => {
+                if (!id) return;
+                try {
+                    const img = await api.get(`/images/${id}`);
+                    if (isMounted) newNames[id] = img.filename || img.original_filename || id;
+                } catch (e) {
+                    // keep ID if fetch fails
+                }
+            }));
+
+            if (isMounted) setNames(prev => ({ ...prev, ...newNames }));
+        };
+        fetchNames();
+        return () => { isMounted = false; };
+    }, [parameters, sourceImageId, targetImageId]);
 
     if (!parameters || Object.keys(parameters).length === 0) {
         return <span className="text-gray-400 text-xs">{t('analysisDashboard.noParameters')}</span>;
     }
 
-    const entries = Object.entries(parameters).filter(([key]) => key !== 'analysis_subtype');
-    const displayEntries = expanded ? entries : entries.slice(0, 2);
+    // Build display list
+    const regularEntries = Object.entries(parameters).filter(([key]) =>
+        key !== 'analysis_subtype' && key !== 'target_image_id' && key !== 'search_image_ids'
+    );
+
+    // Prepend Source/Target info
+    const displayItems = [];
+    if (sourceImageId) {
+        displayItems.push({ key: 'Source Image', value: names[sourceImageId] || sourceImageId });
+    }
+
+    // Check both prop and parameters for target ID
+    const effectiveTargetId = targetImageId || parameters.target_image_id;
+    if (effectiveTargetId) {
+        displayItems.push({ key: 'Target Image', value: names[effectiveTargetId] || effectiveTargetId });
+    }
+
+    if (parameters.search_image_ids) {
+        // If multiple, join names (limit to first 3)
+        const ids = Array.isArray(parameters.search_image_ids)
+            ? parameters.search_image_ids
+            : String(parameters.search_image_ids).split(',');
+
+        const displayIds = ids.slice(0, 3);
+        const hasMore = ids.length > 3;
+
+        const nameList = displayIds.map(id => names[id.trim()] || id.trim()).join(', ');
+        displayItems.push({
+            key: 'Target Images',
+            value: nameList + (hasMore ? ` (+${ids.length - 3} more)` : '')
+        });
+    }
+
+    // Add regular params
+    regularEntries.forEach(([key, val]) => displayItems.push({ key, value: val }));
+
+    const limit = defaultExpanded ? displayItems.length : 2;
+    const finalDisplay = expanded ? displayItems : displayItems.slice(0, limit);
 
     return (
         <div className="space-y-1">
-            {displayEntries.map(([key, value]) => (
-                <div key={key} className="flex items-center gap-2 text-xs">
-                    <span className="text-gray-500 dark:text-gray-400">{key}:</span>
-                    <span className="text-gray-900 dark:text-gray-200 font-medium">
-                        {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
+            {finalDisplay.map((item, idx) => (
+                <div key={item.key + idx} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs">
+                    <span className="text-gray-500 dark:text-gray-400 font-medium">{item.key}:</span>
+                    <span className="text-gray-900 dark:text-gray-200 font-mono break-all text-right">
+                        {typeof item.value === 'boolean' ? (item.value ? 'Yes' : 'No') : String(item.value)}
                     </span>
                 </div>
             ))}
-            {entries.length > 2 && (
+            {!defaultExpanded && displayItems.length > 2 && (
                 <button
-                    onClick={() => setExpanded(!expanded)}
-                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                    onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 mt-1"
                 >
                     {expanded ? t('analysisDashboard.showLess') : t('analysisDashboard.showMore')}
                     <FiChevronDown className={`transition-transform ${expanded ? 'rotate-180' : ''}`} size={12} />
@@ -246,6 +319,7 @@ const FilterPanel = ({ filters, onFilterChange, onReset, t }) => {
                     {t('analysisDashboard.clearFilters')}
                 </button>
             </div>
+
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Type Filter */}
@@ -312,7 +386,7 @@ const FilterPanel = ({ filters, onFilterChange, onReset, t }) => {
                     />
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 
@@ -370,12 +444,8 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, onViewResults, onFi
                         </div>
                     </div>
                 )}
-                {/* Thumbnail - Clickable to filter by source image */}
-                <div
-                    className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 bg-gray-100 dark:bg-gray-900 overflow-hidden cursor-pointer hover:ring-2 hover:ring-indigo-500 transition-all"
-                    onClick={() => onFilterByImage && onFilterByImage(analysis.source_image_id)}
-                    title={t('analysisDashboard.filterByImage') || 'Click to filter by this image'}
-                >
+                {/* Thumbnail */}
+                <div className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 bg-gray-100 dark:bg-gray-900 overflow-hidden">
                     {loadingImage ? (
                         <div className="w-full h-full animate-pulse bg-gray-200 dark:bg-gray-700" />
                     ) : imageUrl ? (
@@ -418,6 +488,15 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, onViewResults, onFi
                             >
                                 <FiEye size={16} />
                             </button>
+                            {analysis.source_image_id && (
+                                <button
+                                    onClick={() => onFilterByImage && onFilterByImage(analysis.source_image_id)}
+                                    className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+                                    title={t('analysisDashboard.filterByImage')}
+                                >
+                                    <FiFilter size={16} />
+                                </button>
+                            )}
                             {analysis.status === 'completed' && analysis.parameters && (
                                 <button
                                     onClick={() => onReproduce(analysis)}
@@ -442,7 +521,12 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, onViewResults, onFi
                     {/* Parameters Preview */}
                     {analysis.parameters && Object.keys(analysis.parameters).length > 0 && (
                         <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
-                            <ParametersDisplay parameters={analysis.parameters} t={t} />
+                            <ParametersDisplay
+                                parameters={analysis.parameters}
+                                sourceImageId={analysis.source_image_id}
+                                targetImageId={analysis.target_image_id}
+                                t={t}
+                            />
                         </div>
                     )}
                 </div>
@@ -462,7 +546,7 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, onViewResults, onFi
 };
 
 // Analysis Card for Grid View
-const AnalysisCard = ({ analysis, onViewDetails, onReproduce, isActive, t, locale, batchMode, isSelected, onToggleSelect }) => {
+const AnalysisCard = ({ analysis, onViewDetails, onReproduce, onViewResults, isActive, onFilterByImage, t, locale, batchMode, isSelected, onToggleSelect }) => {
     const [imageUrl, setImageUrl] = useState(null);
     const [loadingImage, setLoadingImage] = useState(true);
 
@@ -524,6 +608,15 @@ const AnalysisCard = ({ analysis, onViewDetails, onReproduce, isActive, t, local
                     >
                         <FiEye className="text-xl" />
                     </button>
+                    {analysis.source_image_id && (
+                        <button
+                            className="p-3 rounded-full bg-white/20 hover:bg-indigo-600 text-white backdrop-blur-md transition-all hover:scale-110 shadow-lg border border-white/10"
+                            onClick={(e) => { e.stopPropagation(); onFilterByImage && onFilterByImage(analysis.source_image_id); }}
+                            title={t('analysisDashboard.filterByImage')}
+                        >
+                            <FiFilter className="text-xl" />
+                        </button>
+                    )}
                     {analysis.status === 'completed' && analysis.parameters && (
                         <button
                             className="p-3 rounded-full bg-white/20 hover:bg-green-600 text-white backdrop-blur-md transition-all hover:scale-110 shadow-lg border border-white/10"
@@ -533,30 +626,39 @@ const AnalysisCard = ({ analysis, onViewDetails, onReproduce, isActive, t, local
                             <FiRepeat className="text-xl" />
                         </button>
                     )}
-                </div>
-
-                {/* Status badge overlay */}
-                <div className="absolute top-2 right-2">
-                    <StatusBadge status={analysis.status} t={t} />
-                </div>
-
-                {/* Checkbox for batch mode */}
-                {batchMode && (
-                    <div
-                        className="absolute top-2 left-2 z-10 cursor-pointer"
-                        onClick={(e) => { e.stopPropagation(); onToggleSelect(analysis._id); }}
-                    >
-                        <div
-                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors shadow-sm ${isSelected
-                                ? 'bg-indigo-600 border-indigo-600 text-white'
-                                : 'bg-white/80 dark:bg-black/50 border-white/50 dark:border-gray-400 hover:border-indigo-500'
-                                }`}
+                    {analysis.status === 'completed' && (
+                        <button
+                            className="p-3 rounded-full bg-white/20 hover:bg-blue-600 text-white backdrop-blur-md transition-all hover:scale-110 shadow-lg border border-white/10"
+                            onClick={(e) => { e.stopPropagation(); onViewResults(analysis); }}
+                            title={t('analysisDashboard.viewResults') || 'View Results'}
                         >
-                            {isSelected && <FiCheck size={14} strokeWidth={3} />}
-                        </div>
-                    </div>
-                )}
+                            <FiPlay className="text-xl" />
+                        </button>
+                    )}
+                </div>
             </div>
+
+            {/* Status badge overlay */}
+            <div className="absolute top-2 right-2">
+                <StatusBadge status={analysis.status} t={t} />
+            </div>
+
+            {/* Checkbox for batch mode */}
+            {batchMode && (
+                <div
+                    className="absolute top-2 left-2 z-10 cursor-pointer"
+                    onClick={(e) => { e.stopPropagation(); onToggleSelect(analysis._id); }}
+                >
+                    <div
+                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors shadow-sm ${isSelected
+                            ? 'bg-indigo-600 border-indigo-600 text-white'
+                            : 'bg-white/80 dark:bg-black/50 border-white/50 dark:border-gray-400 hover:border-indigo-500'
+                            }`}
+                    >
+                        {isSelected && <FiCheck size={14} strokeWidth={3} />}
+                    </div>
+                </div>
+            )}
 
             {/* Content */}
             <div className="p-4 flex-1 flex flex-col gap-2">
@@ -574,7 +676,7 @@ const AnalysisCard = ({ analysis, onViewDetails, onReproduce, isActive, t, local
                     </p>
                 )}
             </div>
-        </div>
+        </div >
     );
 };
 
@@ -584,9 +686,37 @@ const AnalysisListRowCompact = ({ analysis, isActive, onClick, t, locale, batchM
     const TypeIcon = typeConfig.icon;
     const createdDate = new Date(analysis.created_at);
 
+    const [imageUrl, setImageUrl] = useState(null);
+    const [loadingImage, setLoadingImage] = useState(true);
+
+    useEffect(() => {
+        let isMounted = true;
+        const loadImage = async () => {
+            if (!analysis.source_image_id) {
+                setLoadingImage(false);
+                return;
+            }
+            try {
+                const blob = await api.download(`/images/${analysis.source_image_id}/download`);
+                if (isMounted) {
+                    setImageUrl(URL.createObjectURL(blob));
+                }
+            } catch (err) {
+                console.error('Failed to load thumbnail:', err);
+            } finally {
+                if (isMounted) setLoadingImage(false);
+            }
+        };
+        loadImage();
+        return () => {
+            isMounted = false;
+            if (imageUrl) URL.revokeObjectURL(imageUrl);
+        };
+    }, [analysis.source_image_id]);
+
     return (
         <div
-            className={`group flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 transition-all cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 ${isActive
+            className={`group flex items-start gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 transition-all cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 ${isActive
                 ? 'bg-indigo-50 dark:bg-indigo-900/20 border-l-4 border-l-indigo-500 pl-[calc(1rem-4px)]'
                 : 'border-l-4 border-l-transparent'
                 }`}
@@ -595,7 +725,7 @@ const AnalysisListRowCompact = ({ analysis, isActive, onClick, t, locale, batchM
             {/* Checkbox for batch mode */}
             {batchMode && (
                 <div
-                    className="cursor-pointer flex-shrink-0"
+                    className="cursor-pointer flex-shrink-0 mt-1"
                     onClick={(e) => { e.stopPropagation(); onToggleSelect(analysis._id); }}
                 >
                     <div
@@ -608,17 +738,345 @@ const AnalysisListRowCompact = ({ analysis, isActive, onClick, t, locale, batchM
                     </div>
                 </div>
             )}
-            <div className={`text-gray-400 group-hover:text-indigo-500 ${COLOR_CLASSES[typeConfig.color].split(' ')[0]} p-2 rounded-lg`}>
-                <TypeIcon size={16} />
+
+            {/* Thumbnail replacing Type Icon box */}
+            <div className="flex-shrink-0 w-12 h-12 bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                {loadingImage ? (
+                    <div className="w-full h-full animate-pulse bg-gray-200 dark:bg-gray-700" />
+                ) : imageUrl ? (
+                    <img src={imageUrl} alt="Source" className="w-full h-full object-cover" />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <TypeIcon size={20} />
+                    </div>
+                )}
             </div>
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                    <TypeBadge type={analysis.type} subtype={analysis.parameters?.analysis_subtype} t={t} />
-                    <StatusBadge status={analysis.status} t={t} />
+
+            <div className="flex-1 min-w-0 flex flex-col justify-center h-12">
+                <div className="flex items-center gap-2 mb-1">
+                    <TypeBadge type={analysis.type} subtype={analysis.parameters?.analysis_subtype} t={t} compact />
+                    <StatusBadge status={analysis.status} t={t} compact />
                 </div>
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                     {createdDate.toLocaleDateString(locale)}
                 </span>
+                {analysis.status === 'failed' && analysis.error && (
+                    <p className="text-xs text-red-500 truncate mt-1" title={analysis.error}>
+                        <FiAlertCircle className="inline mr-1" size={12} />
+                        {analysis.error}
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// Details Panel for Split View
+const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage, onViewResults, t, locale }) => {
+    const [activeTab, setActiveTab] = useState('source');
+    const [sourceUrl, setSourceUrl] = useState(null);
+    const [targetUrl, setTargetUrl] = useState(null);
+    const [resultUrl, setResultUrl] = useState(null);
+    const [loadingSource, setLoadingSource] = useState(true);
+    const [loadingTarget, setLoadingTarget] = useState(false);
+    const [loadingResult, setLoadingResult] = useState(false);
+    const [imageUrls, setImageUrls] = useState({});
+
+    // Load Provenance Graph Images
+    useEffect(() => {
+        if (analysis.type === 'provenance' && analysis.results?.graph?.nodes) {
+            const loadGraphImages = async () => {
+                const nodesToLoad = analysis.results.graph.nodes.filter(n => !imageUrls[n.id]);
+                if (nodesToLoad.length === 0) return;
+
+                const newUrls = {};
+                await Promise.all(nodesToLoad.map(async (node) => {
+                    try {
+                        const blob = await api.download(`/images/${node.id}/download`);
+                        newUrls[node.id] = URL.createObjectURL(blob);
+                    } catch (err) {
+                        // Silent fail or log
+                    }
+                }));
+
+                if (Object.keys(newUrls).length > 0) {
+                    setImageUrls(prev => ({ ...prev, ...newUrls }));
+                }
+            };
+            loadGraphImages();
+        }
+    }, [analysis]);
+
+    // Load Source Image
+    useEffect(() => {
+        let isMounted = true;
+        setLoadingSource(true);
+        const loadSource = async () => {
+            if (!analysis.source_image_id) {
+                setLoadingSource(false);
+                return;
+            }
+            try {
+                const blob = await api.download(`/images/${analysis.source_image_id}/download`);
+                if (isMounted) setSourceUrl(URL.createObjectURL(blob));
+            } catch (err) {
+                console.error('Failed to load detail source:', err);
+            } finally {
+                if (isMounted) setLoadingSource(false);
+            }
+        };
+        loadSource();
+        return () => {
+            isMounted = false;
+            // Don't revoke immediately in case of tab switch, let component unmount handle it or revoking on change
+            // Actually better to revoke on unmount or id change
+        };
+    }, [analysis.source_image_id]);
+
+    // Load Target Image (for cross-image analyses)
+    useEffect(() => {
+        let isMounted = true;
+        setLoadingTarget(true);
+        const loadTarget = async () => {
+            if (!analysis.parameters?.target_image_id) {
+                setLoadingTarget(false);
+                return;
+            }
+            try {
+                const blob = await api.download(`/images/${analysis.parameters.target_image_id}/download`);
+                if (isMounted) setTargetUrl(URL.createObjectURL(blob));
+            } catch (err) {
+                console.error('Failed to load detail target:', err);
+            } finally {
+                if (isMounted) setLoadingTarget(false);
+            }
+        };
+        loadTarget();
+        return () => { isMounted = false; };
+    }, [analysis.parameters?.target_image_id]);
+
+    // Load Result Image
+    // Load Result Image
+    useEffect(() => {
+        if (activeTab === 'result' && analysis.status === 'completed' && !resultUrl) {
+
+            // Skip provenance if graph is available (handled by render) or if no results
+            if ((analysis.type === 'provenance' && analysis.results?.graph)) {
+                return;
+            }
+
+            let isMounted = true;
+            setLoadingResult(true);
+            const loadResult = async () => {
+                try {
+                    // Determine best result to show based on analysis type/results
+                    let resultKey = null;
+                    if (analysis.results) {
+                        if (analysis.results.pred_map) resultKey = 'pred_map';
+                        // Copy-Move: Cross-check prefers clusters, otherwise prefer matches
+                        else if (analysis.type === 'cross_image_copy_move' && analysis.results.clusters_image) resultKey = 'clusters';
+                        else if (analysis.results.matches_image) resultKey = 'matches';
+                        else if (analysis.results.clusters_image) resultKey = 'clusters';
+                        else if (analysis.results.result_image) resultKey = 'result_image';
+                    }
+
+                    if (!resultKey) {
+                        if (isMounted) setLoadingResult(false);
+                        return;
+                    }
+
+                    const blob = await api.download(`/analyses/${analysis._id}/results/${resultKey}/download`);
+                    if (isMounted) setResultUrl(URL.createObjectURL(blob));
+                } catch (err) {
+                    // Silent fail
+                } finally {
+                    if (isMounted) setLoadingResult(false);
+                }
+            };
+            loadResult();
+            return () => { isMounted = false; };
+        }
+    }, [activeTab, analysis, resultUrl]);
+
+    // Cleanup URLs
+    useEffect(() => {
+        return () => {
+            if (sourceUrl) URL.revokeObjectURL(sourceUrl);
+            if (targetUrl) URL.revokeObjectURL(targetUrl);
+            if (resultUrl) URL.revokeObjectURL(resultUrl);
+        };
+    }, [sourceUrl, targetUrl, resultUrl]);
+
+    return (
+        <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-lg flex flex-col h-full">
+            {/* Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                <div className="flex items-center gap-3">
+                    <TypeBadge type={analysis.type} subtype={analysis.parameters?.analysis_subtype} t={t} />
+                    <StatusBadge status={analysis.status} t={t} />
+                </div>
+                <div className="flex items-center gap-2">
+                    {analysis.source_image_id && (
+                        <button
+                            onClick={() => onFilterByImage && onFilterByImage(analysis.source_image_id)}
+                            className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+                            title={t('analysisDashboard.filterByImage')}
+                        >
+                            <FiFilter size={16} />
+                        </button>
+                    )}
+                    {analysis.status === 'completed' && analysis.parameters && (
+                        <button
+                            onClick={() => onReproduce(analysis)}
+                            className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                            title={t('analysisDashboard.reproduce')}
+                        >
+                            <FiRepeat size={16} />
+                        </button>
+                    )}
+                    {analysis.status === 'completed' && (
+                        <button
+                            onClick={() => onViewResults(analysis)}
+                            className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                            title={t('analysisDashboard.viewResults') || 'View Full Results'}
+                        >
+                            <FiPlay size={16} />
+                        </button>
+                    )}
+                    <button onClick={onClose} className="text-gray-400 hover:text-red-500">
+                        <FiX size={20} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Visual Stage */}
+            <div className="flex-1 bg-gray-100 dark:bg-gray-900 relative min-h-[300px] flex items-center justify-center overflow-hidden">
+                {activeTab === 'source' ? (
+                    loadingSource ? (
+                        <div className="animate-pulse w-full h-full bg-gray-200 dark:bg-gray-800" />
+                    ) : sourceUrl ? (
+                        <img src={sourceUrl} alt="Source" className="w-full h-full object-contain p-4" />
+                    ) : (
+                        <div className="text-gray-400 flex flex-col items-center">
+                            <span className="text-sm">No source image</span>
+                        </div>
+                    )
+                ) : activeTab === 'target' ? (
+                    loadingTarget ? (
+                        <div className="animate-pulse w-full h-full bg-gray-200 dark:bg-gray-800" />
+                    ) : targetUrl ? (
+                        <img src={targetUrl} alt="Target" className="w-full h-full object-contain p-4" />
+                    ) : (
+                        <div className="text-gray-400 flex flex-col items-center">
+                            <span className="text-sm">No target image</span>
+                        </div>
+                    )
+                ) : (
+                    loadingResult ? (
+                        <div className="animate-pulse w-full h-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center">
+                            <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
+                        </div>
+                    ) : analysis.type === 'provenance' && analysis.results?.graph ? (
+                        <div className="w-full h-full p-2 overflow-hidden">
+                            <ProvenanceGraph
+                                nodes={analysis.results.graph.nodes}
+                                edges={analysis.results.graph.edges}
+                                spanningTreeEdges={analysis.results.graph.spanning_tree_edges}
+                                queryImageId={analysis.source_image_id}
+                                getImageUrl={(id) => imageUrls[id]}
+                                width={800}
+                                height={500}
+                            />
+                        </div>
+                    ) : resultUrl ? (
+                        <img src={resultUrl} alt="Result" className="w-full h-full object-contain p-4" />
+                    ) : (
+                        <div className="text-gray-400 flex flex-col items-center gap-2">
+                            {/* Fallback for no preview */}
+                            <span className="text-sm">Preview not available</span>
+                            <button
+                                onClick={() => onViewResults(analysis)}
+                                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+                            >
+                                {t('analysisDashboard.viewResults') || 'View Full Results'}
+                            </button>
+                        </div>
+                    )
+                )}
+
+                {/* Tabs */}
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white/90 dark:bg-gray-800/90 p-1 rounded-lg flex gap-1 shadow-lg backdrop-blur-sm border border-gray-200 dark:border-gray-700">
+                    <button
+                        onClick={() => setActiveTab('source')}
+                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'source'
+                            ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 shadow-sm'
+                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            }`}
+                    >
+                        Source
+                    </button>
+                    {analysis.parameters?.target_image_id && (
+                        <button
+                            onClick={() => setActiveTab('target')}
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'target'
+                                ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 shadow-sm'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                }`}
+                        >
+                            Target
+                        </button>
+                    )}
+                    {analysis.status === 'completed' && (
+                        <button
+                            onClick={() => setActiveTab('result')}
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'result'
+                                ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 shadow-sm'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                }`}
+                        >
+                            Result
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Details Section */}
+            <div className="h-1/3 border-t border-gray-200 dark:border-gray-700 overflow-y-auto p-6 bg-white dark:bg-gray-800">
+                <div className="mb-6">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                        <FiCalendar size={14} />
+                        {t('analysisDashboard.generalInfo')}
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <span className="text-gray-500 dark:text-gray-400">{t('analysisDashboard.created')}</span>
+                            <p className="text-gray-900 dark:text-white">{new Date(analysis.created_at).toLocaleString(locale)}</p>
+                        </div>
+                        <div>
+                            <span className="text-gray-500 dark:text-gray-400">{t('analysisDashboard.updated')}</span>
+                            <p className="text-gray-900 dark:text-white">{new Date(analysis.updated_at).toLocaleString(locale)}</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Parameters */}
+                {analysis.parameters && Object.keys(analysis.parameters).length > 0 && (
+                    <div className="mb-6">
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                            <FiSliders size={14} />
+                            {t('analysisDashboard.parameters')}
+                        </h4>
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 space-y-2">
+                            <ParametersDisplay
+                                parameters={analysis.parameters}
+                                sourceImageId={analysis.source_image_id}
+                                targetImageId={analysis.parameters?.target_image_id || analysis.target_image_id}
+                                t={t}
+                                defaultExpanded={true}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -841,14 +1299,13 @@ const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale })
                                         {t('analysisDashboard.parameters')}
                                     </h3>
                                     <div className="space-y-2">
-                                        {Object.entries(analysis.parameters).map(([key, value]) => (
-                                            <div key={key} className="flex justify-between text-sm">
-                                                <span className="text-gray-500 dark:text-gray-400">{key}</span>
-                                                <span className="text-gray-900 dark:text-white font-medium">
-                                                    {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
-                                                </span>
-                                            </div>
-                                        ))}
+                                        <ParametersDisplay
+                                            parameters={analysis.parameters}
+                                            sourceImageId={analysis.source_image_id}
+                                            targetImageId={analysis.target_image_id}
+                                            t={t}
+                                            defaultExpanded={true}
+                                        />
                                     </div>
                                 </div>
                             )}
@@ -1056,6 +1513,11 @@ const AnalysisDashboardPage = () => {
 
         return () => clearInterval(intervalId);
     }, [analyses, fetchAnalyses]);
+
+    // Clear selection when view mode or split view changes
+    useEffect(() => {
+        setSelectedAnalysis(null);
+    }, [viewMode, isSplitView]);
 
     // Handlers
     const handleFilterChange = useCallback((key, value) => {
@@ -1408,10 +1870,10 @@ const AnalysisDashboardPage = () => {
                             ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
                             : 'bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                             }`}
-                        title={t('analysisDashboard.batchMode')}
+                        title={t('analysisDashboard.selectionMode')}
                     >
                         <FiLayers size={16} />
-                        <span className="hidden sm:inline">{t('analysisDashboard.batch')}</span>
+                        <span className="hidden sm:inline">{t('analysisDashboard.selection')}</span>
                     </button>
                 </div>
             </header>
@@ -1595,6 +2057,7 @@ const AnalysisDashboardPage = () => {
                                         analysis={analysis}
                                         onViewDetails={handleViewDetails}
                                         onReproduce={handleReproduce}
+                                        onFilterByImage={handleFilterByImage}
                                         isActive={selectedAnalysis?._id === analysis._id}
                                         t={t}
                                         locale={locale}
@@ -1635,6 +2098,10 @@ const AnalysisDashboardPage = () => {
                                             analysis={analysis}
                                             isActive={selectedAnalysis?._id === analysis._id}
                                             onClick={handleViewDetails}
+                                            onViewDetails={handleViewDetails}
+                                            onReproduce={handleReproduce}
+                                            onViewResults={handleViewResults}
+                                            onFilterByImage={handleFilterByImage}
                                             t={t}
                                             locale={locale}
                                             batchMode={batchMode}
@@ -1663,125 +2130,24 @@ const AnalysisDashboardPage = () => {
 
                 {/* Split View Preview Panel */}
                 {isSplitView && (
-                    <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-lg flex flex-col">
+                    <div className="flex-1 min-w-[350px] lg:min-w-[450px]">
                         {selectedAnalysis ? (
-                            <>
-                                {/* Preview Header */}
-                                <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-                                    <div className="flex items-center gap-3">
-                                        <TypeBadge type={selectedAnalysis.type} subtype={selectedAnalysis.parameters?.analysis_subtype} t={t} />
-                                        <StatusBadge status={selectedAnalysis.status} t={t} />
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {selectedAnalysis.status === 'completed' && selectedAnalysis.parameters && (
-                                            <button
-                                                onClick={() => handleReproduce(selectedAnalysis)}
-                                                className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-                                                title={t('analysisDashboard.reproduce')}
-                                            >
-                                                <FiRepeat size={16} />
-                                            </button>
-                                        )}
-                                        <button onClick={() => setSelectedAnalysis(null)} className="text-gray-400 hover:text-red-500">
-                                            <FiX size={20} />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Preview Content */}
-                                <div className="flex-1 overflow-y-auto p-6">
-                                    {/* Info */}
-                                    <div className="mb-6">
-                                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                                            <FiCalendar size={14} />
-                                            {t('analysisDashboard.generalInfo')}
-                                        </h4>
-                                        <div className="grid grid-cols-2 gap-3 text-sm">
-                                            <div>
-                                                <span className="text-gray-500 dark:text-gray-400">{t('analysisDashboard.created')}</span>
-                                                <p className="text-gray-900 dark:text-white">{new Date(selectedAnalysis.created_at).toLocaleString(locale)}</p>
-                                            </div>
-                                            <div>
-                                                <span className="text-gray-500 dark:text-gray-400">{t('analysisDashboard.updated')}</span>
-                                                <p className="text-gray-900 dark:text-white">{new Date(selectedAnalysis.updated_at).toLocaleString(locale)}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Parameters */}
-                                    {selectedAnalysis.parameters && Object.keys(selectedAnalysis.parameters).length > 0 && (
-                                        <div className="mb-6">
-                                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                                                <FiSliders size={14} />
-                                                {t('analysisDashboard.parameters')}
-                                            </h4>
-                                            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 space-y-2">
-                                                {Object.entries(selectedAnalysis.parameters).map(([key, value]) => (
-                                                    <div key={key} className="flex justify-between text-sm">
-                                                        <span className="text-gray-500 dark:text-gray-400">{key}</span>
-                                                        <span className="text-gray-900 dark:text-white font-medium">
-                                                            {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Result Images */}
-                                    {selectedAnalysis.status === 'completed' && selectedAnalysis.results && (
-                                        <div className="mb-6">
-                                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                                                <FiImage size={14} />
-                                                {t('analysisDashboard.results') || 'Results'}
-                                            </h4>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                {['pred_map', 'conf_map', 'matches_image', 'clusters_image', 'result_image'].map(key => {
-                                                    if (!selectedAnalysis.results[key]) return null;
-                                                    const resultLabels = {
-                                                        pred_map: t('manipulationDetection.predictionMap') || 'Prediction Map',
-                                                        conf_map: t('manipulationDetection.confidenceMap') || 'Confidence Map',
-                                                        matches_image: t('copyMove.results.matches') || 'Matches',
-                                                        clusters_image: t('copyMove.results.clusters') || 'Clusters',
-                                                        result_image: t('analysisDashboard.resultImage') || 'Result'
-                                                    };
-                                                    return (
-                                                        <div key={key} className="group relative">
-                                                            <button
-                                                                onClick={() => handleDownloadResult(selectedAnalysis._id, key)}
-                                                                className="w-full aspect-video bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-indigo-500 transition-colors"
-                                                                title={`${t('common.download')} ${resultLabels[key]}`}
-                                                            >
-                                                                <div className="w-full h-full flex items-center justify-center text-gray-400 group-hover:text-indigo-500">
-                                                                    <FiDownload size={24} />
-                                                                </div>
-                                                            </button>
-                                                            <span className="block text-xs text-gray-500 dark:text-gray-400 text-center mt-1">
-                                                                {resultLabels[key]}
-                                                            </span>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Error */}
-                                    {selectedAnalysis.status === 'failed' && selectedAnalysis.error && (
-                                        <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 border border-red-200 dark:border-red-900/30">
-                                            <h4 className="text-sm font-semibold text-red-700 dark:text-red-400 mb-2 flex items-center gap-2">
-                                                <FiAlertCircle size={14} />
-                                                {t('analysisDashboard.error')}
-                                            </h4>
-                                            <p className="text-sm text-red-600 dark:text-red-400">{selectedAnalysis.error}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </>
+                            <AnalysisDetailsPanel
+                                key={selectedAnalysis._id}
+                                analysis={selectedAnalysis}
+                                onClose={() => setSelectedAnalysis(null)}
+                                onReproduce={handleReproduce}
+                                onViewResults={handleViewResults}
+                                onFilterByImage={handleFilterByImage}
+                                t={t}
+                                locale={locale}
+                            />
                         ) : (
-                            <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                                <FiColumns size={48} className="mb-4 opacity-50" />
-                                <p>{t('analysisDashboard.selectAnalysis') || 'Select an analysis to preview'}</p>
+                            <div className="h-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-lg flex items-center justify-center text-gray-400">
+                                <div className="text-center">
+                                    <FiActivity size={48} className="mx-auto mb-4 opacity-20" />
+                                    <p>{t('analysisDashboard.selectAnalysis') || 'Select an analysis to view details'}</p>
+                                </div>
                             </div>
                         )}
                     </div>
