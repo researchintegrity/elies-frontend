@@ -431,22 +431,17 @@ const ManipulationDetectionPage = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [availableCategories, setAvailableCategories] = useState([]);
 
-    // Fetch categories on mount
+    // Fetch all available tags from backend (using dedicated endpoint for efficiency)
     useEffect(() => {
-        const fetchCategories = async () => {
+        const fetchTags = async () => {
             try {
-                const data = await api.get('/images', { page: 1, per_page: 100 });
-                const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
-                const categories = new Set();
-                imageList.forEach(img => {
-                    (img.image_type || []).forEach(type => categories.add(type));
-                });
-                setAvailableCategories(Array.from(categories).sort());
+                const tags = await api.get('/images/tags');
+                setAvailableCategories(tags);
             } catch (err) {
-                console.error('Error fetching categories:', err);
+                console.error('Error fetching tags:', err);
             }
         };
-        fetchCategories();
+        fetchTags();
     }, []);
 
     // Handle reproduce analysis from Analysis Dashboard

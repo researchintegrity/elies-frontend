@@ -922,6 +922,12 @@ const translations = {
         'analysisDashboard.deleteConfirmMessage': 'Deseja realmente excluir',
         'analysisDashboard.deletedSuccessfully': 'análises excluídas com sucesso',
         'analysisDashboard.deleteError': 'Erro ao excluir análises',
+        'analysisDashboard.imageDeleted': 'A imagem foi excluída',
+        'analysisDashboard.resultsStillAvailable': 'Os resultados da análise ainda estão disponíveis',
+        'analysisDashboard.tabSource': 'Origem',
+        'analysisDashboard.tabTarget': 'Destino',
+        'analysisDashboard.tabResult': 'Resultado',
+        'analysisDashboard.deleted': 'Deletada',
 
         // Image Analysis - Save to Dashboard
         'analysis.saveToDashboard': 'Salvar no Painel',
@@ -1851,6 +1857,12 @@ const translations = {
         'analysisDashboard.deleteConfirmMessage': 'Are you sure you want to delete',
         'analysisDashboard.deletedSuccessfully': 'analyses deleted successfully',
         'analysisDashboard.deleteError': 'Error deleting analyses',
+        'analysisDashboard.imageDeleted': 'Image has been deleted',
+        'analysisDashboard.resultsStillAvailable': 'Analysis results are still available',
+        'analysisDashboard.tabSource': 'Source',
+        'analysisDashboard.tabTarget': 'Target',
+        'analysisDashboard.tabResult': 'Result',
+        'analysisDashboard.deleted': 'Deleted',
 
         // Image Analysis - Save to Dashboard
         'analysis.saveToDashboard': 'Save to Dashboard',

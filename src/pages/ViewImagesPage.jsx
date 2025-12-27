@@ -377,26 +377,23 @@ const ViewImagesPage = () => {
   const [similarityPage, setSimilarityPage] = useState(1);
   const SIMILARITY_PER_PAGE = 12;
 
-  // Accumulated categories from all visited pages (persisted state)
-  const [allCategories, setAllCategories] = useState(new Set());
+  // Fetch all available tags from backend (using dedicated endpoint for efficiency)
+  const [allCategories, setAllCategories] = useState([]);
 
-  // Update available categories when images change (accumulate from all pages)
   useEffect(() => {
-    if (images.length > 0) {
-      setAllCategories(prev => {
-        const newSet = new Set(prev);
-        images.forEach(img => {
-          (img.imageType || []).forEach(type => newSet.add(type));
-        });
-        return newSet;
-      });
-    }
-  }, [images]);
+    const fetchTags = async () => {
+      try {
+        const tags = await api.get('/images/tags');
+        setAllCategories(tags);
+      } catch (err) {
+        console.error('Error fetching tags:', err);
+      }
+    };
+    fetchTags();
+  }, []);
 
-  // Convert Set to sorted array for rendering
-  const availableCategoriesForSimilarity = useMemo(() => {
-    return Array.from(allCategories).sort();
-  }, [allCategories]);
+  // Convert array for rendering (already sorted from backend)
+  const availableCategoriesForSimilarity = allCategories;
 
   useEffect(() => {
     // Pass all filters to the backend - server handles filtering and pagination

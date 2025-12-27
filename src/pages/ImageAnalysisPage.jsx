@@ -309,25 +309,17 @@ const ImageAnalysisPage = () => {
         fetchImages(galleryPage);
     }, [galleryPage, filterSearch, filterDateFrom, filterDateTo, filterImageType]);
 
-    // Fetch available categories on mount
+    // Fetch all available tags from backend (using dedicated endpoint for efficiency)
     useEffect(() => {
-        const fetchCategories = async () => {
+        const fetchTags = async () => {
             try {
-                // Fetch a batch of images and extract unique types (same as Provenance page)
-                const data = await api.get('/images', { page: 1, per_page: 100 });
-                const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
-                const categories = new Set();
-                imageList.forEach(img => {
-                    const types = img.image_type || [];
-                    types.forEach(type => categories.add(type));
-                });
-                const sortedCategories = Array.from(categories).sort();
-                setAvailableCategories(sortedCategories);
+                const tags = await api.get('/images/tags');
+                setAvailableCategories(tags);
             } catch (err) {
-                console.error('Error fetching categories:', err);
+                console.error('Error fetching tags:', err);
             }
         };
-        fetchCategories();
+        fetchTags();
     }, []);
 
     // Handle reproduce analysis from Analysis Dashboard
@@ -839,7 +831,11 @@ const ImageAnalysisPage = () => {
         if (!tool.hasCanvas) {
             if (selectedTool === 'metadata') {
                 try {
-                    const { canvas } = await loadImageToCanvas(imageUrls[selectedImage.id]);
+                    // Download full image for accurate metadata (thumbnails have reduced dimensions)
+                    const blob = await api.download(`/images/${selectedImage.id}/download`);
+                    const metadataImageUrl = URL.createObjectURL(blob);
+                    const { canvas } = await loadImageToCanvas(metadataImageUrl);
+                    URL.revokeObjectURL(metadataImageUrl);
                     setOriginalCanvas(canvas);
                     const info = getImageInfo(canvas, selectedImage.mimeType);
 
@@ -872,8 +868,12 @@ const ImageAnalysisPage = () => {
         setResultCanvas(null);
 
         try {
-            const imageUrl = imageUrls[selectedImage.id];
+            // For image analysis, we need the full-resolution image, not the thumbnail
+            // Download the full image blob and create an object URL for canvas loading
+            const blob = await api.download(`/images/${selectedImage.id}/download`);
+            const imageUrl = URL.createObjectURL(blob);
             const { canvas } = await loadImageToCanvas(imageUrl);
+            URL.revokeObjectURL(imageUrl); // Clean up the blob URL after loading
             setOriginalCanvas(canvas);
 
             let result = null;

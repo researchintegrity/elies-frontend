@@ -45,7 +45,8 @@ import {
     FiColumns,
     FiBarChart2,
     FiTrash2,
-    FiFileText
+    FiFileText,
+    FiAlertTriangle
 } from 'react-icons/fi';
 import { useLanguage } from '../context/LanguageContext';
 import { api } from '../services/api';
@@ -205,41 +206,9 @@ const StatusBadge = ({ status, t }) => {
 // Parameters Display (expandable)
 const ParametersDisplay = ({ parameters, sourceImageId, targetImageId, t, defaultExpanded = false }) => {
     const [expanded, setExpanded] = useState(defaultExpanded);
-    const [names, setNames] = useState({});
-
-    useEffect(() => {
-        let isMounted = true;
-        const fetchNames = async () => {
-            const idsToFetch = new Set();
-            if (sourceImageId) idsToFetch.add(sourceImageId);
-            if (targetImageId) idsToFetch.add(targetImageId);
-            if (parameters?.target_image_id) idsToFetch.add(parameters.target_image_id); // Fallback if in params
-            // Handle search_image_ids (could be string or array)
-            if (parameters?.search_image_ids) {
-                const ids = Array.isArray(parameters.search_image_ids)
-                    ? parameters.search_image_ids
-                    : String(parameters.search_image_ids).split(',').map(s => s.trim());
-                ids.forEach(id => idsToFetch.add(id));
-            }
-
-            if (idsToFetch.size === 0) return;
-
-            const newNames = {};
-            await Promise.all(Array.from(idsToFetch).map(async (id) => {
-                if (!id) return;
-                try {
-                    const img = await api.get(`/images/${id}`);
-                    if (isMounted) newNames[id] = img.filename || img.original_filename || id;
-                } catch (e) {
-                    // keep ID if fetch fails
-                }
-            }));
-
-            if (isMounted) setNames(prev => ({ ...prev, ...newNames }));
-        };
-        fetchNames();
-        return () => { isMounted = false; };
-    }, [parameters, sourceImageId, targetImageId]);
+    // Removed: useEffect that fetched image metadata for filenames
+    // This was causing multiple API calls per analysis row just to display filenames
+    // Now we display image IDs directly which is more efficient
 
     if (!parameters || Object.keys(parameters).length === 0) {
         return <span className="text-gray-400 text-xs">{t('analysisDashboard.noParameters')}</span>;
@@ -253,13 +222,13 @@ const ParametersDisplay = ({ parameters, sourceImageId, targetImageId, t, defaul
     // Prepend Source/Target info
     const displayItems = [];
     if (sourceImageId) {
-        displayItems.push({ key: 'Source Image', value: names[sourceImageId] || sourceImageId });
+        displayItems.push({ key: 'Source Image', value: sourceImageId });
     }
 
     // Check both prop and parameters for target ID
     const effectiveTargetId = targetImageId || parameters.target_image_id;
     if (effectiveTargetId) {
-        displayItems.push({ key: 'Target Image', value: names[effectiveTargetId] || effectiveTargetId });
+        displayItems.push({ key: 'Target Image', value: effectiveTargetId });
     }
 
     if (parameters.search_image_ids) {
@@ -271,10 +240,10 @@ const ParametersDisplay = ({ parameters, sourceImageId, targetImageId, t, defaul
         const displayIds = ids.slice(0, 3);
         const hasMore = ids.length > 3;
 
-        const nameList = displayIds.map(id => names[id.trim()] || id.trim()).join(', ');
+        const idList = displayIds.map(id => id.trim()).join(', ');
         displayItems.push({
             key: 'Target Images',
-            value: nameList + (hasMore ? ` (+${ids.length - 3} more)` : '')
+            value: idList + (hasMore ? ` (+${ids.length - 3} more)` : '')
         });
     }
 
@@ -402,6 +371,7 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, onViewResults, onFi
     // Use thumbnail URL directly - browser handles caching
     const imageUrl = analysis.source_image_id ? getThumbnailUrl(analysis.source_image_id) : null;
     const loadingImage = false; // No loading state needed with direct URLs
+    const [imageError, setImageError] = useState(false);
 
     const createdDate = new Date(analysis.created_at);
     const typeConfig = ANALYSIS_TYPE_CONFIG[analysis.type] || ANALYSIS_TYPE_CONFIG.external;
@@ -430,11 +400,17 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, onViewResults, onFi
                 <div className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 bg-gray-100 dark:bg-gray-900 overflow-hidden">
                     {loadingImage ? (
                         <div className="w-full h-full animate-pulse bg-gray-200 dark:bg-gray-700" />
+                    ) : imageError ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-amber-500 bg-amber-50 dark:bg-amber-900/20 gap-1">
+                            <FiAlertTriangle size={20} />
+                            <span className="text-xs font-medium">{t('analysisDashboard.deleted')}</span>
+                        </div>
                     ) : imageUrl ? (
                         <img
                             src={imageUrl}
                             alt="Source"
                             className="w-full h-full object-cover"
+                            onError={() => setImageError(true)}
                         />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -532,6 +508,7 @@ const AnalysisCard = ({ analysis, onViewDetails, onReproduce, onViewResults, isA
     // Use thumbnail URL directly - browser handles caching
     const imageUrl = analysis.source_image_id ? getThumbnailUrl(analysis.source_image_id) : null;
     const loadingImage = false; // No loading state needed with direct URLs
+    const [imageError, setImageError] = useState(false);
 
     const createdDate = new Date(analysis.created_at);
     const typeConfig = ANALYSIS_TYPE_CONFIG[analysis.type] || ANALYSIS_TYPE_CONFIG.external;
@@ -549,8 +526,18 @@ const AnalysisCard = ({ analysis, onViewDetails, onReproduce, onViewResults, isA
             <div className="relative w-full pt-[65%] bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 rounded-t-xl overflow-hidden">
                 {loadingImage ? (
                     <div className="absolute inset-0 animate-pulse bg-gray-200 dark:bg-gray-700" />
+                ) : imageError ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-amber-500 bg-amber-50 dark:bg-amber-900/20 gap-1">
+                        <FiAlertTriangle size={32} />
+                        <span className="text-xs font-medium">{t('analysisDashboard.deleted')}</span>
+                    </div>
                 ) : imageUrl ? (
-                    <img src={imageUrl} alt="Source" className="absolute inset-0 w-full h-full object-cover" />
+                    <img
+                        src={imageUrl}
+                        alt="Source"
+                        className="absolute inset-0 w-full h-full object-cover"
+                        onError={() => setImageError(true)}
+                    />
                 ) : (
                     <div className="absolute inset-0 flex items-center justify-center text-gray-400">
                         <TypeIcon size={40} />
@@ -647,6 +634,7 @@ const AnalysisListRowCompact = ({ analysis, isActive, onClick, t, locale, batchM
     // Use thumbnail URL directly - browser handles caching
     const imageUrl = analysis.source_image_id ? getThumbnailUrl(analysis.source_image_id) : null;
     const loadingImage = false; // No loading state needed with direct URLs
+    const [imageError, setImageError] = useState(false);
 
     return (
         <div
@@ -677,8 +665,18 @@ const AnalysisListRowCompact = ({ analysis, isActive, onClick, t, locale, batchM
             <div className="flex-shrink-0 w-12 h-12 bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
                 {loadingImage ? (
                     <div className="w-full h-full animate-pulse bg-gray-200 dark:bg-gray-700" />
+                ) : imageError ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-amber-500 bg-amber-50 dark:bg-amber-900/20 gap-0.5">
+                        <FiAlertTriangle size={16} />
+                        <span className="text-[8px] font-medium">{t('analysisDashboard.deleted')}</span>
+                    </div>
                 ) : imageUrl ? (
-                    <img src={imageUrl} alt="Source" className="w-full h-full object-cover" />
+                    <img
+                        src={imageUrl}
+                        alt="Source"
+                        className="w-full h-full object-cover"
+                        onError={() => setImageError(true)}
+                    />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400">
                         <TypeIcon size={20} />
@@ -714,6 +712,8 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
     const [loadingSource, setLoadingSource] = useState(true);
     const [loadingTarget, setLoadingTarget] = useState(false);
     const [loadingResult, setLoadingResult] = useState(false);
+    const [sourceError, setSourceError] = useState(false);
+    const [targetError, setTargetError] = useState(false);
     const [imageUrls, setImageUrls] = useState({});
 
     // Load Provenance Graph Images - use thumbnail URLs
@@ -846,8 +846,19 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
                 {activeTab === 'source' ? (
                     loadingSource ? (
                         <div className="animate-pulse w-full h-full bg-gray-200 dark:bg-gray-800" />
+                    ) : sourceError ? (
+                        <div className="text-amber-500 flex flex-col items-center gap-3 p-8">
+                            <FiAlertTriangle size={48} />
+                            <span className="text-sm font-medium">{t('analysisDashboard.imageDeleted')}</span>
+                            <span className="text-xs text-gray-400">{t('analysisDashboard.resultsStillAvailable')}</span>
+                        </div>
                     ) : sourceUrl ? (
-                        <img src={sourceUrl} alt="Source" className="w-full h-full object-contain p-4" />
+                        <img
+                            src={sourceUrl}
+                            alt="Source"
+                            className="w-full h-full object-contain p-4"
+                            onError={() => setSourceError(true)}
+                        />
                     ) : (
                         <div className="text-gray-400 flex flex-col items-center">
                             <span className="text-sm">No source image</span>
@@ -856,8 +867,19 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
                 ) : activeTab === 'target' ? (
                     loadingTarget ? (
                         <div className="animate-pulse w-full h-full bg-gray-200 dark:bg-gray-800" />
+                    ) : targetError ? (
+                        <div className="text-amber-500 flex flex-col items-center gap-3 p-8">
+                            <FiAlertTriangle size={48} />
+                            <span className="text-sm font-medium">{t('analysisDashboard.imageDeleted')}</span>
+                            <span className="text-xs text-gray-400">{t('analysisDashboard.resultsStillAvailable')}</span>
+                        </div>
                     ) : targetUrl ? (
-                        <img src={targetUrl} alt="Target" className="w-full h-full object-contain p-4" />
+                        <img
+                            src={targetUrl}
+                            alt="Target"
+                            className="w-full h-full object-contain p-4"
+                            onError={() => setTargetError(true)}
+                        />
                     ) : (
                         <div className="text-gray-400 flex flex-col items-center">
                             <span className="text-sm">No target image</span>
@@ -905,7 +927,7 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
                             : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                             }`}
                     >
-                        Source
+                        {t('analysisDashboard.tabSource')}
                     </button>
                     {analysis.parameters?.target_image_id && (
                         <button
@@ -915,7 +937,7 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
                                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                                 }`}
                         >
-                            Target
+                            {t('analysisDashboard.tabTarget')}
                         </button>
                     )}
                     {analysis.status === 'completed' && (
@@ -926,7 +948,7 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
                                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                                 }`}
                         >
-                            Result
+                            {t('analysisDashboard.tabResult')}
                         </button>
                     )}
                 </div>

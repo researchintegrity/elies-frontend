@@ -24,6 +24,7 @@ import {
     FiImage,
 } from 'react-icons/fi';
 import { api } from '../services/api';
+import { API_BASE_URL } from '../config/api';
 import { showAlert, showToast } from '../utils/alert';
 import { useLanguage } from '../context/LanguageContext';
 import { SkeletonCard, EmptyState } from '../components/common';
@@ -46,6 +47,12 @@ const STEPS = {
     RESULTS: 2
 };
 const STEP_LABELS = ['select', 'configure', 'results'];
+
+// Helper to get thumbnail URL with auth token
+const getThumbnailUrl = (imageId) => {
+    const token = localStorage.getItem('authToken');
+    return `${API_BASE_URL}/images/${imageId}/thumbnail${token ? `?token=${token}` : ''}`;
+};
 
 // --- Sub-Components ---
 
@@ -378,23 +385,17 @@ const ProvenancePage = () => {
         checkHealth();
     }, []);
 
-    // Fetch all available categories on mount (for dropdown)
+    // Fetch all available tags from backend (using dedicated endpoint for efficiency)
     useEffect(() => {
-        const fetchCategories = async () => {
+        const fetchTags = async () => {
             try {
-                // Fetch a large batch to get all unique tags
-                const data = await api.get('/images', { page: 1, per_page: 100 });
-                const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
-                const categories = new Set();
-                imageList.forEach(img => {
-                    (img.image_type || []).forEach(type => categories.add(type));
-                });
-                setAvailableCategories(Array.from(categories).sort());
+                const tags = await api.get('/images/tags');
+                setAvailableCategories(tags);
             } catch (err) {
-                console.error('Error fetching categories:', err);
+                console.error('Error fetching tags:', err);
             }
         };
-        fetchCategories();
+        fetchTags();
     }, []);
 
     // Handle reproduce analysis from Analysis Dashboard
@@ -595,27 +596,17 @@ const ProvenancePage = () => {
         prevGalleryFiltersRef.current = galleryFilters;
     }, [galleryFilters, galleryPage]);
 
-    // Load image URLs
+    // Load image URLs - use thumbnail URLs directly
     useEffect(() => {
-        const loadImageUrls = async () => {
-            for (const img of images) {
-                if (!imageUrls[img.id] && !loadingUrls[img.id]) {
-                    setLoadingUrls(p => ({ ...p, [img.id]: true }));
-                    try {
-                        const blob = await api.download(`/images/${img.id}/download`);
-                        const url = URL.createObjectURL(blob);
-                        setImageUrls(p => ({ ...p, [img.id]: url }));
-                    } catch (_err) {
-                        console.error(`Error loading image ${img.id}:`, _err);
-                    } finally {
-                        setLoadingUrls(p => ({ ...p, [img.id]: false }));
-                    }
-                }
+        // Generate thumbnail URLs for all images
+        const newUrls = {};
+        for (const img of images) {
+            if (!imageUrls[img.id]) {
+                newUrls[img.id] = getThumbnailUrl(img.id);
             }
-        };
-
-        if (images.length > 0) {
-            loadImageUrls();
+        }
+        if (Object.keys(newUrls).length > 0) {
+            setImageUrls(prev => ({ ...prev, ...newUrls }));
         }
     }, [images]);
 
@@ -651,39 +642,19 @@ const ProvenancePage = () => {
         };
     }, [analysisId, analyzing, t]);
 
-    // Fetch images for analysis results (graph nodes) that might not be in the current gallery page
+    // Load thumbnail URLs for analysis results (graph nodes) that might not be in the current gallery page
     useEffect(() => {
-        const loadResultImages = async () => {
-            if (!analysisResults?.graph?.nodes) return;
+        if (!analysisResults?.graph?.nodes) return;
 
-            const nodesToLoad = analysisResults.graph.nodes.filter(
-                node => !imageUrls[node.id] && !loadingUrls[node.id]
-            );
-
-            if (nodesToLoad.length === 0) return;
-
-            // Mark all as loading to prevent duplicate fetches
-            setLoadingUrls(prev => {
-                const next = { ...prev };
-                nodesToLoad.forEach(n => next[n.id] = true);
-                return next;
-            });
-
-            // Fetch concurrently
-            await Promise.all(nodesToLoad.map(async (node) => {
-                try {
-                    const blob = await api.download(`/images/${node.id}/download`);
-                    const url = URL.createObjectURL(blob);
-                    setImageUrls(prev => ({ ...prev, [node.id]: url }));
-                } catch (err) {
-                    console.error(`Error loading graph node image ${node.id}:`, err);
-                } finally {
-                    setLoadingUrls(prev => ({ ...prev, [node.id]: false }));
-                }
-            }));
-        };
-
-        loadResultImages();
+        const newUrls = {};
+        for (const node of analysisResults.graph.nodes) {
+            if (!imageUrls[node.id]) {
+                newUrls[node.id] = getThumbnailUrl(node.id);
+            }
+        }
+        if (Object.keys(newUrls).length > 0) {
+            setImageUrls(prev => ({ ...prev, ...newUrls }));
+        }
     }, [analysisResults]);
 
     const fetchImages = useCallback(async (page = 1, filters = {}) => {
@@ -786,17 +757,15 @@ const ProvenancePage = () => {
             setFilterGalleryImages(transformed);
             setTotalFilterImages(total);
 
-            // Load thumbnails for this page
+            // Generate thumbnail URLs for this page - no blob download needed
+            const newUrls = {};
             for (const img of transformed) {
                 if (!filterGalleryUrls[img.id] && !imageUrls[img.id]) {
-                    try {
-                        const blob = await api.download(`/images/${img.id}/download`);
-                        const url = URL.createObjectURL(blob);
-                        setFilterGalleryUrls(prev => ({ ...prev, [img.id]: url }));
-                    } catch (err) {
-                        console.error(`Error loading filter gallery image ${img.id}:`, err);
-                    }
+                    newUrls[img.id] = getThumbnailUrl(img.id);
                 }
+            }
+            if (Object.keys(newUrls).length > 0) {
+                setFilterGalleryUrls(prev => ({ ...prev, ...newUrls }));
             }
 
         } catch (err) {
@@ -829,27 +798,21 @@ const ProvenancePage = () => {
         prevFilterState.current = { filterMode, filterTags, filterDateFrom, filterDateTo, filterSearch };
     }, [filterMode, filterTags, filterDateFrom, filterDateTo, filterSearch, filterGridPage]);
 
-    // Load thumbnails for similarity results
+    // Generate thumbnail URLs for similarity results
     useEffect(() => {
-        const loadSimilarityThumbnails = async () => {
-            if (similarityResults.length === 0) return;
+        if (similarityResults.length === 0) return;
 
-            for (const result of similarityResults) {
-                const imageId = result.image_id;
-                // Skip if already loaded
-                if (filterGalleryUrls[imageId] || imageUrls[imageId]) continue;
-
-                try {
-                    const blob = await api.download(`/images/${imageId}/download`);
-                    const url = URL.createObjectURL(blob);
-                    setFilterGalleryUrls(prev => ({ ...prev, [imageId]: url }));
-                } catch (err) {
-                    console.error(`Error loading similarity thumbnail ${imageId}:`, err);
-                }
+        const newUrls = {};
+        for (const result of similarityResults) {
+            const imageId = result.image_id;
+            // Skip if already loaded
+            if (!filterGalleryUrls[imageId] && !imageUrls[imageId]) {
+                newUrls[imageId] = getThumbnailUrl(imageId);
             }
-        };
-
-        loadSimilarityThumbnails();
+        }
+        if (Object.keys(newUrls).length > 0) {
+            setFilterGalleryUrls(prev => ({ ...prev, ...newUrls }));
+        }
     }, [similarityResults]);
 
     const handleAnalyze = async () => {
