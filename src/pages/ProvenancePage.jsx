@@ -341,7 +341,9 @@ const ProvenancePage = () => {
     const [galleryFilters, setGalleryFilters] = useState({
         search: '',
         imageType: [],
-        sourceType: 'all'
+        sourceType: 'all',
+        dateFrom: '',
+        dateTo: ''
     });
 
     // Available categories for dropdown (fetched once on mount, shows all tags)
@@ -671,6 +673,12 @@ const ProvenancePage = () => {
             }
             if (filters.search) {
                 queryParams.search = filters.search;
+            }
+            if (filters.dateFrom) {
+                queryParams.date_from = filters.dateFrom;
+            }
+            if (filters.dateTo) {
+                queryParams.date_to = filters.dateTo;
             }
 
             const data = await api.get('/images', queryParams);
@@ -1082,10 +1090,32 @@ const ProvenancePage = () => {
                                         ))}
                                     </select>
 
+                                    {/* Date From filter */}
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">{t('filters.dateFrom') || 'From'}</span>
+                                        <input
+                                            type="date"
+                                            value={galleryFilters.dateFrom}
+                                            onChange={(e) => setGalleryFilters(f => ({ ...f, dateFrom: e.target.value }))}
+                                            className="px-2 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                                        />
+                                    </div>
+
+                                    {/* Date To filter */}
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">{t('filters.dateTo') || 'To'}</span>
+                                        <input
+                                            type="date"
+                                            value={galleryFilters.dateTo}
+                                            onChange={(e) => setGalleryFilters(f => ({ ...f, dateTo: e.target.value }))}
+                                            className="px-2 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                                        />
+                                    </div>
+
                                     {/* Clear filters button */}
-                                    {(galleryFilters.search || galleryFilters.imageType.length > 0) && (
+                                    {(galleryFilters.search || galleryFilters.imageType.length > 0 || galleryFilters.dateFrom || galleryFilters.dateTo) && (
                                         <button
-                                            onClick={() => setGalleryFilters({ search: '', imageType: [], sourceType: 'all' })}
+                                            onClick={() => setGalleryFilters({ search: '', imageType: [], sourceType: 'all', dateFrom: '', dateTo: '' })}
                                             className="flex items-center gap-1 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
                                         >
                                             <FiX size={14} />
@@ -1111,12 +1141,12 @@ const ProvenancePage = () => {
                                     </div>
                                 ) : images.length === 0 ? (
                                     <EmptyState
-                                        title={(galleryFilters.search || galleryFilters.imageType.length > 0) ? t('common.noResults') : t('cbir.noImages')}
-                                        description={(galleryFilters.search || galleryFilters.imageType.length > 0) ? t('provenance.noFilterResults') : t('cbir.noImagesDescription')}
+                                        title={(galleryFilters.search || galleryFilters.imageType.length > 0 || galleryFilters.dateFrom || galleryFilters.dateTo) ? t('common.noResults') : t('cbir.noImages')}
+                                        description={(galleryFilters.search || galleryFilters.imageType.length > 0 || galleryFilters.dateFrom || galleryFilters.dateTo) ? t('provenance.noFilterResults') : t('cbir.noImagesDescription')}
                                         icon="image"
-                                        actionLabel={(galleryFilters.search || galleryFilters.imageType.length > 0) ? t('filters.clearFilters') : t('common.update')}
-                                        onAction={() => (galleryFilters.search || galleryFilters.imageType.length > 0)
-                                            ? setGalleryFilters({ search: '', imageType: [], sourceType: 'all' })
+                                        actionLabel={(galleryFilters.search || galleryFilters.imageType.length > 0 || galleryFilters.dateFrom || galleryFilters.dateTo) ? t('filters.clearFilters') : t('common.update')}
+                                        onAction={() => (galleryFilters.search || galleryFilters.imageType.length > 0 || galleryFilters.dateFrom || galleryFilters.dateTo)
+                                            ? setGalleryFilters({ search: '', imageType: [], sourceType: 'all', dateFrom: '', dateTo: '' })
                                             : fetchImages(1, galleryFilters)
                                         }
                                         showAction={true}
