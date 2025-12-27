@@ -20,6 +20,7 @@ import {
   FiShare2,
   FiCopy,
   FiActivity,
+  FiFlag,
 } from 'react-icons/fi';
 
 const Sidebar = ({ activePage, onNavigate, pages, isCollapsed = false, onToggle }) => {
@@ -191,7 +192,7 @@ const Sidebar = ({ activePage, onNavigate, pages, isCollapsed = false, onToggle 
         <NavSection title={t('sidebar.images')}>
           <NavItem pageKey={pages.UPLOAD_IMAGE} icon={FiUpload} label={t('sidebar.uploadImages')} />
           <NavItem pageKey={pages.VIEW_IMAGES} icon={FiGrid} label={t('sidebar.gallery')} />
-
+          <NavItem pageKey={pages.FLAGGED_IMAGES} icon={FiFlag} label={t('sidebar.flagged') || 'Flagged'} />
         </NavSection>
 
         <NavSection title={t('sidebar.documents')}>

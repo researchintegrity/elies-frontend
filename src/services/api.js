@@ -322,6 +322,17 @@ export const api = {
     },
 
     /**
+     * Get all analyses associated with a specific image
+     * Returns analyses where the image is either source or target
+     * @param {string} imageId - Image ID to get analyses for
+     * @param {number} limit - Maximum number of analyses to return (default: 50)
+     * @returns {Promise<Array>} Array of analysis objects
+     */
+    getAnalysesByImage: async (imageId, limit = 50) => {
+        return api.get(`/analyses/by-image/${imageId}`, { limit });
+    },
+
+    /**
      * Save an external analysis result
      * Allows storing results from external tools with optional file upload
      * @param {Object} data - Analysis data
@@ -338,7 +349,7 @@ export const api = {
         const formData = new FormData();
         formData.append('source_image_id', data.source_image_id);
         formData.append('tool_name', data.tool_name);
-        
+
         if (data.tool_version) {
             formData.append('tool_version', data.tool_version);
         }
@@ -354,16 +365,16 @@ export const api = {
         if (data.result_file) {
             formData.append('result_file', data.result_file);
         }
-        
+
         // Use getHeaders(true) for multipart form data (no Content-Type header)
         const headers = getHeaders(true);
-        
+
         const response = await fetch(`${API_BASE_URL}/analyses/external`, {
             method: 'POST',
             headers,
             body: formData
         });
-        
+
         return response.json();
     },
 
@@ -382,33 +393,33 @@ export const api = {
         formData.append('image_id', data.image_id);
         formData.append('analysis_subtype', data.analysis_subtype);
         formData.append('parameters', JSON.stringify(data.parameters || {}));
-        
+
         if (data.notes) {
             formData.append('notes', data.notes);
         }
         if (data.result_image) {
             // Convert blob to file if needed
             const filename = `${data.analysis_subtype}_result.png`;
-            const file = data.result_image instanceof File 
-                ? data.result_image 
+            const file = data.result_image instanceof File
+                ? data.result_image
                 : new File([data.result_image], filename, { type: 'image/png' });
             formData.append('result_image', file);
         }
-        
+
         // Use getHeaders(true) for multipart form data (no Content-Type header)
         const headers = getHeaders(true);
-        
+
         const response = await fetch(`${API_BASE_URL}/analyses/external`, {
             method: 'POST',
             headers,
             body: formData
         });
-        
+
         if (!response.ok) {
             const error = await response.json().catch(() => ({ detail: 'Failed to save analysis' }));
             throw new Error(error.detail || 'Failed to save analysis');
         }
-        
+
         return response.json();
     },
 
@@ -420,5 +431,28 @@ export const api = {
      */
     downloadAnalysisResult: async (analysisId, resultType) => {
         return api.download(`/analyses/${analysisId}/results/${resultType}/download`);
-    }
+    },
+
+    // --- Flagged Images ---
+
+    /**
+     * Toggle the flagged status of an image
+     * @param {string} imageId - Image ID to toggle flag status
+     * @returns {Promise<Object>} Updated image object
+     */
+    toggleImageFlag: async (imageId) => {
+        return api.patch(`/images/${imageId}/flag`, {});
+    },
+
+    /**
+     * Get flagged images only
+     * @param {Object} params - Query params (page, per_page, etc.)
+     * @returns {Promise<Object>} Paginated response with flagged images
+     */
+    getFlaggedImages: async (params = {}) => {
+        return api.get('/images', { ...params, flagged: true });
+    },
 };
+
+export { API_BASE_URL };
+export default api;

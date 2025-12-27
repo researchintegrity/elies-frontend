@@ -10,6 +10,7 @@ const UploadPDFPage = lazy(() => import('./pages/UploadPDFPage'));
 const UploadImagePage = lazy(() => import('./pages/UploadImagePage'));
 const ViewImagesPage = lazy(() => import('./pages/ViewImagesPage'));
 const ViewPDFPage = lazy(() => import('./pages/ViewPDFPage'));
+const FlaggedImagesPage = lazy(() => import('./pages/FlaggedImagesPage'));
 
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const CBIRSearchPage = lazy(() => import('./pages/CBIRSearchPage'));
@@ -26,8 +27,8 @@ const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
 // Page keys
 const PAGES = {
   UPLOAD_IMAGE: 'uploadImage',
-
   VIEW_IMAGES: 'viewImages',
+  FLAGGED_IMAGES: 'flaggedImages',
   UPLOAD_PDF: 'uploadPDF',
   VIEW_PDFS: 'viewPDFs',
   PROFILE: 'profile',
@@ -100,7 +101,8 @@ function AppLayout() {
         return <UploadImagePage />;
       case PAGES.VIEW_IMAGES:
         return <ViewImagesPage />;
-
+      case PAGES.FLAGGED_IMAGES:
+        return <FlaggedImagesPage onNavigate={setActivePage} />;
       case PAGES.UPLOAD_PDF:
         return <UploadPDFPage />;
       case PAGES.VIEW_PDFS:

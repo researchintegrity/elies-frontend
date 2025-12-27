@@ -83,7 +83,10 @@ export const useImages = () => {
                 uploadedDate: img.uploaded_date,
                 fileSize: img.file_size,
                 sourceType: img.source_type,
-                imageType: img.image_type || []
+                imageType: img.image_type || [],
+                isFlagged: img.is_flagged || false,
+                analysisStatus: img.analysis_status || {},
+                analysisResults: img.analysis_results || {}
             }));
 
             setImages(transformed);
@@ -176,6 +179,35 @@ export const useImages = () => {
         }
     }, [t]);
 
+    /**
+     * Toggle the flagged status of an image (optimistic update)
+     * @param {Object} image - Image object with id and is_flagged properties
+     * @returns {Promise<boolean>} Success status
+     */
+    const toggleFlag = useCallback(async (image) => {
+        // Optimistic update
+        const newFlagStatus = !image.isFlagged;
+        setImages(prev => prev.map(img =>
+            img.id === image.id ? { ...img, isFlagged: newFlagStatus } : img
+        ));
+
+        try {
+            const updatedImage = await api.toggleImageFlag(image.id);
+            // Update with server response to ensure consistency
+            setImages(prev => prev.map(img =>
+                img.id === image.id ? { ...img, isFlagged: updatedImage.is_flagged } : img
+            ));
+            return true;
+        } catch (err) {
+            // Revert optimistic update on error
+            setImages(prev => prev.map(img =>
+                img.id === image.id ? { ...img, isFlagged: image.isFlagged } : img
+            ));
+            showToast(t('images.flagError') || 'Failed to update flag status', 'error');
+            return false;
+        }
+    }, [t]);
+
     return {
         images,
         loading,
@@ -185,6 +217,9 @@ export const useImages = () => {
         uploadImage,
         deleteImage,
         addImageTypes,
-        removeImageType
+        removeImageType,
+        toggleFlag,
     };
 };
+
+export default useImages;
