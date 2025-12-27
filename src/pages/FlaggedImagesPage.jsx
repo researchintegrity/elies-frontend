@@ -616,28 +616,56 @@ const FlaggedImageDetailPanel = ({
   // Handlers
   const handleViewResults = (analysis) => {
     // Store data and navigate to appropriate page
+    const targetPage = getTargetPageForAnalysis(analysis.type);
     sessionStorage.setItem('viewResultsAnalysis', JSON.stringify({
       analysisId: analysis._id,
-      targetPage: getTargetPageForAnalysis(analysis.type),
+      targetPage: targetPage,
     }));
-    window.location.reload();
+
+    if (onNavigate) {
+      onNavigate(targetPage);
+    } else {
+      window.location.reload();
+    }
   };
 
   const handleReproduce = (analysis) => {
+    const targetPage = getTargetPageForAnalysis(analysis.type);
     sessionStorage.setItem('reproduceAnalysis', JSON.stringify({
       analysisId: analysis._id,
-      targetPage: getTargetPageForAnalysis(analysis.type),
+      targetPage: targetPage,
     }));
-    window.location.reload();
+
+    if (onNavigate) {
+      onNavigate(targetPage);
+    } else {
+      window.location.reload();
+    }
   };
 
   const handleStartNewAnalysis = (analysisType) => {
+    // Map internal types to actual page keys
+    const pageMapping = {
+      'imageAnalysis': 'imageAnalysis',
+      'manipulationDetection': 'manipulationDetection',
+      'copyMove': 'copyMove',
+      'copyMoveSingle': 'copyMove',
+      'provenance': 'provenance'
+    };
+
+    const targetPage = pageMapping[analysisType] || analysisType;
+
     sessionStorage.setItem('startAnalysis', JSON.stringify({
       imageIds: [image.imageId],
-      targetPage: analysisType,
+      targetPage: targetPage,
       mode: 'single'
     }));
-    window.location.reload();
+
+    if (onNavigate) {
+      onNavigate(targetPage);
+    } else {
+      window.location.reload();
+    }
   };
 
   const handleOpenAnnotation = () => {
@@ -1427,8 +1455,13 @@ const FlaggedImagesPage = ({ onNavigate }) => {
 
     sessionStorage.setItem('startAnalysis', JSON.stringify(startAnalysisData));
     showToast(t('analyze.navigatingToTool') || 'Navigating to analysis tool...', 'success');
-    window.location.reload();
-  }, [selectedImages, t]);
+
+    if (onNavigate) {
+      onNavigate(startAnalysisData.targetPage);
+    } else {
+      window.location.reload();
+    }
+  }, [selectedImages, t, onNavigate]);
 
   // Find similar images (CBIR)
   const handleSimilaritySearch = useCallback(async (queryImage) => {

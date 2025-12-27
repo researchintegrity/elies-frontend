@@ -739,6 +739,13 @@ const CopyMovePage = ({ onNavigate }) => {
                 const isCrossMode = analysisMode === 'cross';
                 setMode(isCrossMode ? 'cross' : 'single');
 
+                // Set default method: Cross -> Keypoint, Single -> Dense
+                if (isCrossMode) {
+                    setMethodType('keypoint');
+                } else {
+                    setMethodType('dense');
+                }
+
                 // Load source image info (first image)
                 const sourceId = imageIds && imageIds.length > 0 ? imageIds[0] : null;
                 if (sourceId) {
@@ -1098,6 +1105,8 @@ const CopyMovePage = ({ onNavigate }) => {
         setMode(newMode);
         if (newMode === 'cross') {
             setMethodType('keypoint');
+        } else if (newMode === 'single') {
+            setMethodType('dense');
         }
     };
 
