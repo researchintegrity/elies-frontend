@@ -272,7 +272,6 @@ const CBIRSearchPage = () => {
   const [images, setImages] = useState([]);
   const [imageUrls, setImageUrls] = useState({});
   const [loadingImages, setLoadingImages] = useState(true);
-  const [loadingUrls, setLoadingUrls] = useState({});
   const [errorImages, setErrorImages] = useState(null);
 
   // Gallery Filters (for selecting source images)
@@ -304,53 +303,7 @@ const CBIRSearchPage = () => {
   const [galleryPage, setGalleryPage] = useState(1);
   const [totalImages, setTotalImages] = useState(0);
 
-  // Fetch images when page or gallery filters change
-  useEffect(() => {
-    fetchImages(galleryPage, galleryFilters);
-  }, [galleryPage, galleryFilters]);
-
-  // Reset to page 1 when gallery filters change
-  const prevGalleryFiltersRef = React.useRef(galleryFilters);
-  useEffect(() => {
-    const prev = prevGalleryFiltersRef.current;
-    if (JSON.stringify(prev) !== JSON.stringify(galleryFilters) && galleryPage !== 1) {
-      setGalleryPage(1);
-    }
-    prevGalleryFiltersRef.current = galleryFilters;
-  }, [galleryFilters, galleryPage]);
-
-  // Load image URLs - use thumbnail URLs directly
-  useEffect(() => {
-    const newUrls = {};
-    for (const img of images) {
-      if (!imageUrls[img.id]) {
-        newUrls[img.id] = getThumbnailUrl(img.id);
-      }
-    }
-    if (Object.keys(newUrls).length > 0) {
-      setImageUrls(prev => ({ ...prev, ...newUrls }));
-    }
-  }, [images]);
-
-  useEffect(() => {
-    if (images.length > 0) {
-      setAvailableCategories(prev => {
-        const categories = new Set(prev);
-        images.forEach(img => {
-          (img.imageType || []).forEach(type => categories.add(type));
-        });
-        return Array.from(categories).sort();
-      });
-    }
-  }, [images]);
-
-  useEffect(() => {
-    if (selectedImage) {
-      // Always default to 'all' types - user can manually filter if needed
-      setCategoryFilter('all');
-    }
-  }, [selectedImage]);
-
+  // Fetch images logic (defined before useEffect to avoid reference errors)
   const fetchImages = useCallback(async (page = 1, filters = {}) => {
     setLoadingImages(true);
     setErrorImages(null);
@@ -406,6 +359,11 @@ const CBIRSearchPage = () => {
     }
   }, []);
 
+  // Fetch images when page or gallery filters change
+  useEffect(() => {
+    fetchImages(galleryPage, galleryFilters);
+  }, [galleryPage, galleryFilters, fetchImages]);
+
   // Fetch all available tags from backend (using dedicated endpoint for efficiency)
   useEffect(() => {
     const fetchTags = async () => {
@@ -418,6 +376,19 @@ const CBIRSearchPage = () => {
     };
     fetchTags();
   }, []);
+
+  // Load image URLs - use thumbnail URLs directly
+  useEffect(() => {
+    const newUrls = {};
+    for (const img of images) {
+      if (!imageUrls[img.id]) {
+        newUrls[img.id] = getThumbnailUrl(img.id);
+      }
+    }
+    if (Object.keys(newUrls).length > 0) {
+      setImageUrls(prev => ({ ...prev, ...newUrls }));
+    }
+  }, [images]);
 
   // ESC key to clear selection
   useEffect(() => {
@@ -642,8 +613,7 @@ const CBIRSearchPage = () => {
                       isSelected={selectedImage?.id === img.id}
                       onClick={() => setSelectedImage(img)}
                       imageUrl={imageUrls[img.id]}
-                      loading={loadingUrls[img.id]}
-                      error={!imageUrls[img.id] && !loadingUrls[img.id]}
+                      error={!imageUrls[img.id]}
                     />
                   ))}
                 </div>
