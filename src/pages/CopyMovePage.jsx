@@ -1092,7 +1092,15 @@ const CopyMovePage = ({ onNavigate }) => {
         return false;
     }, [currentStep, mode, sourceImage, targetImage, batchMode, batchImages]);
 
-    // Render step content
+
+    // specific handler for mode change to set default values
+    const handleModeChange = (newMode) => {
+        setMode(newMode);
+        if (newMode === 'cross') {
+            setMethodType('keypoint');
+        }
+    };
+
     const renderStepContent = () => {
         switch (currentStep) {
             case STEPS.SELECT:
@@ -1103,7 +1111,7 @@ const CopyMovePage = ({ onNavigate }) => {
                             {/* Mode Toggle */}
                             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
                                 <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">{t('copyMove.mode')}</h3>
-                                <ModeToggle mode={mode} onModeChange={setMode} t={t} />
+                                <ModeToggle mode={mode} onModeChange={handleModeChange} t={t} />
                             </div>
 
                             {/* Selected Images */}
