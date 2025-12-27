@@ -252,8 +252,8 @@ const ImageCard = ({ image, onClick, onSelect, isSelected, isSelectionMode, simi
         title={image.isFlagged ? (t('image.unflag') || 'Remove flag') : (t('image.flag') || 'Flag as suspicious')}
       >
         <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-md ${image.isFlagged
-            ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse'
-            : 'bg-white/90 dark:bg-black/60 text-gray-400 hover:text-red-500 hover:bg-white dark:hover:bg-black/80'
+          ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse'
+          : 'bg-white/90 dark:bg-black/60 text-gray-400 hover:text-red-500 hover:bg-white dark:hover:bg-black/80'
           }`}>
           <FiFlag size={16} className={image.isFlagged ? 'fill-current' : ''} />
         </div>
@@ -415,6 +415,39 @@ const ViewImagesPage = () => {
     fetchTags();
   }, []);
 
+  // ESC key handler
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ignore if input is focused (but allow ranges/buttons to be escaped)
+      if (e.target.tagName === 'TEXTAREA' || (e.target.tagName === 'INPUT' && !['checkbox', 'radio', 'range', 'button', 'submit'].includes(e.target.type))) {
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        const modalOpen = isBatchTagModalOpen || lightboxImage;
+        if (modalOpen) {
+          // If modal is open, let it close first
+          if (lightboxImage) setLightboxImage(null);
+          // BatchTagModal handles its own close via callback usually, but if we control isOpen...
+          if (isBatchTagModalOpen) setIsBatchTagModalOpen(false);
+          return;
+        }
+
+        if (selectedIds.size > 0) {
+          setSelectedImages(new Map());
+        } else if (similarityMode) {
+          handleExitSimilarityMode();
+        } else if (filters.tags.length > 0 || filters.dateFrom || filters.dateTo || searchQuery || filters.sourceType !== 'all') {
+          // Clear filters
+          setFilters({ sourceType: 'all', dateFrom: '', dateTo: '', tags: [] });
+          setSearchQuery('');
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isBatchTagModalOpen, lightboxImage, selectedIds, similarityMode, filters, searchQuery, t]);
+
   // Convert array for rendering (already sorted from backend)
   const availableCategoriesForSimilarity = allCategories;
 
@@ -539,7 +572,8 @@ const ViewImagesPage = () => {
       fileSize: result.file_size || 0,
       sourceType: result.source_type || 'unknown',
       imageType: result.image_type || [],
-      similarityScore: result.similarity_score
+      similarityScore: result.similarity_score,
+      isFlagged: result.is_flagged || false
     }));
   }, [similarityMode, similarityResults, t]);
 

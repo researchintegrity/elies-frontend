@@ -58,7 +58,10 @@ const handleResponse = async (response) => {
     }
 
     if (!response.ok) {
-        const errorMessage = data?.detail || data?.message || translate('api.requestError');
+        let errorMessage = data?.detail || data?.message || translate('api.requestError');
+        if (typeof errorMessage === 'object') {
+            errorMessage = JSON.stringify(errorMessage);
+        }
         throw new Error(errorMessage);
     }
 
@@ -135,7 +138,9 @@ export const api = {
     // --- Image Type Management ---
 
     addImageTypes: async (imageId, types) => {
-        return api.post(`/images/${imageId}/types`, { types });
+        // Ensure types is an array
+        const typesArray = Array.isArray(types) ? types : [types];
+        return api.post(`/images/${imageId}/types`, { types: typesArray });
     },
 
     removeImageType: async (imageId, typeName) => {

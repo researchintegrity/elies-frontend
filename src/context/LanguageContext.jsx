@@ -33,6 +33,7 @@ const translations = {
         'sidebar.images': 'Imagens',
         'sidebar.uploadImages': 'Upload Imagens',
         'sidebar.gallery': 'Galeria',
+        'sidebar.flagged': 'Investigação',
         'sidebar.annotate': 'Anotar Imagens',
         'sidebar.documents': 'Documentos',
         'sidebar.viewPdfs': 'Visualizar PDFs',
@@ -82,6 +83,7 @@ const translations = {
         'common.previous': 'Anterior',
         'common.next': 'Próximo',
         'common.saving': 'Salvando...',
+        'common.exit': 'Sair',
 
         // Upload Pages
         'upload.title': 'Upload de Imagens',
@@ -136,6 +138,8 @@ const translations = {
         // Image Filters Panel
         'filters.title': 'Filtros',
         'filters.origin': 'Origem',
+        'filters.tag': 'Tag',
+        'filters.tagAll': 'Todas as Tags',
         'filters.originAll': 'Todas',
         'filters.originUploaded': 'Enviadas por Mim',
         'filters.originExtracted': 'Extraídas de PDF',
@@ -242,6 +246,7 @@ const translations = {
         'similarity.searchError': 'Erro na busca',
         'similarity.searchErrorMessage': 'Erro ao buscar imagens similares.',
         'similarity.selectOneImage': 'Selecione exatamente uma imagem para buscar similares.',
+        'similarity.resultsFor': 'Resultados para',
 
         // Batch Tag Modal
         'batchTag.title': 'Classificar Imagens',
@@ -1083,6 +1088,7 @@ const translations = {
         'sidebar.images': 'Images',
         'sidebar.uploadImages': 'Upload Images',
         'sidebar.gallery': 'Gallery',
+        'sidebar.flagged': 'Flagged Images',
         'sidebar.annotate': 'Annotate Images',
         'sidebar.documents': 'Documents',
         'sidebar.viewPdfs': 'View PDFs',
@@ -1132,6 +1138,7 @@ const translations = {
         'common.previous': 'Previous',
         'common.next': 'Next',
         'common.saving': 'Saving...',
+        'common.exit': 'Exit',
 
         // Upload Pages
         'upload.title': 'Upload Images',
@@ -1186,6 +1193,8 @@ const translations = {
         // Image Filters Panel
         'filters.title': 'Filters',
         'filters.origin': 'Source',
+        'filters.tag': 'Tag',
+        'filters.tagAll': 'All Tags',
         'filters.originAll': 'All',
         'filters.originUploaded': 'Uploaded by Me',
         'filters.originExtracted': 'Extracted from PDF',
@@ -1291,6 +1300,7 @@ const translations = {
         'similarity.searchError': 'Search Error',
         'similarity.searchErrorMessage': 'Error searching for similar images.',
         'similarity.selectOneImage': 'Select exactly one image to search for similar ones.',
+        'similarity.resultsFor': 'Results for',
 
         // Batch Tag Modal
         'batchTag.title': 'Classify Images',
