@@ -686,6 +686,9 @@ const ViewImagesPage = () => {
     'copyMoveSingle': 'copyMove',
     'copyMoveCross': 'copyMove',
     'provenance': 'provenance',
+    // Batch analysis types route to the same pages
+    'batchManipulation': 'manipulationDetection',
+    'batchCopyMove': 'copyMove',
   };
 
   const handleAnalyzeSelected = useCallback((analysisType) => {
@@ -699,12 +702,17 @@ const ViewImagesPage = () => {
     }
 
     // Determine mode based on analysis type
-    const mode = analysisType === 'copyMoveCross' ? 'cross' : 'single';
+    let mode = 'single';
+    if (analysisType === 'copyMoveCross') {
+      mode = 'cross';
+    } else if (analysisType === 'batchManipulation' || analysisType === 'batchCopyMove') {
+      mode = 'batch';
+    }
 
     const startAnalysisData = {
-      imageIds: selectedArray.map(img => img.id || img.imageId),  // Array for future batch support
+      imageIds: selectedArray.map(img => img.id || img.imageId),
       targetPage: analysisTypeToPageKey[analysisType],
-      mode: mode  // 'single', 'cross', or future 'batch'
+      mode: mode  // 'single', 'cross', or 'batch'
     };
 
     sessionStorage.setItem('startAnalysis', JSON.stringify(startAnalysisData));

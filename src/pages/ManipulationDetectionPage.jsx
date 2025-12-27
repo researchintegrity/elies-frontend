@@ -15,6 +15,7 @@ import {
     FiImage,
     FiZap,
     FiCheck,
+    FiCheckCircle,
     FiAlertCircle,
     FiLoader,
     FiRefreshCw,
@@ -399,7 +400,7 @@ const IllustratedGuide = ({ t }) => (
 );
 
 // --- Main Component ---
-const ManipulationDetectionPage = () => {
+const ManipulationDetectionPage = ({ onNavigate }) => {
     const { images, loading: imagesLoading, fetchImages, pagination } = useImages();
     const { t } = useLanguage();
 
@@ -419,6 +420,12 @@ const ManipulationDetectionPage = () => {
     const [statusMessage, setStatusMessage] = useState(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [loadingReproduce, setLoadingReproduce] = useState(false);
+
+    // Batch analysis state
+    const [batchMode, setBatchMode] = useState(false);
+    const [batchImages, setBatchImages] = useState([]);  // Array of {id, filename}
+    const [batchResults, setBatchResults] = useState([]);  // Array of {imageId, analysisId, status, results}
+    const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -443,6 +450,18 @@ const ManipulationDetectionPage = () => {
         };
         fetchTags();
     }, []);
+
+    // ESC key to clear selection
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && currentStep === STEPS.SELECT) {
+                setBatchImages([]);
+                setSelectedImage(null);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [currentStep]);
 
     // Handle reproduce analysis from Analysis Dashboard
     useEffect(() => {
@@ -610,7 +629,47 @@ const ManipulationDetectionPage = () => {
                     return;
                 }
 
-                // Load source image info (first image in the array)
+                // Handle batch mode - load all images
+                if (mode === 'batch' && imageIds && imageIds.length > 0) {
+                    setBatchMode(true);
+                    const loadedImages = [];
+                    let failedCount = 0;
+
+                    for (const imgId of imageIds) {
+                        try {
+                            const img = await api.get(`/images/${imgId}`);
+                            loadedImages.push({ id: img._id, filename: img.filename });
+                        } catch (err) {
+                            console.error(`Failed to load image ${imgId}:`, err);
+                            failedCount++;
+                        }
+                    }
+
+                    if (loadedImages.length === 0) {
+                        showAlert(
+                            t('common.error'),
+                            t('manipulation.allImagesDeleted') || 'All selected images no longer exist',
+                            'error'
+                        );
+                        setLoadingReproduce(false);
+                        return;
+                    }
+
+                    setBatchImages(loadedImages);
+
+                    if (failedCount > 0) {
+                        showToast(`${failedCount} ${t('manipulation.imagesNotFound') || 'image(s) could not be loaded'}`, 'warning');
+                    }
+
+                    // Navigate to configure step
+                    setTimeout(() => {
+                        setCurrentStep(STEPS.CONFIGURE);
+                        setLoadingReproduce(false);
+                    }, 300);
+                    return;
+                }
+
+                // Single mode - load first image only
                 const imageId = imageIds && imageIds.length > 0 ? imageIds[0] : null;
                 if (imageId) {
                     try {
@@ -691,23 +750,44 @@ const ManipulationDetectionPage = () => {
         return () => clearInterval(pollInterval);
     }, [analysisId, analysisStatus, t]);
 
-    // Handle image click
+    // Handle image click - supports both single and batch selection
     const handleImageClick = useCallback((image) => {
+        // Toggle selection in batch images array
+        setBatchImages(prev => {
+            const isSelected = prev.some(img => img.id === image.id);
+            if (isSelected) {
+                return prev.filter(img => img.id !== image.id);
+            } else {
+                return [...prev, { id: image.id, filename: image.filename }];
+            }
+        });
+        // Also update single selection for backwards compatibility
         setSelectedImage(prev => prev?.id === image.id ? null : image);
     }, []);
 
     // Navigation
     const canNavigateToStep = (step) => {
         if (step === STEPS.SELECT) return true;
-        if (step === STEPS.CONFIGURE) return !!selectedImage;
-        if (step === STEPS.RESULTS) return analysisId !== null;
+        if (step === STEPS.CONFIGURE) return batchImages.length > 0 || !!selectedImage;
+        if (step === STEPS.RESULTS) return analysisId !== null || batchResults.length > 0;
         return false;
     };
 
-    const goToNextStep = () => { if (currentStep < STEPS.RESULTS) setCurrentStep(prev => prev + 1); };
+    const goToNextStep = () => {
+        if (currentStep < STEPS.RESULTS) {
+            // Enable batch mode if multiple images selected
+            if (currentStep === STEPS.SELECT && batchImages.length > 1) {
+                setBatchMode(true);
+            } else if (currentStep === STEPS.SELECT && batchImages.length === 1) {
+                setBatchMode(false);
+                setSelectedImage(batchImages[0]);
+            }
+            setCurrentStep(prev => prev + 1);
+        }
+    };
     const goToPrevStep = () => { if (currentStep > STEPS.SELECT) setCurrentStep(prev => prev - 1); };
 
-    // Run analysis
+    // Run single analysis
     const handleRunAnalysis = async () => {
         if (!selectedImage) { showToast(t('manipulation.selectImageFirst'), 'warning'); return; }
 
@@ -724,18 +804,128 @@ const ManipulationDetectionPage = () => {
         }
     };
 
+    // Run batch analysis - submit all to queue, then poll in parallel
+    const handleRunBatchAnalysis = async () => {
+        if (batchImages.length === 0) {
+            showToast(t('manipulation.noImagesSelected') || 'No images selected', 'warning');
+            return;
+        }
+
+        setIsAnalyzing(true);
+        setCurrentStep(STEPS.RESULTS);
+        setBatchProgress({ current: 0, total: batchImages.length });
+
+        // Initialize results array
+        const initialResults = batchImages.map(image => ({
+            imageId: image.id,
+            filename: image.filename,
+            analysisId: null,
+            status: 'queued',
+            results: null
+        }));
+        setBatchResults(initialResults);
+
+        // Step 1: Submit all analyses in parallel (Celery manages the queue)
+        const submissionResults = await Promise.all(
+            batchImages.map(async (image, idx) => {
+                try {
+                    const response = await api.startManipulationAnalysis(image.id, { save_noiseprint: saveNoiseprint });
+                    return { imageId: image.id, analysisId: response.analysis_id, status: 'processing' };
+                } catch (err) {
+                    console.error(`Error submitting analysis for ${image.id}:`, err);
+                    return { imageId: image.id, analysisId: null, status: 'failed', error: err.message };
+                }
+            })
+        );
+
+        // Update results with analysis IDs
+        const resultsWithIds = initialResults.map(result => {
+            const submission = submissionResults.find(s => s.imageId === result.imageId);
+            return submission ? { ...result, ...submission } : result;
+        });
+        setBatchResults(resultsWithIds);
+
+        const successfulSubmissions = submissionResults.filter(s => s.analysisId);
+        showToast(`${t('manipulation.batchQueued') || 'Queued'}: ${successfulSubmissions.length}/${batchImages.length} ${t('manipulation.imagesAnalyzed') || 'images'}`, 'success');
+
+        // Step 2: Poll all analyses in parallel
+        // Include all items that have an analysisId and are not yet completed/failed
+        let pendingAnalyses = resultsWithIds.filter(r => r.analysisId && !['completed', 'failed'].includes(r.status));
+        let pollCount = 0;
+        let currentResults = [...resultsWithIds];
+
+        while (pendingAnalyses.length > 0 && pollCount < MAX_POLL_ATTEMPTS) {
+            await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+            pollCount++;
+
+            // Poll all pending analyses in parallel
+            const statusUpdates = await Promise.all(
+                pendingAnalyses.map(async (item) => {
+                    try {
+                        const analysis = await api.getAnalysisById(item.analysisId);
+                        // Map backend 'pending' status to 'processing' for UI consistency
+                        const uiStatus = analysis.status === 'pending' ? 'processing' : analysis.status;
+                        return { imageId: item.imageId, status: uiStatus, results: analysis.results };
+                    } catch (err) {
+                        console.error(`Error polling ${item.analysisId}:`, err);
+                        return { imageId: item.imageId, status: 'processing' }; // Keep trying
+                    }
+                })
+            );
+
+            // Update results
+            currentResults = currentResults.map(result => {
+                const update = statusUpdates.find(u => u.imageId === result.imageId);
+                if (update) {
+                    return { ...result, status: update.status, results: update.results || result.results };
+                }
+                return result;
+            });
+            setBatchResults([...currentResults]);
+
+            // Update progress
+            const completedCount = currentResults.filter(r => r.status === 'completed' || r.status === 'failed').length;
+            setBatchProgress({ current: completedCount, total: batchImages.length });
+
+            // Filter still pending - any that are not completed or failed
+            pendingAnalyses = currentResults.filter(r => r.analysisId && !['completed', 'failed'].includes(r.status));
+        }
+
+        // Mark timeout for any still pending
+        if (pendingAnalyses.length > 0) {
+            currentResults = currentResults.map(r =>
+                pendingAnalyses.some(p => p.imageId === r.imageId) ? { ...r, status: 'timeout' } : r
+            );
+            setBatchResults([...currentResults]);
+        }
+
+        setIsAnalyzing(false);
+        const completed = currentResults.filter(r => r.status === 'completed').length;
+        const failed = currentResults.filter(r => r.status !== 'completed').length;
+
+        if (completed > 0 && failed === 0) {
+            showToast(`${t('manipulation.batchCompleted') || 'Batch analysis completed'}: ${completed} ${t('manipulation.imagesAnalyzed') || 'images'}`, 'success');
+        } else if (completed > 0) {
+            showToast(`${completed} ${t('manipulation.completed') || 'completed'}, ${failed} ${t('manipulation.failed') || 'failed'}`, 'warning');
+        } else {
+            showToast(t('manipulation.batchFailed') || 'Batch analysis failed', 'error');
+        }
+    };
+
     // Reset
     const handleReset = () => {
         setCurrentStep(STEPS.SELECT); setSelectedImage(null);
         setAnalysisId(null); setAnalysisStatus(null); setAnalysisResults(null); setStatusMessage(null); setIsAnalyzing(false);
         setSaveNoiseprint(false); handleClearFilters();
+        // Reset batch state
+        setBatchMode(false); setBatchImages([]); setBatchResults([]); setBatchProgress({ current: 0, total: 0 });
     };
 
     const canProceed = useMemo(() => {
-        if (currentStep === STEPS.SELECT) return !!selectedImage;
-        if (currentStep === STEPS.CONFIGURE) return true;
+        if (currentStep === STEPS.SELECT) return batchMode ? batchImages.length > 0 : !!selectedImage;
+        if (currentStep === STEPS.CONFIGURE) return batchMode ? batchImages.length > 0 : true;
         return false;
-    }, [currentStep, selectedImage]);
+    }, [currentStep, selectedImage, batchMode, batchImages]);
 
     // Render step content
     const renderStepContent = () => {
@@ -743,18 +933,46 @@ const ManipulationDetectionPage = () => {
             case STEPS.SELECT:
                 return (
                     <div className="flex gap-4 h-full">
-                        {/* Left Panel: Selected Image */}
+                        {/* Left Panel: Selected Images */}
                         <div className="w-64 flex-shrink-0 flex flex-col gap-3">
                             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
-                                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">{t('manipulation.selectedImage')}</h3>
-                                <CompactImagePreview image={selectedImage} onRemove={() => setSelectedImage(null)} t={t} />
+                                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
+                                    {t('manipulation.selectedImages') || 'Selected Images'} ({batchImages.length})
+                                </h3>
+
+                                {batchImages.length > 0 ? (
+                                    <div className="max-h-48 overflow-y-auto scrollbar-custom space-y-2">
+                                        {batchImages.map((image) => (
+                                            <div key={image.id} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                                                <div className="w-8 h-8 rounded overflow-hidden bg-gray-200 dark:bg-gray-600 flex-shrink-0">
+                                                    <img
+                                                        src={getThumbnailUrl(image.id)}
+                                                        alt={image.filename}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </div>
+                                                <span className="flex-1 text-xs text-gray-700 dark:text-gray-300 truncate">{image.filename}</span>
+                                                <button
+                                                    onClick={() => setBatchImages(prev => prev.filter(img => img.id !== image.id))}
+                                                    className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400 hover:text-gray-600"
+                                                >
+                                                    <FiX size={12} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-4 text-gray-400 text-xs">
+                                        {t('manipulation.noImagesSelected') || 'No images selected'}
+                                    </div>
+                                )}
 
                                 {/* Instructions */}
                                 <div className="mt-3 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800">
                                     <div className="flex gap-2 items-start">
                                         <FiInfo className="text-emerald-500 flex-shrink-0 mt-0.5" size={12} />
                                         <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
-                                            {t('manipulation.selectInstructions')}
+                                            {t('manipulation.selectMultiple') || 'Click to select images for batch analysis'}
                                         </p>
                                     </div>
                                 </div>
@@ -847,7 +1065,7 @@ const ManipulationDetectionPage = () => {
                                 ) : (
                                     <div className="grid grid-cols-6 gap-2">
                                         {images.map(image => (
-                                            <LazyImageCard key={image.id} image={image} isSelected={selectedImage?.id === image.id} onClick={() => handleImageClick(image)} />
+                                            <LazyImageCard key={image.id} image={image} isSelected={batchImages.some(img => img.id === image.id)} onClick={() => handleImageClick(image)} />
                                         ))}
                                     </div>
                                 )}
@@ -873,15 +1091,50 @@ const ManipulationDetectionPage = () => {
                 return (
                     <div className="max-w-2xl mx-auto">
                         <div className="text-center mb-6">
-                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t('manipulation.step.configureTitle')}</h2>
-                            <p className="text-gray-500">{t('manipulation.step.configureDesc')}</p>
+                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                                {batchMode ? t('manipulation.batchConfigureTitle') || 'Configure Batch Analysis' : t('manipulation.step.configureTitle')}
+                            </h2>
+                            <p className="text-gray-500">
+                                {batchMode ? t('manipulation.batchConfigureDesc') || 'These settings will apply to all selected images' : t('manipulation.step.configureDesc')}
+                            </p>
                         </div>
 
-                        {/* Selected Image Summary */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-4">
-                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('manipulation.selectedImage')}</h3>
-                            <CompactImagePreview image={selectedImage} onRemove={() => { setSelectedImage(null); setCurrentStep(STEPS.SELECT); }} t={t} />
-                        </div>
+                        {/* Selected Images - Batch Mode */}
+                        {batchMode ? (
+                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                                        {t('manipulation.selectedImages') || 'Selected Images'} ({batchImages.length})
+                                    </h3>
+                                </div>
+                                <div className="max-h-48 overflow-y-auto scrollbar-custom space-y-2">
+                                    {batchImages.map((image) => (
+                                        <div key={image.id} className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                                            <div className="w-10 h-10 rounded overflow-hidden bg-gray-200 dark:bg-gray-600 flex-shrink-0">
+                                                <img
+                                                    src={getThumbnailUrl(image.id)}
+                                                    alt={image.filename}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            </div>
+                                            <span className="flex-1 text-sm text-gray-700 dark:text-gray-300 truncate">{image.filename}</span>
+                                            <button
+                                                onClick={() => setBatchImages(prev => prev.filter(img => img.id !== image.id))}
+                                                className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400 hover:text-gray-600"
+                                            >
+                                                <FiX size={14} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            /* Single Image Mode */
+                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-4">
+                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('manipulation.selectedImage')}</h3>
+                                <CompactImagePreview image={selectedImage} onRemove={() => { setSelectedImage(null); setCurrentStep(STEPS.SELECT); }} t={t} />
+                            </div>
+                        )}
 
                         {/* Options */}
                         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-4">
@@ -915,12 +1168,112 @@ const ManipulationDetectionPage = () => {
                 return (
                     <div className="max-w-4xl mx-auto">
                         <div className="text-center mb-6">
-                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t('manipulation.results')}</h2>
-                            <p className="text-gray-500">{t('manipulation.step.resultsDesc')}</p>
+                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                                {batchMode ? t('manipulation.batchResults') || 'Batch Analysis Results' : t('manipulation.results')}
+                            </h2>
+                            <p className="text-gray-500">
+                                {batchMode ? t('manipulation.batchResultsDesc') || 'Results for all analyzed images' : t('manipulation.step.resultsDesc')}
+                            </p>
+                            {batchMode && (
+                                <button
+                                    onClick={() => onNavigate && onNavigate('analysisDashboard')}
+                                    className="mt-4 inline-flex items-center gap-3 px-8 py-5 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors group w-full max-w-2xl justify-center"
+                                >
+                                    <FiInfo className="text-indigo-500 group-hover:scale-110 transition-transform flex-shrink-0" size={24} />
+                                    <span className="text-lg font-medium text-indigo-700 dark:text-indigo-300">
+                                        {t('manipulation.batchDashboardNotice') || 'Individual results are available in the Analysis Dashboard'}
+                                    </span>
+                                    <FiArrowRight className="text-indigo-400 group-hover:translate-x-1 transition-transform flex-shrink-0" size={20} />
+                                </button>
+                            )}
                         </div>
-                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-                            {analysisId ? <ResultsViewer analysisId={analysisId} status={analysisStatus} results={analysisResults} statusMessage={statusMessage} t={t} /> : <IllustratedGuide t={t} />}
-                        </div>
+
+                        {/* Batch Results View */}
+                        {batchMode ? (
+                            <div className="space-y-4">
+                                {/* Progress Bar */}
+                                {isAnalyzing && (
+                                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                {t('manipulation.analyzing') || 'Analyzing'} {batchProgress.current} / {batchProgress.total}
+                                            </span>
+                                            <span className="text-sm text-gray-500">
+                                                {Math.round((batchProgress.current / batchProgress.total) * 100)}%
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                            <div
+                                                className="bg-emerald-500 h-2 rounded-full transition-all duration-300"
+                                                style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Results Grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {batchResults.map((result, idx) => (
+                                        <div key={result.imageId || idx} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-600 flex-shrink-0">
+                                                    <img
+                                                        src={getThumbnailUrl(result.imageId)}
+                                                        alt={result.filename}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{result.filename}</p>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        {result.status === 'queued' && (
+                                                            <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                                                                <FiLoader size={12} /> {t('manipulation.queued') || 'Queued'}
+                                                            </span>
+                                                        )}
+                                                        {result.status === 'processing' && (
+                                                            <span className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
+                                                                <FiLoader className="animate-spin" size={12} /> {t('manipulation.processing') || 'Processing'}
+                                                            </span>
+                                                        )}
+                                                        {result.status === 'completed' && (
+                                                            <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                                                                <FiCheckCircle size={12} /> {t('manipulation.complete') || 'Complete'}
+                                                            </span>
+                                                        )}
+                                                        {result.status === 'failed' && (
+                                                            <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                                                                <FiAlertCircle size={12} /> {t('manipulation.failed') || 'Failed'}
+                                                            </span>
+                                                        )}
+                                                        {result.status === 'timeout' && (
+                                                            <span className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-400">
+                                                                <FiAlertCircle size={12} /> {t('manipulation.timeout') || 'Timeout'}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {result.results?.integrity_score !== undefined && (
+                                                <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-xs text-gray-500">{t('manipulation.integrityScore') || 'Integrity Score'}</span>
+                                                        <span className={`text-sm font-semibold ${result.results.integrity_score > 0.7 ? 'text-emerald-600' : result.results.integrity_score > 0.3 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                                            {(result.results.integrity_score * 100).toFixed(1)}%
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            /* Single Result View */
+                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+                                {analysisId ? <ResultsViewer analysisId={analysisId} status={analysisStatus} results={analysisResults} statusMessage={statusMessage} t={t} /> : <IllustratedGuide t={t} />}
+                            </div>
+                        )}
                     </div>
                 );
 
@@ -989,10 +1342,10 @@ const ManipulationDetectionPage = () => {
                         </button>
                     )}
                     {currentStep === STEPS.CONFIGURE && (
-                        <button onClick={handleRunAnalysis} disabled={isAnalyzing}
+                        <button onClick={batchMode ? handleRunBatchAnalysis : handleRunAnalysis} disabled={isAnalyzing || (batchMode && batchImages.length === 0)}
                             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
                         >
-                            {isAnalyzing ? <><FiLoader className="animate-spin" size={16} />{t('manipulation.analyzing')}</> : <><FiZap size={16} />{t('manipulation.analyze')}</>}
+                            {isAnalyzing ? <><FiLoader className="animate-spin" size={16} />{batchMode ? t('manipulation.analyzingBatch') || 'Analyzing...' : t('manipulation.analyzing')}</> : <><FiZap size={16} />{batchMode ? t('manipulation.analyzeBatch') || `Analyze ${batchImages.length} Images` : t('manipulation.analyze')}</>}
                         </button>
                     )}
                     {currentStep === STEPS.RESULTS && (

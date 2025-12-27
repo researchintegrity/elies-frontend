@@ -26,12 +26,17 @@ const SelectionToolbar = ({ selectedCount, onClearSelection, onDelete, onTag, on
     // Analysis menu options
     // maxImages: hide option when more images are selected
     // exactImages: require exactly this many images
+    // isBatch: marks this as a batch analysis option
     const analysisOptions = [
+        // Single image options
         { key: 'imageAnalysis', icon: FiImage, label: t('analyze.imageAnalysis'), minImages: 1, maxImages: 1 },
-        { key: 'manipulationDetection', icon: FiActivity, label: t('analyze.manipulationDetection'), minImages: 1 },
-        { key: 'copyMoveSingle', icon: FiCopy, label: t('analyze.copyMoveSingle'), minImages: 1 },
+        { key: 'manipulationDetection', icon: FiActivity, label: t('analyze.manipulationDetection'), minImages: 1, maxImages: 1 },
+        { key: 'copyMoveSingle', icon: FiCopy, label: t('analyze.copyMoveSingle'), minImages: 1, maxImages: 1 },
         { key: 'copyMoveCross', icon: FiCopy, label: t('analyze.copyMoveCross'), minImages: 2, exactImages: 2 },
         { key: 'provenance', icon: FiGitBranch, label: t('analyze.provenance'), minImages: 1, maxImages: 1 },
+        // Batch analysis options (2+ images)
+        { key: 'batchManipulation', icon: FiActivity, label: t('analyze.batchManipulation'), minImages: 2, isBatch: true },
+        { key: 'batchCopyMove', icon: FiCopy, label: t('analyze.batchCopyMove'), minImages: 2, isBatch: true },
     ];
 
     const handleAnalysisSelect = (analysisKey) => {

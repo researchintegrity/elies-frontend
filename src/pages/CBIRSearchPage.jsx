@@ -419,6 +419,17 @@ const CBIRSearchPage = () => {
     fetchTags();
   }, []);
 
+  // ESC key to clear selection
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setSelectedImage(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleSearch = async () => {
     if (!selectedImage) {
       showAlert(t('common.warning'), t('cbir.selectSourceFirst'), 'warning');

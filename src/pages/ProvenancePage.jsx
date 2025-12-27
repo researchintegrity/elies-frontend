@@ -400,6 +400,17 @@ const ProvenancePage = () => {
         fetchTags();
     }, []);
 
+    // ESC key to clear selection
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && currentStep === STEPS.SELECT) {
+                setSelectedImage(null);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [currentStep]);
+
     // Handle reproduce analysis from Analysis Dashboard
     useEffect(() => {
         const reproduceData = sessionStorage.getItem('reproduceAnalysis');

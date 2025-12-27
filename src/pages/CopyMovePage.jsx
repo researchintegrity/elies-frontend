@@ -14,6 +14,7 @@ import {
     FiImage,
     FiZap,
     FiCheck,
+    FiCheckCircle,
     FiAlertCircle,
     FiLoader,
     FiRefreshCw,
@@ -401,7 +402,7 @@ const ResultsViewer = ({ analysisId, status, results, t }) => {
 };
 
 // --- Main Component ---
-const CopyMovePage = () => {
+const CopyMovePage = ({ onNavigate }) => {
     const { images, loading: imagesLoading, fetchImages, pagination } = useImages();
     const { t } = useLanguage();
 
@@ -428,6 +429,12 @@ const CopyMovePage = () => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [loadingReproduce, setLoadingReproduce] = useState(false);
 
+    // Batch analysis state
+    const [batchMode, setBatchMode] = useState(false);
+    const [batchImages, setBatchImages] = useState([]);  // Array of {id, filename}
+    const [batchResults, setBatchResults] = useState([]);  // Array of {imageId, analysisId, status, results}
+    const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
+
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -453,6 +460,19 @@ const CopyMovePage = () => {
             if (filterMode === 'similar') setFilterMode('all');
         }
     }, [sourceImage, filterMode]);
+
+    // ESC key to clear selection
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && currentStep === STEPS.SELECT) {
+                setBatchImages([]);
+                setSourceImage(null);
+                setTargetImage(null);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [currentStep]);
 
     // Fetch all available tags from backend (using dedicated endpoint for efficiency)
     useEffect(() => {
@@ -674,6 +694,47 @@ const CopyMovePage = () => {
                     return;
                 }
 
+                // Handle batch mode - load all images
+                if (analysisMode === 'batch' && imageIds && imageIds.length > 0) {
+                    setBatchMode(true);
+                    setMode('single'); // Batch uses single-image analysis for each
+                    const loadedImages = [];
+                    let failedCount = 0;
+
+                    for (const imgId of imageIds) {
+                        try {
+                            const img = await api.get(`/images/${imgId}`);
+                            loadedImages.push({ id: img._id, filename: img.filename });
+                        } catch (err) {
+                            console.error(`Failed to load image ${imgId}:`, err);
+                            failedCount++;
+                        }
+                    }
+
+                    if (loadedImages.length === 0) {
+                        showAlert(
+                            t('common.error'),
+                            t('copyMove.allImagesDeleted') || 'All selected images no longer exist',
+                            'error'
+                        );
+                        setLoadingReproduce(false);
+                        return;
+                    }
+
+                    setBatchImages(loadedImages);
+
+                    if (failedCount > 0) {
+                        showToast(`${failedCount} ${t('copyMove.imagesNotFound') || 'image(s) could not be loaded'}`, 'warning');
+                    }
+
+                    // Navigate to configure step
+                    setTimeout(() => {
+                        setCurrentStep(STEPS.CONFIGURE);
+                        setLoadingReproduce(false);
+                    }, 300);
+                    return;
+                }
+
                 // Set mode based on the trigger
                 const isCrossMode = analysisMode === 'cross';
                 setMode(isCrossMode ? 'cross' : 'single');
@@ -814,11 +875,22 @@ const CopyMovePage = () => {
         return () => clearInterval(pollInterval);
     }, [analysisId, analysisStatus, t]);
 
-    // Handle image selection
+    // Handle image selection - supports multi-selection for batch mode in single mode
     const handleImageClick = useCallback((image) => {
         if (mode === 'single') {
+            // Toggle selection in batch images array for multi-selection
+            setBatchImages(prev => {
+                const isSelected = prev.some(img => img.id === image.id);
+                if (isSelected) {
+                    return prev.filter(img => img.id !== image.id);
+                } else {
+                    return [...prev, { id: image.id, filename: image.filename }];
+                }
+            });
+            // Also update single selection for backwards compatibility
             setSourceImage(prev => prev?.id === image.id ? null : image);
         } else {
+            // Cross mode - original behavior
             if (!sourceImage || sourceImage.id === image.id) {
                 setSourceImage(prev => prev?.id === image.id ? null : image);
             } else if (!targetImage || targetImage.id === image.id) {
@@ -830,23 +902,44 @@ const CopyMovePage = () => {
     }, [mode, sourceImage, targetImage]);
 
     const getImageRole = (image) => {
-        if (sourceImage?.id === image.id) return 'source';
-        if (targetImage?.id === image.id) return 'target';
+        if (mode === 'single') {
+            // For single mode, check batchImages array
+            if (batchImages.some(img => img.id === image.id)) return 'source';
+        } else {
+            if (sourceImage?.id === image.id) return 'source';
+            if (targetImage?.id === image.id) return 'target';
+        }
         return null;
     };
 
     // Navigation
     const canNavigateToStep = (step) => {
         if (step === STEPS.SELECT) return true;
-        if (step === STEPS.CONFIGURE) return mode === 'single' ? !!sourceImage : (!!sourceImage && !!targetImage);
-        if (step === STEPS.RESULTS) return analysisId !== null;
+        if (step === STEPS.CONFIGURE) {
+            if (mode === 'single') return batchImages.length > 0 || !!sourceImage;
+            return !!sourceImage && !!targetImage;
+        }
+        if (step === STEPS.RESULTS) return analysisId !== null || batchResults.length > 0;
         return false;
     };
 
-    const goToNextStep = () => { if (currentStep < STEPS.RESULTS) setCurrentStep(prev => prev + 1); };
+    const goToNextStep = () => {
+        if (currentStep < STEPS.RESULTS) {
+            // Enable batch mode if multiple images selected in single mode
+            if (currentStep === STEPS.SELECT && mode === 'single') {
+                if (batchImages.length > 1) {
+                    setBatchMode(true);
+                } else if (batchImages.length === 1) {
+                    setBatchMode(false);
+                    setSourceImage(batchImages[0]);
+                }
+            }
+            setCurrentStep(prev => prev + 1);
+        }
+    };
     const goToPrevStep = () => { if (currentStep > STEPS.SELECT) setCurrentStep(prev => prev - 1); };
 
-    // Run analysis
+    // Run single/cross analysis
     const handleRunAnalysis = async () => {
         if (mode === 'single' && !sourceImage) { showToast(t('copyMove.selectImageFirst'), 'warning'); return; }
         if (mode === 'cross' && (!sourceImage || !targetImage)) { showToast(t('copyMove.selectBothImages'), 'warning'); return; }
@@ -869,6 +962,112 @@ const CopyMovePage = () => {
         }
     };
 
+    // Run batch analysis - submit all to queue, then poll in parallel
+    const handleRunBatchAnalysis = async () => {
+        if (batchImages.length === 0) {
+            showToast(t('copyMove.noImagesSelected') || 'No images selected', 'warning');
+            return;
+        }
+
+        setIsAnalyzing(true);
+        setCurrentStep(STEPS.RESULTS);
+        setBatchProgress({ current: 0, total: batchImages.length });
+
+        // Initialize results array
+        const initialResults = batchImages.map(image => ({
+            imageId: image.id,
+            filename: image.filename,
+            analysisId: null,
+            status: 'queued',
+            results: null
+        }));
+        setBatchResults(initialResults);
+
+        // Step 1: Submit all analyses in parallel (Celery manages the queue)
+        const submissionResults = await Promise.all(
+            batchImages.map(async (image) => {
+                try {
+                    const response = await api.startCopyMoveAnalysis(image.id, 'dense', denseMethod);
+                    return { imageId: image.id, analysisId: response.analysis_id, status: 'processing' };
+                } catch (err) {
+                    console.error(`Error submitting analysis for ${image.id}:`, err);
+                    return { imageId: image.id, analysisId: null, status: 'failed', error: err.message };
+                }
+            })
+        );
+
+        // Update results with analysis IDs
+        const resultsWithIds = initialResults.map(result => {
+            const submission = submissionResults.find(s => s.imageId === result.imageId);
+            return submission ? { ...result, ...submission } : result;
+        });
+        setBatchResults(resultsWithIds);
+
+        const successfulSubmissions = submissionResults.filter(s => s.analysisId);
+        showToast(`${t('copyMove.batchQueued') || 'Queued'}: ${successfulSubmissions.length}/${batchImages.length} ${t('copyMove.imagesAnalyzed') || 'images'}`, 'success');
+
+        // Step 2: Poll all analyses in parallel
+        let pendingAnalyses = resultsWithIds.filter(r => r.analysisId && !['completed', 'failed'].includes(r.status));
+        let pollCount = 0;
+        let currentResults = [...resultsWithIds];
+
+        while (pendingAnalyses.length > 0 && pollCount < MAX_POLL_ATTEMPTS) {
+            await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+            pollCount++;
+
+            // Poll all pending analyses in parallel
+            const statusUpdates = await Promise.all(
+                pendingAnalyses.map(async (item) => {
+                    try {
+                        const analysis = await api.getAnalysisById(item.analysisId);
+                        const uiStatus = analysis.status === 'pending' ? 'processing' : analysis.status;
+                        return { imageId: item.imageId, status: uiStatus, results: analysis.results };
+                    } catch (err) {
+                        console.error(`Error polling ${item.analysisId}:`, err);
+                        return { imageId: item.imageId, status: 'processing' };
+                    }
+                })
+            );
+
+            // Update results
+            currentResults = currentResults.map(result => {
+                const update = statusUpdates.find(u => u.imageId === result.imageId);
+                if (update) {
+                    return { ...result, status: update.status, results: update.results || result.results };
+                }
+                return result;
+            });
+            setBatchResults([...currentResults]);
+
+            // Update progress
+            const completedCount = currentResults.filter(r => r.status === 'completed' || r.status === 'failed').length;
+            setBatchProgress({ current: completedCount, total: batchImages.length });
+
+            // Filter still pending
+            pendingAnalyses = currentResults.filter(r => r.analysisId && !['completed', 'failed'].includes(r.status));
+        }
+
+        // Mark timeout for any still pending
+        if (pendingAnalyses.length > 0) {
+            currentResults = currentResults.map(r =>
+                pendingAnalyses.some(p => p.imageId === r.imageId) ? { ...r, status: 'timeout' } : r
+            );
+            setBatchResults([...currentResults]);
+        }
+
+        setIsAnalyzing(false);
+        const completed = currentResults.filter(r => r.status === 'completed').length;
+        const failed = currentResults.filter(r => r.status !== 'completed').length;
+
+        if (completed > 0 && failed === 0) {
+            showToast(`${t('copyMove.batchCompleted') || 'Batch analysis completed'}: ${completed} ${t('copyMove.imagesAnalyzed') || 'images'}`, 'success');
+        } else if (completed > 0) {
+            showToast(`${completed} ${t('copyMove.completed') || 'completed'}, ${failed} ${t('copyMove.failed') || 'failed'}`, 'warning');
+        } else {
+            showToast(t('copyMove.batchFailed') || 'Batch analysis failed', 'error');
+        }
+    };
+
     // Reset
     const handleReset = () => {
         setCurrentStep(STEPS.SELECT); setMode('single'); setSourceImage(null); setTargetImage(null);
@@ -877,13 +1076,21 @@ const CopyMovePage = () => {
         // Clear filters
         setFilterMode('all'); setFilterTags([]); setFilterDateFrom(''); setFilterDateTo('');
         setSearchQuery(''); setSimilarityResults([]);
+        // Reset batch state
+        setBatchMode(false); setBatchImages([]); setBatchResults([]); setBatchProgress({ current: 0, total: 0 });
     };
 
     const canProceed = useMemo(() => {
-        if (currentStep === STEPS.SELECT) return mode === 'single' ? !!sourceImage : (!!sourceImage && !!targetImage);
-        if (currentStep === STEPS.CONFIGURE) return true;
+        if (currentStep === STEPS.SELECT) {
+            if (mode === 'single') return batchImages.length > 0;
+            return !!sourceImage && !!targetImage;
+        }
+        if (currentStep === STEPS.CONFIGURE) {
+            if (batchMode) return batchImages.length > 0;
+            return true;
+        }
         return false;
-    }, [currentStep, mode, sourceImage, targetImage]);
+    }, [currentStep, mode, sourceImage, targetImage, batchMode, batchImages]);
 
     // Render step content
     const renderStepContent = () => {
@@ -901,20 +1108,52 @@ const CopyMovePage = () => {
 
                             {/* Selected Images */}
                             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 flex-1">
-                                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">{t('copyMove.selectedImages')}</h3>
-                                <div className="space-y-2">
-                                    <CompactImagePreview image={sourceImage} label={t('copyMove.source')} color="indigo" onRemove={() => setSourceImage(null)} t={t} />
-                                    {mode === 'cross' && (
+                                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
+                                    {mode === 'single' ? `${t('copyMove.selectedImages') || 'Selected Images'} (${batchImages.length})` : t('copyMove.selectedImages')}
+                                </h3>
+
+                                {mode === 'single' ? (
+                                    /* Batch Images List for Single Mode */
+                                    batchImages.length > 0 ? (
+                                        <div className="max-h-40 overflow-y-auto scrollbar-custom space-y-2">
+                                            {batchImages.map((image) => (
+                                                <div key={image.id} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                                                    <div className="w-8 h-8 rounded overflow-hidden bg-gray-200 dark:bg-gray-600 flex-shrink-0">
+                                                        <img
+                                                            src={getThumbnailUrl(image.id)}
+                                                            alt={image.filename}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    </div>
+                                                    <span className="flex-1 text-xs text-gray-700 dark:text-gray-300 truncate">{image.filename}</span>
+                                                    <button
+                                                        onClick={() => setBatchImages(prev => prev.filter(img => img.id !== image.id))}
+                                                        className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400 hover:text-gray-600"
+                                                    >
+                                                        <FiX size={12} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-4 text-gray-400 text-xs">
+                                            {t('copyMove.noImagesSelected') || 'No images selected'}
+                                        </div>
+                                    )
+                                ) : (
+                                    /* Cross Mode - Source/Target Images */
+                                    <div className="space-y-2">
+                                        <CompactImagePreview image={sourceImage} label={t('copyMove.source')} color="indigo" onRemove={() => setSourceImage(null)} t={t} />
                                         <CompactImagePreview image={targetImage} label={t('copyMove.target')} color="amber" onRemove={() => setTargetImage(null)} t={t} />
-                                    )}
-                                </div>
+                                    </div>
+                                )}
 
                                 {/* Instructions */}
                                 <div className="mt-3 p-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800">
                                     <div className="flex gap-2 items-start">
                                         <FiInfo className="text-indigo-500 flex-shrink-0 mt-0.5" size={12} />
                                         <p className="text-[11px] text-indigo-700 dark:text-indigo-300">
-                                            {mode === 'single' ? t('copyMove.selectInstructionsSingle') : t('copyMove.selectInstructionsCross')}
+                                            {mode === 'single' ? t('copyMove.selectMultiple') || 'Click to select images for batch analysis' : t('copyMove.selectInstructionsCross')}
                                         </p>
                                     </div>
                                 </div>
@@ -1076,7 +1315,7 @@ const CopyMovePage = () => {
                                 ) : (
                                     <div className="grid grid-cols-6 gap-2">
                                         {images.map(image => (
-                                            <LazyImageCard key={image.id} image={image} isSelected={sourceImage?.id === image.id || targetImage?.id === image.id} onClick={() => handleImageClick(image)} role={getImageRole(image)} t={t} />
+                                            <LazyImageCard key={image.id} image={image} isSelected={mode === 'single' ? batchImages.some(img => img.id === image.id) : (sourceImage?.id === image.id || targetImage?.id === image.id)} onClick={() => handleImageClick(image)} role={getImageRole(image)} t={t} />
                                         ))}
                                     </div>
                                 )}
@@ -1113,17 +1352,49 @@ const CopyMovePage = () => {
                 return (
                     <div className="max-w-2xl mx-auto">
                         <div className="text-center mb-6">
-                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t('copyMove.step.configureTitle')}</h2>
-                            <p className="text-gray-500">{t('copyMove.step.configureDesc')}</p>
+                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                                {batchMode ? t('copyMove.batchConfigureTitle') || 'Configure Batch Analysis' : t('copyMove.step.configureTitle')}
+                            </h2>
+                            <p className="text-gray-500">
+                                {batchMode ? t('copyMove.batchConfigureDesc') || 'These settings will apply to all selected images' : t('copyMove.step.configureDesc')}
+                            </p>
                         </div>
 
-                        {/* Selected Images Summary */}
+                        {/* Selected Images Summary - Batch or Normal */}
                         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-4">
-                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('copyMove.selectedImages')}</h3>
-                            <div className={`grid gap-3 ${mode === 'cross' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                                <CompactImagePreview image={sourceImage} label={t('copyMove.source')} color="indigo" onRemove={() => { setSourceImage(null); setCurrentStep(STEPS.SELECT); }} t={t} />
-                                {mode === 'cross' && <CompactImagePreview image={targetImage} label={t('copyMove.target')} color="amber" onRemove={() => { setTargetImage(null); setCurrentStep(STEPS.SELECT); }} t={t} />}
-                            </div>
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                                {batchMode ? `${t('copyMove.selectedImages') || 'Selected Images'} (${batchImages.length})` : t('copyMove.selectedImages')}
+                            </h3>
+
+                            {batchMode ? (
+                                /* Batch Images Panel */
+                                <div className="max-h-48 overflow-y-auto scrollbar-custom space-y-2">
+                                    {batchImages.map((image) => (
+                                        <div key={image.id} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                                            <div className="w-10 h-10 rounded overflow-hidden bg-gray-200 dark:bg-gray-600 flex-shrink-0">
+                                                <img
+                                                    src={getThumbnailUrl(image.id)}
+                                                    alt={image.filename}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            </div>
+                                            <span className="flex-1 text-xs text-gray-700 dark:text-gray-300 truncate">{image.filename}</span>
+                                            <button
+                                                onClick={() => setBatchImages(prev => prev.filter(img => img.id !== image.id))}
+                                                className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-400 hover:text-gray-600"
+                                            >
+                                                <FiX size={12} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                /* Normal Single/Cross Images */
+                                <div className={`grid gap-3 ${mode === 'cross' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                    <CompactImagePreview image={sourceImage} label={t('copyMove.source')} color="indigo" onRemove={() => { setSourceImage(null); setCurrentStep(STEPS.SELECT); }} t={t} />
+                                    {mode === 'cross' && <CompactImagePreview image={targetImage} label={t('copyMove.target')} color="amber" onRemove={() => { setTargetImage(null); setCurrentStep(STEPS.SELECT); }} t={t} />}
+                                </div>
+                            )}
                         </div>
 
                         {/* Method Selection */}
@@ -1191,12 +1462,112 @@ const CopyMovePage = () => {
                 return (
                     <div className="max-w-4xl mx-auto">
                         <div className="text-center mb-6">
-                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t('copyMove.results')}</h2>
-                            <p className="text-gray-500">{t('copyMove.step.resultsDesc')}</p>
+                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                                {batchMode ? t('copyMove.batchResults') || 'Batch Analysis Results' : t('copyMove.results')}
+                            </h2>
+                            <p className="text-gray-500">
+                                {batchMode ? t('copyMove.batchResultsDesc') || 'Results for all analyzed images' : t('copyMove.step.resultsDesc')}
+                            </p>
+                            {batchMode && (
+                                <button
+                                    onClick={() => onNavigate && onNavigate('analysisDashboard')}
+                                    className="mt-4 inline-flex items-center gap-3 px-8 py-5 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors group w-full max-w-2xl justify-center"
+                                >
+                                    <FiInfo className="text-indigo-500 group-hover:scale-110 transition-transform flex-shrink-0" size={24} />
+                                    <span className="text-lg font-medium text-indigo-700 dark:text-indigo-300">
+                                        {t('copyMove.batchDashboardNotice') || 'Individual results are available in the Analysis Dashboard'}
+                                    </span>
+                                    <FiArrowRight className="text-indigo-400 group-hover:translate-x-1 transition-transform flex-shrink-0" size={20} />
+                                </button>
+                            )}
                         </div>
-                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-                            {analysisId ? <ResultsViewer analysisId={analysisId} status={analysisStatus} results={analysisResults} t={t} /> : <IllustratedGuide t={t} />}
-                        </div>
+
+                        {/* Batch Results View */}
+                        {batchMode ? (
+                            <div className="space-y-4">
+                                {/* Progress Bar */}
+                                {isAnalyzing && (
+                                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                {t('copyMove.analyzing') || 'Analyzing'} {batchProgress.current} / {batchProgress.total}
+                                            </span>
+                                            <span className="text-sm text-gray-500">
+                                                {Math.round((batchProgress.current / batchProgress.total) * 100)}%
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                            <div
+                                                className="bg-indigo-500 h-2 rounded-full transition-all duration-300"
+                                                style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Results Grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {batchResults.map((result, idx) => (
+                                        <div key={result.imageId || idx} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-600 flex-shrink-0">
+                                                    <img
+                                                        src={getThumbnailUrl(result.imageId)}
+                                                        alt={result.filename}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{result.filename}</p>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        {result.status === 'queued' && (
+                                                            <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                                                                <FiLoader size={12} /> {t('copyMove.queued') || 'Queued'}
+                                                            </span>
+                                                        )}
+                                                        {result.status === 'processing' && (
+                                                            <span className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
+                                                                <FiLoader className="animate-spin" size={12} /> {t('copyMove.processing') || 'Processing'}
+                                                            </span>
+                                                        )}
+                                                        {result.status === 'completed' && (
+                                                            <span className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400">
+                                                                <FiCheckCircle size={12} /> {t('copyMove.complete') || 'Complete'}
+                                                            </span>
+                                                        )}
+                                                        {result.status === 'failed' && (
+                                                            <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                                                                <FiAlertCircle size={12} /> {t('copyMove.failed') || 'Failed'}
+                                                            </span>
+                                                        )}
+                                                        {result.status === 'timeout' && (
+                                                            <span className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-400">
+                                                                <FiAlertCircle size={12} /> {t('copyMove.timeout') || 'Timeout'}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {result.results?.num_matches !== undefined && (
+                                                <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-xs text-gray-500">{t('copyMove.matches') || 'Matches'}</span>
+                                                        <span className={`text-sm font-semibold ${result.results.num_matches > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                                                            {result.results.num_matches}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            /* Single Result View */
+                            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+                                {analysisId ? <ResultsViewer analysisId={analysisId} status={analysisStatus} results={analysisResults} t={t} /> : <IllustratedGuide t={t} />}
+                            </div>
+                        )}
                     </div>
                 );
 
@@ -1265,10 +1636,10 @@ const CopyMovePage = () => {
                         </button>
                     )}
                     {currentStep === STEPS.CONFIGURE && (
-                        <button onClick={handleRunAnalysis} disabled={isAnalyzing}
+                        <button onClick={batchMode ? handleRunBatchAnalysis : handleRunAnalysis} disabled={isAnalyzing || (batchMode && batchImages.length === 0)}
                             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
                         >
-                            {isAnalyzing ? <><FiLoader className="animate-spin" size={16} />{t('copyMove.analyzing')}</> : <><FiZap size={16} />{t('copyMove.analyze')}</>}
+                            {isAnalyzing ? <><FiLoader className="animate-spin" size={16} />{batchMode ? t('copyMove.analyzingBatch') || 'Analyzing...' : t('copyMove.analyzing')}</> : <><FiZap size={16} />{batchMode ? t('copyMove.analyzeBatch') || `Analyze ${batchImages.length} Images` : t('copyMove.analyze')}</>}
                         </button>
                     )}
                     {currentStep === STEPS.RESULTS && (

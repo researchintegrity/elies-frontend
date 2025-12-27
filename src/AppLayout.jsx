@@ -116,9 +116,9 @@ function AppLayout() {
       case PAGES.PROVENANCE:
         return <ProvenancePage />;
       case PAGES.COPY_MOVE:
-        return <CopyMovePage />;
+        return <CopyMovePage onNavigate={setActivePage} />;
       case PAGES.MANIPULATION_DETECTION:
-        return <ManipulationDetectionPage />;
+        return <ManipulationDetectionPage onNavigate={setActivePage} />;
       case PAGES.ANALYSIS_DASHBOARD:
         return <AnalysisDashboardPage />;
       // Admin pages
