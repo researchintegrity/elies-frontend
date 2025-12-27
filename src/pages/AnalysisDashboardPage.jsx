@@ -724,8 +724,18 @@ const AnalysisListRowCompact = ({ analysis, isActive, onClick, onFilterByImage, 
 };
 
 // Details Panel for Split View
-const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage, onViewResults, t, locale }) => {
-    const [activeTab, setActiveTab] = useState(analysis.type === 'cross_image_copy_move' ? 'comparison' : 'source');
+const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage, onViewResults, onNext, onPrev, hasNext, hasPrev, activeTab: externalActiveTab, onTabChange, t, locale }) => {
+    const [internalActiveTab, setInternalActiveTab] = useState(analysis.type === 'cross_image_copy_move' ? 'comparison' : 'source');
+
+    // Sync with external tab state if provided
+    const activeTab = externalActiveTab || internalActiveTab;
+    const setActiveTab = (tab) => {
+        if (onTabChange) {
+            onTabChange(tab);
+        } else {
+            setInternalActiveTab(tab);
+        }
+    };
     const [sourceUrl, setSourceUrl] = useState(null);
     const [targetUrl, setTargetUrl] = useState(null);
     const [resultUrl, setResultUrl] = useState(null);
@@ -887,6 +897,29 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
                 <div className="flex items-center gap-3">
                     <TypeBadge type={analysis.type} subtype={analysis.parameters?.analysis_subtype} t={t} />
                     <StatusBadge status={analysis.status} t={t} />
+
+                    {/* Navigation */}
+                    {(onNext || onPrev) && (
+                        <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 ml-2">
+                            <button
+                                onClick={onPrev}
+                                disabled={!hasPrev}
+                                className="p-1.5 rounded-l-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                title={t('common.previous') || 'Previous'}
+                            >
+                                <FiChevronLeft size={16} />
+                            </button>
+                            <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
+                            <button
+                                onClick={onNext}
+                                disabled={!hasNext}
+                                className="p-1.5 rounded-r-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                title={t('common.next') || 'Next'}
+                            >
+                                <FiChevronRight size={16} />
+                            </button>
+                        </div>
+                    )}
                 </div>
                 <div className="flex items-center gap-2">
                     {analysis.source_image_id && (
@@ -1516,6 +1549,7 @@ const AnalysisDashboardPage = () => {
 
     // Modal state
     const [selectedAnalysis, setSelectedAnalysis] = useState(null);
+    const [detailsActiveTab, setDetailsActiveTab] = useState(null); // Persistent tab state
 
     // Batch selection state
     const [batchMode, setBatchMode] = useState(false);
@@ -2180,25 +2214,38 @@ const AnalysisDashboardPage = () => {
 
                             {/* Split View (compact list) */}
                             {isSplitView && (
-                                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-                                    {analyses.map(analysis => (
-                                        <AnalysisListRowCompact
-                                            key={analysis._id}
-                                            analysis={analysis}
-                                            isActive={selectedAnalysis?._id === analysis._id}
-                                            onClick={handleViewDetails}
-                                            onViewDetails={handleViewDetails}
-                                            onReproduce={handleReproduce}
-                                            onViewResults={handleViewResults}
-                                            onFilterByImage={handleFilterByImage}
-                                            isFilterActive={filters.source_image_id === analysis.source_image_id}
+                                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden flex flex-col h-full">
+                                    <div className="flex-1 overflow-y-auto min-h-0">
+                                        {analyses.map(analysis => (
+                                            <AnalysisListRowCompact
+                                                key={analysis._id}
+                                                analysis={analysis}
+                                                isActive={selectedAnalysis?._id === analysis._id}
+                                                onClick={handleViewDetails}
+                                                onViewDetails={handleViewDetails}
+                                                onReproduce={handleReproduce}
+                                                onViewResults={handleViewResults}
+                                                onFilterByImage={handleFilterByImage}
+                                                isFilterActive={filters.source_image_id === analysis.source_image_id}
+                                                t={t}
+                                                locale={locale}
+                                                batchMode={batchMode}
+                                                isSelected={selectedIds.has(analysis._id)}
+                                                onToggleSelect={handleToggleSelect}
+                                            />
+                                        ))}
+                                    </div>
+                                    <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 p-2">
+                                        <Pagination
+                                            currentPage={currentPage}
+                                            totalPages={totalPages}
+                                            totalItems={totalItems}
+                                            pageSize={pageSize}
+                                            onPageChange={handlePageChange}
+                                            onPageSizeChange={handlePageSizeChange}
                                             t={t}
-                                            locale={locale}
-                                            batchMode={batchMode}
-                                            isSelected={selectedIds.has(analysis._id)}
-                                            onToggleSelect={handleToggleSelect}
                                         />
-                                    ))}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -2229,6 +2276,18 @@ const AnalysisDashboardPage = () => {
                                 onReproduce={handleReproduce}
                                 onViewResults={handleViewResults}
                                 onFilterByImage={handleFilterByImage}
+                                activeTab={detailsActiveTab}
+                                onTabChange={setDetailsActiveTab}
+                                onNext={(() => {
+                                    const idx = analyses.findIndex(a => a._id === selectedAnalysis._id);
+                                    return idx !== -1 && idx < analyses.length - 1 ? () => setSelectedAnalysis(analyses[idx + 1]) : null;
+                                })()}
+                                onPrev={(() => {
+                                    const idx = analyses.findIndex(a => a._id === selectedAnalysis._id);
+                                    return idx > 0 ? () => setSelectedAnalysis(analyses[idx - 1]) : null;
+                                })()}
+                                hasNext={analyses.findIndex(a => a._id === selectedAnalysis._id) < analyses.length - 1}
+                                hasPrev={analyses.findIndex(a => a._id === selectedAnalysis._id) > 0}
                                 t={t}
                                 locale={locale}
                             />
