@@ -1124,36 +1124,26 @@ const ViewImagesPage = () => {
                 <button
                   onClick={async () => {
                     try {
-                      let allImages = [];
-                      let page = 1;
-                      const perPage = 100;
-                      let hasMore = true;
+                      // Build query params matching API format
+                      const queryParams = {};
+                      if (filters.tags.length > 0) queryParams.image_type = filters.tags.join(',');
+                      if (filters.dateFrom) queryParams.date_from = filters.dateFrom;
+                      if (filters.dateTo) queryParams.date_to = filters.dateTo;
+                      if (searchQuery) queryParams.search = searchQuery;
+                      if (filters.sourceType && filters.sourceType !== 'all') queryParams.source_type = filters.sourceType;
 
-                      while (hasMore) {
-                        // Build query params matching API format
-                        const queryParams = { page, per_page: perPage };
-                        if (filters.tags.length > 0) queryParams.image_type = filters.tags.join(',');
-                        if (filters.dateFrom) queryParams.date_from = filters.dateFrom;
-                        if (filters.dateTo) queryParams.date_to = filters.dateTo;
-                        if (searchQuery) queryParams.search = searchQuery;
-                        if (filters.sourceType && filters.sourceType !== 'all') queryParams.source_type = filters.sourceType;
-                        const data = await api.get('/images', queryParams);
-                        const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
-                        allImages = [...allImages, ...imageList];
-
-                        hasMore = imageList.length >= perPage;
-                        page++;
-                        if (page > 50) break;
-                      }
+                      // Single lightweight API call to get filtered image IDs
+                      const data = await api.get('/images/ids', queryParams);
+                      const ids = data.ids || [];
 
                       setSelectedImages(prev => {
                         const newMap = new Map(prev);
-                        allImages.forEach(img => newMap.set(img.id || img._id, img));
+                        ids.forEach(id => newMap.set(id, { id }));
                         return newMap;
                       });
-                      showToast(`${allImages.length} ${t('provenance.imagesSelected')}`, 'success');
+                      showToast(`${ids.length} ${t('provenance.imagesSelected')}`, 'success');
                     } catch (err) {
-                      console.error('Error fetching filtered images:', err);
+                      console.error('Error fetching filtered image IDs:', err);
                       showToast(t('common.error') || 'Error', 'error');
                     }
                   }}
@@ -1166,31 +1156,19 @@ const ViewImagesPage = () => {
               <button
                 onClick={async () => {
                   try {
-                    let allImages = [];
-                    let page = 1;
-                    const perPage = 100;
-                    let hasMore = true;
-
-                    while (hasMore) {
-                      // No filters applied - fetch all images
-                      const queryParams = { page, per_page: perPage };
-                      const data = await api.get('/images', queryParams);
-                      const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
-                      allImages = [...allImages, ...imageList];
-
-                      hasMore = imageList.length >= perPage;
-                      page++;
-                      if (page > 50) break;
-                    }
+                    // Single lightweight API call to get all image IDs
+                    const data = await api.get('/images/ids');
+                    const ids = data.ids || [];
 
                     setSelectedImages(prev => {
                       const newMap = new Map(prev);
-                      allImages.forEach(img => newMap.set(img.id || img._id, img));
+                      // Store just the ID as key, with minimal object for the Map
+                      ids.forEach(id => newMap.set(id, { id }));
                       return newMap;
                     });
-                    showToast(`${allImages.length} ${t('provenance.imagesSelected')}`, 'success');
+                    showToast(`${ids.length} ${t('provenance.imagesSelected')}`, 'success');
                   } catch (err) {
-                    console.error('Error fetching all images:', err);
+                    console.error('Error fetching all image IDs:', err);
                     showToast(t('common.error') || 'Error', 'error');
                   }
                 }}
