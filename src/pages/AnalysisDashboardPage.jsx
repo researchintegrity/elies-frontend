@@ -36,6 +36,7 @@ import {
     FiExternalLink,
     FiChevronDown,
     FiTag,
+    FiTarget,
 
     FiZap,
     FiSun,
@@ -312,7 +313,6 @@ const FilterPanel = ({ filters, onFilterChange, onReset, t }) => {
                         <option value="single_image_copy_move">{t('analysisDashboard.types.singleCopyMove')}</option>
                         <option value="cross_image_copy_move">{t('analysisDashboard.types.crossCopyMove')}</option>
                         <option value="trufor">{t('analysisDashboard.types.trufor')}</option>
-                        <option value="cbir_search">{t('analysisDashboard.types.cbir')}</option>
                         <option value="provenance">{t('analysisDashboard.types.provenance')}</option>
                         <option value="external">{t('analysisDashboard.types.external')}</option>
                     </select>
@@ -367,7 +367,7 @@ const FilterPanel = ({ filters, onFilterChange, onReset, t }) => {
 };
 
 // Analysis Row - uses thumbnail URL for fast loading
-const AnalysisRow = ({ analysis, onViewDetails, onReproduce, onViewResults, onFilterByImage, t, locale, batchMode, isSelected, onToggleSelect }) => {
+const AnalysisRow = ({ analysis, onViewDetails, onReproduce, onViewResults, onFilterByImage, isFilterActive, t, locale, batchMode, isSelected, onToggleSelect }) => {
     // Use thumbnail URL directly - browser handles caching
     const imageUrl = analysis.source_image_id ? getThumbnailUrl(analysis.source_image_id) : null;
     const loadingImage = false; // No loading state needed with direct URLs
@@ -449,10 +449,13 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, onViewResults, onFi
                             {analysis.source_image_id && (
                                 <button
                                     onClick={() => onFilterByImage && onFilterByImage(analysis.source_image_id)}
-                                    className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
-                                    title={t('analysisDashboard.filterByImage')}
+                                    className={`p-2 rounded-lg transition-colors ${isFilterActive
+                                        ? 'text-indigo-600 bg-indigo-100 dark:bg-indigo-900/40 ring-1 ring-indigo-500/30'
+                                        : 'text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
+                                        }`}
+                                    title={isFilterActive ? t('analysisDashboard.clearFilter') : t('analysisDashboard.filterByImage')}
                                 >
-                                    <FiFilter size={16} />
+                                    <FiFilter size={16} className={isFilterActive ? "fill-current" : ""} />
                                 </button>
                             )}
                             {analysis.status === 'completed' && analysis.parameters && (
@@ -504,7 +507,7 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, onViewResults, onFi
 };
 
 // Analysis Card for Grid View - uses thumbnail URL for fast loading
-const AnalysisCard = ({ analysis, onViewDetails, onReproduce, onViewResults, isActive, onFilterByImage, t, locale, batchMode, isSelected, onToggleSelect }) => {
+const AnalysisCard = ({ analysis, onViewDetails, onReproduce, onViewResults, isActive, onFilterByImage, isFilterActive, t, locale, batchMode, isSelected, onToggleSelect }) => {
     // Use thumbnail URL directly - browser handles caching
     const imageUrl = analysis.source_image_id ? getThumbnailUrl(analysis.source_image_id) : null;
     const loadingImage = false; // No loading state needed with direct URLs
@@ -555,11 +558,14 @@ const AnalysisCard = ({ analysis, onViewDetails, onReproduce, onViewResults, isA
                     </button>
                     {analysis.source_image_id && (
                         <button
-                            className="p-3 rounded-full bg-white/20 hover:bg-indigo-600 text-white backdrop-blur-md transition-all hover:scale-110 shadow-lg border border-white/10"
+                            className={`p-3 rounded-full backdrop-blur-md transition-all hover:scale-110 shadow-lg border border-white/10 ${isFilterActive
+                                ? 'bg-indigo-600 text-white ring-2 ring-white/50'
+                                : 'bg-white/20 hover:bg-indigo-600 text-white'
+                                }`}
                             onClick={(e) => { e.stopPropagation(); onFilterByImage && onFilterByImage(analysis.source_image_id); }}
-                            title={t('analysisDashboard.filterByImage')}
+                            title={isFilterActive ? t('analysisDashboard.clearFilter') : t('analysisDashboard.filterByImage')}
                         >
-                            <FiFilter className="text-xl" />
+                            <FiFilter className={`text-xl ${isFilterActive ? "fill-current" : ""}`} />
                         </button>
                     )}
                     {analysis.status === 'completed' && analysis.parameters && (
@@ -626,7 +632,7 @@ const AnalysisCard = ({ analysis, onViewDetails, onReproduce, onViewResults, isA
 };
 
 // Compact List Row for Split View - uses thumbnail URL for fast loading
-const AnalysisListRowCompact = ({ analysis, isActive, onClick, t, locale, batchMode, isSelected, onToggleSelect }) => {
+const AnalysisListRowCompact = ({ analysis, isActive, onClick, onFilterByImage, isFilterActive, t, locale, batchMode, isSelected, onToggleSelect }) => {
     const typeConfig = ANALYSIS_TYPE_CONFIG[analysis.type] || ANALYSIS_TYPE_CONFIG.external;
     const TypeIcon = typeConfig.icon;
     const createdDate = new Date(analysis.created_at);
@@ -699,13 +705,27 @@ const AnalysisListRowCompact = ({ analysis, isActive, onClick, t, locale, batchM
                     </p>
                 )}
             </div>
+
+            {/* Filter Action - Visible on hover or active */}
+            {analysis.source_image_id && (isFilterActive || onFilterByImage) && (
+                <button
+                    className={`mt-1 p-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 ${isFilterActive
+                        ? 'opacity-100 text-indigo-600 bg-indigo-100 dark:bg-indigo-900/40 ring-1 ring-indigo-500/30'
+                        : 'text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
+                        }`}
+                    onClick={(e) => { e.stopPropagation(); onFilterByImage && onFilterByImage(analysis.source_image_id); }}
+                    title={isFilterActive ? t('analysisDashboard.clearFilter') : t('analysisDashboard.filterByImage')}
+                >
+                    <FiFilter size={14} className={isFilterActive ? "fill-current" : ""} />
+                </button>
+            )}
         </div>
     );
 };
 
 // Details Panel for Split View
 const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage, onViewResults, t, locale }) => {
-    const [activeTab, setActiveTab] = useState('source');
+    const [activeTab, setActiveTab] = useState(analysis.type === 'cross_image_copy_move' ? 'comparison' : 'source');
     const [sourceUrl, setSourceUrl] = useState(null);
     const [targetUrl, setTargetUrl] = useState(null);
     const [resultUrl, setResultUrl] = useState(null);
@@ -741,46 +761,107 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
 
     // Load Target Image - use thumbnail URL for detail panel
     useEffect(() => {
-        if (analysis.parameters?.target_image_id) {
-            setTargetUrl(getThumbnailUrl(analysis.parameters.target_image_id));
+        const targetId = analysis.parameters?.target_image_id || analysis.target_image_id;
+        if (targetId) {
+            setTargetUrl(getThumbnailUrl(targetId));
         }
         setLoadingTarget(false);
-    }, [analysis.parameters?.target_image_id]);
+    }, [analysis.parameters?.target_image_id, analysis.target_image_id]);
 
     // Load Result Image
+    // Load Result Image
+    // Result Navigation State
+    const [availableResults, setAvailableResults] = useState([]);
+    const [currentResultIndex, setCurrentResultIndex] = useState(0);
+
+    // Initialize available results
+    useEffect(() => {
+        if (!analysis.results) return;
+
+        const results = [];
+        // Define priority/order of results
+        const resultKeys = [
+            { key: 'pred_map', label: 'analysisDashboard.resultTypes.pred_map' },
+            { key: 'conf_map', label: 'analysisDashboard.resultTypes.conf_map' },
+            { key: 'noiseprint', label: 'analysisDashboard.resultTypes.noiseprint' },
+            { key: 'matches_image', label: 'analysisDashboard.resultTypes.matches' },
+            { key: 'clusters_image', label: 'analysisDashboard.resultTypes.clusters' },
+            { key: 'result_image', label: 'analysisDashboard.resultTypes.result_image' }
+        ];
+
+        resultKeys.forEach(({ key, label }) => {
+            if (analysis.results[key]) {
+                let apiType = key;
+                // Special handling: remove _image suffix for matches and clusters only
+                if (key === 'matches_image' || key === 'clusters_image') {
+                    apiType = key.replace('_image', '');
+                }
+                // result_image should REMAIN result_image
+
+                results.push({ key, label, apiType });
+            }
+        });
+
+        // Special handling for copy-move cross: prioritize clusters
+        if (analysis.type === 'cross_image_copy_move') {
+            // If we have clusters, make it first or default? logic is fine usually.
+        }
+
+        setAvailableResults(results);
+        setCurrentResultIndex(0);
+        setResultUrl(null); // Reset URL to trigger load
+    }, [analysis]);
+
+    // Cleanup result URL when switching results
+    useEffect(() => {
+        setResultUrl(null);
+    }, [currentResultIndex]);
+
+    const handleNextResult = (e) => {
+        e.stopPropagation();
+        if (availableResults.length <= 1) return;
+        setCurrentResultIndex((prev) => (prev + 1) % availableResults.length);
+    };
+
+    const handlePrevResult = (e) => {
+        e.stopPropagation();
+        if (availableResults.length <= 1) return;
+        setCurrentResultIndex((prev) => (prev - 1 + availableResults.length) % availableResults.length);
+    };
+
     // Load Result Image
     useEffect(() => {
-        if (activeTab === 'result' && analysis.status === 'completed' && !resultUrl) {
+        if (activeTab === 'result' && analysis.status === 'completed' && !resultUrl && availableResults.length > 0) {
 
-            // Skip provenance if graph is available (handled by render) or if no results
+            // Skip provenance if graph is available
             if ((analysis.type === 'provenance' && analysis.results?.graph)) {
                 return;
             }
 
             let isMounted = true;
             setLoadingResult(true);
+
             const loadResult = async () => {
                 try {
-                    // Determine best result to show based on analysis type/results
-                    let resultKey = null;
-                    if (analysis.results) {
-                        if (analysis.results.pred_map) resultKey = 'pred_map';
-                        // Copy-Move: Cross-check prefers clusters, otherwise prefer matches
-                        else if (analysis.type === 'cross_image_copy_move' && analysis.results.clusters_image) resultKey = 'clusters';
-                        else if (analysis.results.matches_image) resultKey = 'matches';
-                        else if (analysis.results.clusters_image) resultKey = 'clusters';
-                        else if (analysis.results.result_image) resultKey = 'result_image';
-                    }
+                    const currentResult = availableResults[currentResultIndex];
+                    if (!currentResult) return;
 
-                    if (!resultKey) {
-                        if (isMounted) setLoadingResult(false);
-                        return;
-                    }
+                    // Mapping for API endpoint types if needed specifically
+                    // Using currentResult.apiType which was pre-calculated
+                    // Copy-move keys: matches_image -> matches, clusters_image -> clusters
+                    // Standard keys: pred_map -> pred_map
 
-                    const blob = await api.download(`/analyses/${analysis._id}/results/${resultKey}/download`);
+                    // Actually the download endpoint might map matches_image to matches/download?
+                    // Let's use the logic from AnalysisDetailModal which had a mapping
+                    // Or just strict check.
+                    // api.download(`/analyses/${id}/results/${type}/download`)
+
+                    let downloadType = currentResult.apiType;
+
+                    const blob = await api.download(`/analyses/${analysis._id}/results/${downloadType}/download`);
                     if (isMounted) setResultUrl(URL.createObjectURL(blob));
                 } catch (err) {
-                    // Silent fail
+                    console.error("Failed to load result", err);
                 } finally {
                     if (isMounted) setLoadingResult(false);
                 }
@@ -788,7 +869,7 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
             loadResult();
             return () => { isMounted = false; };
         }
-    }, [activeTab, analysis, resultUrl]);
+    }, [activeTab, analysis, resultUrl, availableResults, currentResultIndex]);
 
     // Cleanup URLs
     useEffect(() => {
@@ -885,6 +966,43 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
                             <span className="text-sm">No target image</span>
                         </div>
                     )
+                ) : activeTab === 'comparison' ? (
+                    <div className="w-full h-full flex flex-row items-center justify-center p-4 gap-4">
+                        {/* Source Side */}
+                        <div className="flex-1 h-full flex flex-col items-center overflow-hidden">
+                            <span className="mb-2 text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                                <FiImage size={14} /> {t('analysisDashboard.tabSource')}
+                            </span>
+                            {loadingSource ? (
+                                <div className="animate-pulse w-full h-full bg-gray-200 dark:bg-gray-800 rounded-lg" />
+                            ) : sourceUrl ? (
+                                <img src={sourceUrl} alt="Source" className="w-full h-full object-contain rounded-lg border border-gray-200 dark:border-gray-700 bg-black/5 dark:bg-white/5" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                    <span className="text-sm">N/A</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Separator */}
+                        <div className="h-full w-px bg-gray-200 dark:bg-gray-700" />
+
+                        {/* Target Side */}
+                        <div className="flex-1 h-full flex flex-col items-center overflow-hidden">
+                            <span className="mb-2 text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                                <FiTarget size={14} /> {t('analysisDashboard.tabTarget')}
+                            </span>
+                            {loadingTarget ? (
+                                <div className="animate-pulse w-full h-full bg-gray-200 dark:bg-gray-800 rounded-lg" />
+                            ) : targetUrl ? (
+                                <img src={targetUrl} alt="Target" className="w-full h-full object-contain rounded-lg border border-gray-200 dark:border-gray-700 bg-black/5 dark:bg-white/5" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                    <span className="text-sm">N/A</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 ) : (
                     loadingResult ? (
                         <div className="animate-pulse w-full h-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center">
@@ -903,7 +1021,46 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
                             />
                         </div>
                     ) : resultUrl ? (
-                        <img src={resultUrl} alt="Result" className="w-full h-full object-contain p-4" />
+                        <div className="relative w-full h-full group">
+                            <img src={resultUrl} alt="Result" className="w-full h-full object-contain p-4" />
+
+                            {/* Result Type Badge */}
+                            {availableResults.length > 0 && (
+                                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black/60 text-white rounded-full px-4 py-1.5 text-sm font-medium backdrop-blur-sm shadow-sm border border-white/10 z-10">
+                                    {availableResults[currentResultIndex] ? t(availableResults[currentResultIndex].label) : ''}
+                                </div>
+                            )}
+
+                            {/* Navigation Arrows */}
+                            {availableResults.length > 1 && (
+                                <>
+                                    <button
+                                        onClick={handlePrevResult}
+                                        className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white/80 dark:bg-gray-800/80 p-3 rounded-full shadow-lg hover:bg-white dark:hover:bg-gray-700 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                        title={t('common.previous')}
+                                    >
+                                        <FiChevronLeft size={24} className="text-gray-700 dark:text-gray-300" />
+                                    </button>
+                                    <button
+                                        onClick={handleNextResult}
+                                        className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/80 dark:bg-gray-800/80 p-3 rounded-full shadow-lg hover:bg-white dark:hover:bg-gray-700 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                        title={t('common.next')}
+                                    >
+                                        <FiChevronRight size={24} className="text-gray-700 dark:text-gray-300" />
+                                    </button>
+                                    {/* Dots Indicators */}
+                                    <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 flex gap-2">
+                                        {availableResults.map((_, idx) => (
+                                            <div
+                                                key={idx}
+                                                className={`w-2 h-2 rounded-full transition-colors ${idx === currentResultIndex ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'
+                                                    }`}
+                                            />
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     ) : (
                         <div className="text-gray-400 flex flex-col items-center gap-2">
                             {/* Fallback for no preview */}
@@ -938,6 +1095,18 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
                                 }`}
                         >
                             {t('analysisDashboard.tabTarget')}
+                        </button>
+                    )}
+                    {/* Add Comparison Tab for Cross-Image Copy-Move */}
+                    {analysis.type === 'cross_image_copy_move' && (
+                        <button
+                            onClick={() => setActiveTab('comparison')}
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'comparison'
+                                ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 shadow-sm'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                }`}
+                        >
+                            {t('analysisDashboard.tabComparison')}
                         </button>
                     )}
                     {analysis.status === 'completed' && (
@@ -1451,9 +1620,13 @@ const AnalysisDashboardPage = () => {
     }, []);
 
     const handleFilterByImage = useCallback((imageId) => {
-        handleFilterChange('source_image_id', imageId);
-        showToast(t('analysisDashboard.filteringByImage') || 'Filtering by this source image', 'info');
-    }, [handleFilterChange, t]);
+        if (filters.source_image_id === imageId) {
+            handleFilterChange('source_image_id', null);
+        } else {
+            handleFilterChange('source_image_id', imageId);
+            showToast(t('analysisDashboard.filteringByImage') || 'Filtering by this source image', 'info');
+        }
+    }, [handleFilterChange, t, filters.source_image_id]);
 
     const handlePageChange = useCallback((page) => {
         setCurrentPage(page);
@@ -1910,20 +2083,20 @@ const AnalysisDashboardPage = () => {
                     </button>
 
                     {/* Failed */}
-                    {(stats.failed > 0 || filters.status === 'failed') && (
-                        <button
-                            onClick={() => handleFilterChange('status', filters.status === 'failed' ? null : 'failed')}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${filters.status === 'failed'
-                                ? 'bg-red-200 dark:bg-red-800/50 ring-2 ring-red-500'
-                                : 'bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-800/50'
-                                }`}
-                        >
-                            <FiX className="text-red-600 dark:text-red-400" size={14} />
-                            <span className="text-sm font-medium text-red-700 dark:text-red-400">
-                                {stats.failed || 0} {t('analysisDashboard.status.failed')}
-                            </span>
-                        </button>
-                    )}
+                    <button
+                        onClick={() => handleFilterChange('status', filters.status === 'failed' ? null : 'failed')}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${filters.status === 'failed'
+                            ? 'bg-red-200 dark:bg-red-800/50 ring-2 ring-red-500'
+                            : 'bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-800/50'
+                            }`}
+                    >
+                        <FiAlertCircle className="text-red-600 dark:text-red-400" size={14} />
+                        <span className="text-sm font-medium text-red-700 dark:text-red-400">
+                            {stats.failed || 0} {t('analysisDashboard.status.failed')}
+                        </span>
+                    </button>
+
+
                 </div>
             )}
 
@@ -1972,6 +2145,7 @@ const AnalysisDashboardPage = () => {
                                         onViewDetails={handleViewDetails}
                                         onReproduce={handleReproduce}
                                         onFilterByImage={handleFilterByImage}
+                                        isFilterActive={filters.source_image_id === analysis.source_image_id}
                                         isActive={selectedAnalysis?._id === analysis._id}
                                         t={t}
                                         locale={locale}
@@ -1993,6 +2167,7 @@ const AnalysisDashboardPage = () => {
                                             onReproduce={handleReproduce}
                                             onViewResults={handleViewResults}
                                             onFilterByImage={handleFilterByImage}
+                                            isFilterActive={filters.source_image_id === analysis.source_image_id}
                                             t={t}
                                             locale={locale}
                                             batchMode={batchMode}
@@ -2016,6 +2191,7 @@ const AnalysisDashboardPage = () => {
                                             onReproduce={handleReproduce}
                                             onViewResults={handleViewResults}
                                             onFilterByImage={handleFilterByImage}
+                                            isFilterActive={filters.source_image_id === analysis.source_image_id}
                                             t={t}
                                             locale={locale}
                                             batchMode={batchMode}

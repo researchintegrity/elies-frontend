@@ -794,7 +794,7 @@ const translations = {
         'copyMove.noSimilarFound': 'Nenhuma imagem similar encontrada',
         'copyMove.selectSourceForSimilar': 'Selecione uma imagem de origem primeiro',
         // Batch analysis
-        'copyMove.selectedImages': 'Imagens Selecionadas',
+
         'copyMove.batchConfigureTitle': 'Configurar Análise em Lote',
         'copyMove.batchConfigureDesc': 'Estas configurações serão aplicadas a todas as imagens selecionadas',
         'copyMove.analyzeBatch': 'Analisar Imagens',
@@ -811,9 +811,7 @@ const translations = {
         'copyMove.batchQueued': 'Na fila',
         'copyMove.queued': 'Na fila',
         'copyMove.batchDashboardNotice': 'Os resultados individuais estão disponíveis no Painel de Análises',
-        'copyMove.processing': 'Processando...',
-        'copyMove.failed': 'Falhou',
-        'copyMove.timeout': 'Tempo esgotado',
+
         'copyMove.selectMultiple': 'Clique para selecionar imagens para análise em lote',
 
 
@@ -904,6 +902,7 @@ const translations = {
         'analysisDashboard.title': 'Painel de Análises',
         'analysisDashboard.subtitle': 'Visualize e gerencie todas as análises realizadas',
         'analysisDashboard.filters': 'Filtros',
+        'analysisDashboard.clearFilter': 'Limpar Filtro',
         'analysisDashboard.clearFilters': 'Limpar Filtros',
         'analysisDashboard.filterType': 'Tipo',
         'analysisDashboard.filterStatus': 'Status',
@@ -981,6 +980,13 @@ const translations = {
         'analysisDashboard.tabSource': 'Origem',
         'analysisDashboard.tabTarget': 'Destino',
         'analysisDashboard.tabResult': 'Resultado',
+        'analysisDashboard.tabComparison': 'Comparação',
+        'analysisDashboard.resultTypes.pred_map': 'Mapa de Predição',
+        'analysisDashboard.resultTypes.conf_map': 'Mapa de Confiança',
+        'analysisDashboard.resultTypes.noiseprint': 'Noiseprint',
+        'analysisDashboard.resultTypes.matches': 'Correspondências',
+        'analysisDashboard.resultTypes.clusters': 'Agrupamentos',
+        'analysisDashboard.resultTypes.result_image': 'Resultado',
         'analysisDashboard.deleted': 'Deletada',
 
         // Image Analysis - Save to Dashboard
@@ -1783,7 +1789,7 @@ const translations = {
         'copyMove.noSimilarFound': 'No similar images found',
         'copyMove.selectSourceForSimilar': 'Select a source image first',
         // Batch analysis
-        'copyMove.selectedImages': 'Selected Images',
+
         'copyMove.batchConfigureTitle': 'Configure Batch Analysis',
         'copyMove.batchConfigureDesc': 'These settings will apply to all selected images',
         'copyMove.analyzeBatch': 'Analyze Images',
@@ -1800,9 +1806,7 @@ const translations = {
         'copyMove.batchQueued': 'Queued',
         'copyMove.queued': 'Queued',
         'copyMove.batchDashboardNotice': 'Individual results are available in the Analysis Dashboard',
-        'copyMove.processing': 'Processing...',
-        'copyMove.failed': 'Failed',
-        'copyMove.timeout': 'Timeout',
+
         'copyMove.selectMultiple': 'Click to select images for batch analysis',
 
 
@@ -1893,6 +1897,7 @@ const translations = {
         'analysisDashboard.title': 'Analysis Dashboard',
         'analysisDashboard.subtitle': 'View and manage all past analyses',
         'analysisDashboard.filters': 'Filters',
+        'analysisDashboard.clearFilter': 'Clear Filter',
         'analysisDashboard.clearFilters': 'Clear Filters',
         'analysisDashboard.filterType': 'Type',
         'analysisDashboard.filterStatus': 'Status',
@@ -1970,6 +1975,13 @@ const translations = {
         'analysisDashboard.tabSource': 'Source',
         'analysisDashboard.tabTarget': 'Target',
         'analysisDashboard.tabResult': 'Result',
+        'analysisDashboard.tabComparison': 'Comparison',
+        'analysisDashboard.resultTypes.pred_map': 'Prediction Map',
+        'analysisDashboard.resultTypes.conf_map': 'Confidence Map',
+        'analysisDashboard.resultTypes.noiseprint': 'Noiseprint',
+        'analysisDashboard.resultTypes.matches': 'Matches',
+        'analysisDashboard.resultTypes.clusters': 'Clusters',
+        'analysisDashboard.resultTypes.result_image': 'Result Overlay',
         'analysisDashboard.deleted': 'Deleted',
 
         // Image Analysis - Save to Dashboard
