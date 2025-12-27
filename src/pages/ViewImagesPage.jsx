@@ -679,9 +679,38 @@ const ViewImagesPage = () => {
     handleClearSelection();
   };
 
-  const handleAnalyzeSelected = () => {
-    showToast(t('batch.analyzeComingSoon'), "info");
+  // Map analysis types to page keys (matches PAGES in AppLayout)
+  const analysisTypeToPageKey = {
+    'imageAnalysis': 'imageAnalysis',
+    'manipulationDetection': 'manipulationDetection',
+    'copyMoveSingle': 'copyMove',
+    'copyMoveCross': 'copyMove',
+    'provenance': 'provenance',
   };
+
+  const handleAnalyzeSelected = useCallback((analysisType) => {
+    const selectedArray = Array.from(selectedImages.values());
+    if (selectedArray.length === 0) return;
+
+    // Validate selection for cross copy-move
+    if (analysisType === 'copyMoveCross' && selectedArray.length !== 2) {
+      showToast(t('analyze.selectTwoImages'), 'warning');
+      return;
+    }
+
+    // Determine mode based on analysis type
+    const mode = analysisType === 'copyMoveCross' ? 'cross' : 'single';
+
+    const startAnalysisData = {
+      imageIds: selectedArray.map(img => img.id || img.imageId),  // Array for future batch support
+      targetPage: analysisTypeToPageKey[analysisType],
+      mode: mode  // 'single', 'cross', or future 'batch'
+    };
+
+    sessionStorage.setItem('startAnalysis', JSON.stringify(startAnalysisData));
+    showToast(t('analyze.navigatingToTool'), 'success');
+    window.location.reload();
+  }, [selectedImages, t]);
 
   // Find similar images handler
   const handleFindSimilar = useCallback(() => {

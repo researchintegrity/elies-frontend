@@ -583,6 +583,63 @@ const ProvenancePage = () => {
         loadViewResultsData();
     }, [t]);
 
+    // Handle start analysis from Gallery (Analyze button)
+    useEffect(() => {
+        const startAnalysisData = sessionStorage.getItem('startAnalysis');
+        if (!startAnalysisData) return;
+
+        const loadStartAnalysisData = async () => {
+            setLoadingReproduce(true);
+            try {
+                const { imageIds, targetPage, mode } = JSON.parse(startAnalysisData);
+                sessionStorage.removeItem('startAnalysis'); // Clear after reading
+
+                // Only handle provenance target
+                if (targetPage !== 'provenance') {
+                    setLoadingReproduce(false);
+                    return;
+                }
+
+                // Load query image info (first image)
+                const imageId = imageIds && imageIds.length > 0 ? imageIds[0] : null;
+                if (imageId) {
+                    try {
+                        const img = await api.get(`/images/${imageId}`);
+                        setSelectedImage({
+                            id: img._id,
+                            imageId: img._id,
+                            filename: img.filename,
+                            imageType: img.image_type || []
+                        });
+
+                        // Load the image URL for preview
+                        setImageUrls(prev => ({ ...prev, [img._id]: getThumbnailUrl(img._id) }));
+                    } catch (err) {
+                        console.error('Failed to load source image:', err);
+                        showAlert(
+                            t('common.warning'),
+                            t('provenance.sourceImageDeleted') || 'Source image no longer exists',
+                            'warning'
+                        );
+                        setLoadingReproduce(false);
+                        return;
+                    }
+                }
+
+                // Navigate to configure step
+                setTimeout(() => {
+                    setCurrentStep(STEPS.CONFIGURE);
+                    setLoadingReproduce(false);
+                }, 300);
+            } catch (err) {
+                console.error('Failed to parse start analysis data:', err);
+                setLoadingReproduce(false);
+            }
+        };
+
+        loadStartAnalysisData();
+    }, [t]);
+
     // Fetch images with filters
     useEffect(() => {
         fetchImages(galleryPage, galleryFilters);
@@ -940,8 +997,8 @@ const ProvenancePage = () => {
                             <div className="absolute inset-0 w-16 h-16 rounded-full border-4 border-transparent border-t-emerald-500 animate-spin" />
                         </div>
                         <div className="text-center">
-                            <p className="font-semibold text-gray-900 dark:text-white">{t('provenance.loadingParameters') || 'Loading parameters...'}</p>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('provenance.validatingImages') || 'Validating images from previous analysis'}</p>
+                            <p className="font-semibold text-gray-900 dark:text-white">{t('analyze.loadingAnalysis') || 'Loading analysis...'}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('analyze.preparingImage') || 'Preparing image for analysis'}</p>
                         </div>
                     </div>
                 </div>

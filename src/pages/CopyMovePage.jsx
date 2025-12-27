@@ -657,6 +657,75 @@ const CopyMovePage = () => {
         loadViewResultsData();
     }, [t]);
 
+    // Handle start analysis from Gallery (Analyze button)
+    useEffect(() => {
+        const startAnalysisData = sessionStorage.getItem('startAnalysis');
+        if (!startAnalysisData) return;
+
+        const loadStartAnalysisData = async () => {
+            setLoadingReproduce(true);
+            try {
+                const { imageIds, targetPage, mode: analysisMode } = JSON.parse(startAnalysisData);
+                sessionStorage.removeItem('startAnalysis'); // Clear after reading
+
+                // Only handle copyMove target
+                if (targetPage !== 'copyMove') {
+                    setLoadingReproduce(false);
+                    return;
+                }
+
+                // Set mode based on the trigger
+                const isCrossMode = analysisMode === 'cross';
+                setMode(isCrossMode ? 'cross' : 'single');
+
+                // Load source image info (first image)
+                const sourceId = imageIds && imageIds.length > 0 ? imageIds[0] : null;
+                if (sourceId) {
+                    try {
+                        const img = await api.get(`/images/${sourceId}`);
+                        setSourceImage({ id: img._id, filename: img.filename });
+                    } catch (err) {
+                        console.error('Failed to load source image:', err);
+                        showAlert(
+                            t('common.warning'),
+                            t('copyMove.sourceImageDeleted') || 'Source image no longer exists',
+                            'warning'
+                        );
+                        setLoadingReproduce(false);
+                        return;
+                    }
+                }
+
+                // Load target image for cross mode (second image)
+                if (isCrossMode && imageIds.length > 1) {
+                    const targetId = imageIds[1];
+                    try {
+                        const img = await api.get(`/images/${targetId}`);
+                        setTargetImage({ id: img._id, filename: img.filename });
+                    } catch (err) {
+                        console.error('Failed to load target image:', err);
+                        showAlert(
+                            t('common.warning'),
+                            t('copyMove.targetImageDeleted') || 'Target image no longer exists',
+                            'warning'
+                        );
+                    }
+                }
+
+                // Navigate to configure step
+                setTimeout(() => {
+                    setCurrentStep(STEPS.CONFIGURE);
+                    setLoadingReproduce(false);
+                }, 300);
+            } catch (err) {
+                console.error('Failed to parse start analysis data:', err);
+                setLoadingReproduce(false);
+            }
+        };
+
+        loadStartAnalysisData();
+    }, [t]);
+
     // Fetch images with filters when on select step
     useEffect(() => {
         if (currentStep === STEPS.SELECT) {
@@ -1147,8 +1216,8 @@ const CopyMovePage = () => {
                             <div className="absolute inset-0 w-16 h-16 rounded-full border-4 border-transparent border-t-indigo-500 animate-spin" />
                         </div>
                         <div className="text-center">
-                            <p className="font-semibold text-gray-900 dark:text-white">{t('copyMove.loadingParameters') || 'Loading parameters...'}</p>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('copyMove.validatingImages') || 'Validating images from previous analysis'}</p>
+                            <p className="font-semibold text-gray-900 dark:text-white">{t('analyze.loadingAnalysis') || 'Loading analysis...'}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('analyze.preparingImage') || 'Preparing image for analysis'}</p>
                         </div>
                     </div>
                 </div>

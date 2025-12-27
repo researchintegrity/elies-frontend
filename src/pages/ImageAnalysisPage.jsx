@@ -571,6 +571,64 @@ const ImageAnalysisPage = () => {
         loadViewResultsData();
     }, [t]);
 
+    // Handle start analysis from Gallery (Analyze button)
+    useEffect(() => {
+        const startAnalysisData = sessionStorage.getItem('startAnalysis');
+        if (!startAnalysisData) return;
+
+        const loadStartAnalysisData = async () => {
+            setLoadingReproduce(true);
+            try {
+                const { imageIds, targetPage, mode } = JSON.parse(startAnalysisData);
+                sessionStorage.removeItem('startAnalysis'); // Clear after reading
+
+                // Only handle imageAnalysis target
+                if (targetPage !== 'imageAnalysis') {
+                    setLoadingReproduce(false);
+                    return;
+                }
+
+                // Load source image info (first image in the array)
+                const imageId = imageIds && imageIds.length > 0 ? imageIds[0] : null;
+                if (imageId) {
+                    try {
+                        const img = await api.get(`/images/${imageId}`);
+                        const transformedImage = {
+                            id: img._id,
+                            filename: img.filename,
+                            fileSize: img.file_size,
+                            sourceType: img.source_type,
+                            mimeType: img.mime_type || 'image/jpeg',
+                            exifMetadata: img.exifMetadata || img.exif_metadata || null
+                        };
+
+                        // Load the full-res image URL for analysis FIRST
+                        const blob = await api.download(`/images/${img._id}/download`);
+                        const url = URL.createObjectURL(blob);
+                        setImageUrls(prev => ({ ...prev, [img._id]: url }));
+
+                        // Then set selected image - this triggers the auto-run analysis
+                        setSelectedImage(transformedImage);
+                    } catch (err) {
+                        console.error('Failed to load source image:', err);
+                        showAlert(
+                            t('common.warning'),
+                            t('analysis.sourceImageDeleted') || 'Source image no longer exists',
+                            'warning'
+                        );
+                    }
+                }
+
+                setLoadingReproduce(false);
+            } catch (err) {
+                console.error('Failed to parse start analysis data:', err);
+                setLoadingReproduce(false);
+            }
+        };
+
+        loadStartAnalysisData();
+    }, [t]);
+
     // Handle wheel zoom with non-passive listener to prevent scroll
     useEffect(() => {
         const container = zoomContainerRef.current;
@@ -1375,8 +1433,8 @@ const ImageAnalysisPage = () => {
                             <div className="absolute inset-0 w-16 h-16 rounded-full border-4 border-transparent border-t-indigo-500 animate-spin" />
                         </div>
                         <div className="text-center">
-                            <p className="font-semibold text-gray-900 dark:text-white">{t('analysis.loadingParameters') || 'Loading parameters...'}</p>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('analysis.validatingImage') || 'Validating image from previous analysis'}</p>
+                            <p className="font-semibold text-gray-900 dark:text-white">{t('analyze.loadingAnalysis') || 'Loading analysis...'}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('analyze.preparingImage') || 'Preparing image for analysis'}</p>
                         </div>
                     </div>
                 </div>

@@ -46,7 +46,7 @@ const PAGES = {
 function AppLayout() {
   // Check sessionStorage for reproduce/view results navigation
   const getInitialPage = () => {
-    // First check for reproduce navigation
+    // First check for reproduce navigation (from Analysis Dashboard)
     const reproduceData = sessionStorage.getItem('reproduceAnalysis');
     if (reproduceData) {
       try {
@@ -56,6 +56,19 @@ function AppLayout() {
         }
       } catch (err) {
         console.error('Failed to parse reproduce data:', err);
+      }
+    }
+
+    // Check for start analysis from Gallery
+    const startAnalysisData = sessionStorage.getItem('startAnalysis');
+    if (startAnalysisData) {
+      try {
+        const { targetPage } = JSON.parse(startAnalysisData);
+        if (targetPage) {
+          return targetPage;
+        }
+      } catch (err) {
+        console.error('Failed to parse start analysis data:', err);
       }
     }
 
