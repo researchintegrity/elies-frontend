@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FiImage, FiAlertTriangle, FiCheck } from 'react-icons/fi';
 import { api } from '../../services/api';
+import { API_BASE_URL } from '../../config/api';
 
 /**
  * useImageLoader - Custom hook for loading image blobs
@@ -80,11 +81,44 @@ const ImageThumbnail = ({
     onClick,
     className = '',
     lazy = true,
-    showHoverEffect = true
+    showHoverEffect = true,
+    variant = 'thumbnail' // 'thumbnail' | 'full'
 }) => {
-    // Use hook if imageId provided, otherwise use directUrl
-    const { imageUrl: loadedUrl, loading, error, retry } = useImageLoader(imageId || null);
-    const imageUrl = directUrl || loadedUrl;
+    // Only use blob loader for 'full' variant or if explicitly requested
+    const shouldLoadBlob = variant === 'full' && !!imageId && !directUrl;
+    const { imageUrl: loadedBlobUrl, loading: blobLoading, error: blobError, retry: blobRetry } = useImageLoader(shouldLoadBlob ? imageId : null);
+
+    // Determine properties based on variant
+    let displayUrl = directUrl;
+    let isLoading = false;
+    let isError = false;
+    let retryFn = null;
+
+    if (directUrl) {
+        // Direct URL provided (e.g. object URL)
+        displayUrl = directUrl;
+    } else if (variant === 'full') {
+        // Blob loading for full quality
+        displayUrl = loadedBlobUrl;
+        isLoading = blobLoading;
+        isError = blobError;
+        retryFn = blobRetry;
+    } else {
+        // Thumbnail mode: use direct API URL with token for auth
+        // Browser handles caching and loading state natively
+        const token = localStorage.getItem('authToken');
+        displayUrl = imageId ? `${API_BASE_URL}/images/${imageId}/thumbnail${token ? `?token=${token}` : ''}` : null;
+        isLoading = false; // Native img handles loading
+        isError = false;
+    }
+
+    // Handle native image loading errors for thumbnail mode
+    const [nativeError, setNativeError] = useState(false);
+    const handleNativeError = () => {
+        setNativeError(true);
+    };
+
+    if (variant === 'thumbnail' && nativeError) isError = true;
 
     const handleClick = (e) => {
         if (isSelectionMode || e.ctrlKey || e.metaKey) {
@@ -114,8 +148,8 @@ const ImageThumbnail = ({
                 >
                     <div
                         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors shadow-sm ${isSelected
-                                ? 'bg-indigo-600 border-indigo-600 text-white'
-                                : 'bg-white/80 dark:bg-black/50 border-white/50 dark:border-gray-400 hover:border-indigo-500'
+                            ? 'bg-indigo-600 border-indigo-600 text-white'
+                            : 'bg-white/80 dark:bg-black/50 border-white/50 dark:border-gray-400 hover:border-indigo-500'
                             }`}
                     >
                         {isSelected && <FiCheck size={14} strokeWidth={3} />}
@@ -123,16 +157,16 @@ const ImageThumbnail = ({
                 </div>
             )}
 
-            {/* Loading state */}
-            {loading && (
+            {/* Loading state placeholders (for blob mode or initial load) */}
+            {isLoading && (
                 <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse" />
             )}
 
             {/* Error state */}
-            {error && !loading && (
+            {isError && !isLoading && (
                 <div
                     className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 bg-gray-50 dark:bg-gray-800"
-                    onClick={(e) => { e.stopPropagation(); retry?.(); }}
+                    onClick={(e) => { e.stopPropagation(); retryFn?.(); }}
                 >
                     <FiAlertTriangle size={24} className="mb-2 text-amber-500" />
                     <span className="text-xs">Error</span>
@@ -140,18 +174,19 @@ const ImageThumbnail = ({
             )}
 
             {/* Image */}
-            {imageUrl && !error && (
+            {displayUrl && !isError && (
                 <img
-                    src={imageUrl}
+                    src={displayUrl}
                     alt={alt}
+                    onError={handleNativeError}
                     className={`w-full h-full object-cover transition-transform duration-300 ${showHoverEffect ? 'group-hover:scale-105' : ''
-                        } ${loading ? 'opacity-0' : 'opacity-100'}`}
+                        } ${isLoading ? 'opacity-0' : 'opacity-100'}`}
                     loading={lazy ? 'lazy' : 'eager'}
                 />
             )}
 
             {/* Placeholder when no image */}
-            {!imageUrl && !loading && !error && (
+            {!displayUrl && !isLoading && !isError && (
                 <div className="absolute inset-0 flex items-center justify-center text-gray-400">
                     <FiImage size={24} />
                 </div>

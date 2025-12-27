@@ -37,7 +37,14 @@ import {
 import { useImages } from '../hooks/useImages';
 import { useLanguage } from '../context/LanguageContext';
 import { api } from '../services/api';
+import { API_BASE_URL } from '../config/api';
 import { showAlert, showToast } from '../utils/alert';
+
+// Helper to get thumbnail URL with auth token
+const getThumbnailUrl = (imageId) => {
+    const token = localStorage.getItem('authToken');
+    return `${API_BASE_URL}/images/${imageId}/thumbnail${token ? `?token=${token}` : ''}`;
+};
 
 // --- Constants ---
 const IMAGES_PER_PAGE = 18;
@@ -205,42 +212,18 @@ const ImageCard = ({ image, isSelected, onClick, imageUrl, loading, role, t }) =
     );
 };
 
-// Lazy Image Card
+// Lazy Image Card - uses thumbnail URL for fast loading
 const LazyImageCard = ({ image, isSelected, onClick, role, t }) => {
-    const [imageUrl, setImageUrl] = useState(null);
-    const [loading, setLoading] = useState(true);
+    // Use thumbnail URL directly - browser handles caching
+    const imageUrl = image?.id ? getThumbnailUrl(image.id) : null;
 
-    useEffect(() => {
-        let isMounted = true;
-        const loadImage = async () => {
-            try {
-                const blob = await api.download(`/images/${image.id}/download`);
-                const url = URL.createObjectURL(blob);
-                if (isMounted) { setImageUrl(url); setLoading(false); }
-            } catch (err) {
-                if (isMounted) setLoading(false);
-            }
-        };
-        if (image?.id) loadImage();
-        return () => { isMounted = false; if (imageUrl) URL.revokeObjectURL(imageUrl); };
-    }, [image?.id]);
-
-    return <ImageCard image={image} isSelected={isSelected} onClick={onClick} imageUrl={imageUrl} loading={loading} role={role} t={t} />;
+    return <ImageCard image={image} isSelected={isSelected} onClick={onClick} imageUrl={imageUrl} loading={false} role={role} t={t} />;
 };
 
-// Compact Selected Image Preview
+// Compact Selected Image Preview - uses thumbnail URL for fast loading
 const CompactImagePreview = ({ image, label, color, onRemove, t }) => {
-    const [imageUrl, setImageUrl] = useState(null);
-
-    useEffect(() => {
-        let isMounted = true;
-        if (image?.id) {
-            api.download(`/images/${image.id}/download`)
-                .then(blob => { if (isMounted) setImageUrl(URL.createObjectURL(blob)); })
-                .catch(() => { });
-        }
-        return () => { isMounted = false; if (imageUrl) URL.revokeObjectURL(imageUrl); };
-    }, [image?.id]);
+    // Use thumbnail URL directly - browser handles caching
+    const imageUrl = image?.id ? getThumbnailUrl(image.id) : null;
 
     if (!image) {
         return (

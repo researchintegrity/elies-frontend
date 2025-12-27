@@ -49,8 +49,15 @@ import {
 } from 'react-icons/fi';
 import { useLanguage } from '../context/LanguageContext';
 import { api } from '../services/api';
+import { API_BASE_URL } from '../config/api';
 import { showAlert, showToast } from '../utils/alert';
 import { SkeletonCard, EmptyState } from '../components/common';
+
+// Helper to get thumbnail URL with auth token
+const getThumbnailUrl = (imageId) => {
+    const token = localStorage.getItem('authToken');
+    return `${API_BASE_URL}/images/${imageId}/thumbnail${token ? `?token=${token}` : ''}`;
+};
 
 // --- Constants ---
 const AUTO_REFRESH_INTERVAL = 5000; // 5 seconds for processing analyses
@@ -390,36 +397,11 @@ const FilterPanel = ({ filters, onFilterChange, onReset, t }) => {
     );
 };
 
-// Analysis Row
+// Analysis Row - uses thumbnail URL for fast loading
 const AnalysisRow = ({ analysis, onViewDetails, onReproduce, onViewResults, onFilterByImage, t, locale, batchMode, isSelected, onToggleSelect }) => {
-    const [imageUrl, setImageUrl] = useState(null);
-    const [loadingImage, setLoadingImage] = useState(true);
-
-    // Load thumbnail for source image
-    useEffect(() => {
-        let isMounted = true;
-        const loadImage = async () => {
-            if (!analysis.source_image_id) {
-                setLoadingImage(false);
-                return;
-            }
-            try {
-                const blob = await api.download(`/images/${analysis.source_image_id}/download`);
-                if (isMounted) {
-                    setImageUrl(URL.createObjectURL(blob));
-                }
-            } catch (err) {
-                console.error('Failed to load thumbnail:', err);
-            } finally {
-                if (isMounted) setLoadingImage(false);
-            }
-        };
-        loadImage();
-        return () => {
-            isMounted = false;
-            if (imageUrl) URL.revokeObjectURL(imageUrl);
-        };
-    }, [analysis.source_image_id]);
+    // Use thumbnail URL directly - browser handles caching
+    const imageUrl = analysis.source_image_id ? getThumbnailUrl(analysis.source_image_id) : null;
+    const loadingImage = false; // No loading state needed with direct URLs
 
     const createdDate = new Date(analysis.created_at);
     const typeConfig = ANALYSIS_TYPE_CONFIG[analysis.type] || ANALYSIS_TYPE_CONFIG.external;
@@ -545,35 +527,11 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, onViewResults, onFi
     );
 };
 
-// Analysis Card for Grid View
+// Analysis Card for Grid View - uses thumbnail URL for fast loading
 const AnalysisCard = ({ analysis, onViewDetails, onReproduce, onViewResults, isActive, onFilterByImage, t, locale, batchMode, isSelected, onToggleSelect }) => {
-    const [imageUrl, setImageUrl] = useState(null);
-    const [loadingImage, setLoadingImage] = useState(true);
-
-    useEffect(() => {
-        let isMounted = true;
-        const loadImage = async () => {
-            if (!analysis.source_image_id) {
-                setLoadingImage(false);
-                return;
-            }
-            try {
-                const blob = await api.download(`/images/${analysis.source_image_id}/download`);
-                if (isMounted) {
-                    setImageUrl(URL.createObjectURL(blob));
-                }
-            } catch (err) {
-                console.error('Failed to load thumbnail:', err);
-            } finally {
-                if (isMounted) setLoadingImage(false);
-            }
-        };
-        loadImage();
-        return () => {
-            isMounted = false;
-            if (imageUrl) URL.revokeObjectURL(imageUrl);
-        };
-    }, [analysis.source_image_id]);
+    // Use thumbnail URL directly - browser handles caching
+    const imageUrl = analysis.source_image_id ? getThumbnailUrl(analysis.source_image_id) : null;
+    const loadingImage = false; // No loading state needed with direct URLs
 
     const createdDate = new Date(analysis.created_at);
     const typeConfig = ANALYSIS_TYPE_CONFIG[analysis.type] || ANALYSIS_TYPE_CONFIG.external;
@@ -680,39 +638,15 @@ const AnalysisCard = ({ analysis, onViewDetails, onReproduce, onViewResults, isA
     );
 };
 
-// Compact List Row for Split View
+// Compact List Row for Split View - uses thumbnail URL for fast loading
 const AnalysisListRowCompact = ({ analysis, isActive, onClick, t, locale, batchMode, isSelected, onToggleSelect }) => {
     const typeConfig = ANALYSIS_TYPE_CONFIG[analysis.type] || ANALYSIS_TYPE_CONFIG.external;
     const TypeIcon = typeConfig.icon;
     const createdDate = new Date(analysis.created_at);
 
-    const [imageUrl, setImageUrl] = useState(null);
-    const [loadingImage, setLoadingImage] = useState(true);
-
-    useEffect(() => {
-        let isMounted = true;
-        const loadImage = async () => {
-            if (!analysis.source_image_id) {
-                setLoadingImage(false);
-                return;
-            }
-            try {
-                const blob = await api.download(`/images/${analysis.source_image_id}/download`);
-                if (isMounted) {
-                    setImageUrl(URL.createObjectURL(blob));
-                }
-            } catch (err) {
-                console.error('Failed to load thumbnail:', err);
-            } finally {
-                if (isMounted) setLoadingImage(false);
-            }
-        };
-        loadImage();
-        return () => {
-            isMounted = false;
-            if (imageUrl) URL.revokeObjectURL(imageUrl);
-        };
-    }, [analysis.source_image_id]);
+    // Use thumbnail URL directly - browser handles caching
+    const imageUrl = analysis.source_image_id ? getThumbnailUrl(analysis.source_image_id) : null;
+    const loadingImage = false; // No loading state needed with direct URLs
 
     return (
         <div
@@ -782,77 +716,35 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
     const [loadingResult, setLoadingResult] = useState(false);
     const [imageUrls, setImageUrls] = useState({});
 
-    // Load Provenance Graph Images
+    // Load Provenance Graph Images - use thumbnail URLs
     useEffect(() => {
         if (analysis.type === 'provenance' && analysis.results?.graph?.nodes) {
-            const loadGraphImages = async () => {
-                const nodesToLoad = analysis.results.graph.nodes.filter(n => !imageUrls[n.id]);
-                if (nodesToLoad.length === 0) return;
-
-                const newUrls = {};
-                await Promise.all(nodesToLoad.map(async (node) => {
-                    try {
-                        const blob = await api.download(`/images/${node.id}/download`);
-                        newUrls[node.id] = URL.createObjectURL(blob);
-                    } catch (err) {
-                        // Silent fail or log
-                    }
-                }));
-
-                if (Object.keys(newUrls).length > 0) {
-                    setImageUrls(prev => ({ ...prev, ...newUrls }));
+            const newUrls = {};
+            for (const node of analysis.results.graph.nodes) {
+                if (!imageUrls[node.id]) {
+                    newUrls[node.id] = getThumbnailUrl(node.id);
                 }
-            };
-            loadGraphImages();
+            }
+            if (Object.keys(newUrls).length > 0) {
+                setImageUrls(prev => ({ ...prev, ...newUrls }));
+            }
         }
     }, [analysis]);
 
-    // Load Source Image
+    // Load Source Image - use thumbnail URL for detail panel
     useEffect(() => {
-        let isMounted = true;
-        setLoadingSource(true);
-        const loadSource = async () => {
-            if (!analysis.source_image_id) {
-                setLoadingSource(false);
-                return;
-            }
-            try {
-                const blob = await api.download(`/images/${analysis.source_image_id}/download`);
-                if (isMounted) setSourceUrl(URL.createObjectURL(blob));
-            } catch (err) {
-                console.error('Failed to load detail source:', err);
-            } finally {
-                if (isMounted) setLoadingSource(false);
-            }
-        };
-        loadSource();
-        return () => {
-            isMounted = false;
-            // Don't revoke immediately in case of tab switch, let component unmount handle it or revoking on change
-            // Actually better to revoke on unmount or id change
-        };
+        if (analysis.source_image_id) {
+            setSourceUrl(getThumbnailUrl(analysis.source_image_id));
+        }
+        setLoadingSource(false);
     }, [analysis.source_image_id]);
 
-    // Load Target Image (for cross-image analyses)
+    // Load Target Image - use thumbnail URL for detail panel
     useEffect(() => {
-        let isMounted = true;
-        setLoadingTarget(true);
-        const loadTarget = async () => {
-            if (!analysis.parameters?.target_image_id) {
-                setLoadingTarget(false);
-                return;
-            }
-            try {
-                const blob = await api.download(`/images/${analysis.parameters.target_image_id}/download`);
-                if (isMounted) setTargetUrl(URL.createObjectURL(blob));
-            } catch (err) {
-                console.error('Failed to load detail target:', err);
-            } finally {
-                if (isMounted) setLoadingTarget(false);
-            }
-        };
-        loadTarget();
-        return () => { isMounted = false; };
+        if (analysis.parameters?.target_image_id) {
+            setTargetUrl(getThumbnailUrl(analysis.parameters.target_image_id));
+        }
+        setLoadingTarget(false);
     }, [analysis.parameters?.target_image_id]);
 
     // Load Result Image

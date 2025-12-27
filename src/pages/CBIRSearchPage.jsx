@@ -13,9 +13,16 @@ import {
   FiLayers
 } from 'react-icons/fi';
 import { api } from '../services/api';
+import { API_BASE_URL } from '../config/api';
 import { showAlert, showToast } from '../utils/alert';
 import { useLanguage } from '../context/LanguageContext';
 import { SkeletonCard, EmptyState } from '../components/common';
+
+// Helper to get thumbnail URL with auth token
+const getThumbnailUrl = (imageId) => {
+  const token = localStorage.getItem('authToken');
+  return `${API_BASE_URL}/images/${imageId}/thumbnail${token ? `?token=${token}` : ''}`;
+};
 
 // --- Sub-Components ---
 
@@ -66,39 +73,11 @@ const SourceImageCard = ({ image, isSelected, onClick, imageUrl, loading, error 
   </div>
 );
 
-// Result Card for Search Results
+// Result Card for Search Results - uses thumbnail URL for fast loading
 const ResultCard = ({ result, rank, onClick, t }) => {
-  const [imageUrl, setImageUrl] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Use thumbnail URL directly - browser handles caching
+  const imageUrl = result?.image_id ? getThumbnailUrl(result.image_id) : null;
   const [error, setError] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    const loadImage = async () => {
-      if (!result.image_id) {
-        setError(true);
-        setLoading(false);
-        return;
-      }
-      try {
-        const blob = await api.download(`/images/${result.image_id}/download`);
-        const url = URL.createObjectURL(blob);
-        if (isMounted) {
-          setImageUrl(url);
-          setLoading(false);
-        }
-      } catch {
-        if (isMounted) {
-          setError(true);
-          setLoading(false);
-        }
-      }
-    };
-    loadImage();
-    return () => {
-      isMounted = false;
-    };
-  }, [result.image_id]);
 
   const similarityPercent = (result.similarity_score * 100).toFixed(1);
   const getSimilarityTone = (score) => {
@@ -131,9 +110,7 @@ const ResultCard = ({ result, rank, onClick, t }) => {
       className="group bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all cursor-pointer hover:shadow-lg"
     >
       <div className="aspect-square bg-gray-100 dark:bg-gray-900 overflow-hidden">
-        {loading ? (
-          <div className="w-full h-full bg-gray-200 dark:bg-gray-700 animate-pulse" />
-        ) : error ? (
+        {error ? (
           <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 bg-gray-50 dark:bg-gray-800">
             <FiAlertTriangle size={24} className="mb-2 text-amber-500" />
             <span className="text-xs">{t('cbir.error')}</span>
@@ -144,6 +121,7 @@ const ResultCard = ({ result, rank, onClick, t }) => {
             alt={result.filename || 'Similar image'}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             loading="lazy"
+            onError={() => setError(true)}
           />
         )}
       </div>
@@ -341,34 +319,16 @@ const CBIRSearchPage = () => {
     prevGalleryFiltersRef.current = galleryFilters;
   }, [galleryFilters, galleryPage]);
 
+  // Load image URLs - use thumbnail URLs directly
   useEffect(() => {
-    const loadImageUrls = async () => {
-      for (const img of images) {
-        setLoadingUrls(prev => {
-          if (prev[img.id]) return prev;
-          return prev;
-        });
-        setImageUrls(prev => {
-          if (prev[img.id]) return prev;
-          (async () => {
-            setLoadingUrls(p => ({ ...p, [img.id]: true }));
-            try {
-              const blob = await api.download(`/images/${img.id}/download`);
-              const url = URL.createObjectURL(blob);
-              setImageUrls(p => ({ ...p, [img.id]: url }));
-            } catch (_err) {
-              console.error(`Error loading image ${img.id}:`, _err);
-            } finally {
-              setLoadingUrls(p => ({ ...p, [img.id]: false }));
-            }
-          })();
-          return prev;
-        });
+    const newUrls = {};
+    for (const img of images) {
+      if (!imageUrls[img.id]) {
+        newUrls[img.id] = getThumbnailUrl(img.id);
       }
-    };
-
-    if (images.length > 0) {
-      loadImageUrls();
+    }
+    if (Object.keys(newUrls).length > 0) {
+      setImageUrls(prev => ({ ...prev, ...newUrls }));
     }
   }, [images]);
 

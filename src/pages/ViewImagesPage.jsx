@@ -24,6 +24,7 @@ import ImageFilters from '../components/ImageFilters';
 import TagInput from '../components/TagInput';
 import BatchTagModal from '../components/BatchTagModal';
 import { SkeletonCard, EmptyState } from '../components/common';
+import { API_BASE_URL } from '../config/api';
 
 // --- Components ---
 
@@ -124,29 +125,13 @@ const LightboxModal = ({ image, onClose, imageUrl, onTagAdd, onTagRemove, t, loc
 
 // Query Image Thumbnail for Similarity Mode (with selection support)
 const QueryImageThumbnail = ({ image, isSelected, onSelect, isSelectionMode }) => {
-  const [imageUrl, setImageUrl] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const token = localStorage.getItem('authToken');
+  const imageUrl = useMemo(() => {
+    if (!image) return null;
+    return `${API_BASE_URL}/images/${image.imageId || image.id}/thumbnail${token ? `?token=${token}` : ''}`;
+  }, [image, token]);
 
-  useEffect(() => {
-    let isMounted = true;
-    const loadImage = async () => {
-      try {
-        const blob = await api.download(`/images/${image.imageId || image.id}/download`);
-        const url = URL.createObjectURL(blob);
-        if (isMounted) {
-          setImageUrl(url);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (isMounted) setLoading(false);
-      }
-    };
-    if (image) loadImage();
-    return () => {
-      isMounted = false;
-      if (imageUrl) URL.revokeObjectURL(imageUrl);
-    };
-  }, [image?.id, image?.imageId]);
+  if (!image) return null;
 
   if (!image) return null;
 
@@ -176,10 +161,8 @@ const QueryImageThumbnail = ({ image, isSelected, onSelect, isSelectionMode }) =
           </div>
         </div>
 
-        {loading ? (
-          <div className="w-full h-full animate-pulse bg-gray-200 dark:bg-gray-600" />
-        ) : imageUrl ? (
-          <img src={imageUrl} alt={image.filename} className="w-full h-full object-cover" />
+        {imageUrl ? (
+          <img src={imageUrl} alt={image.filename} className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-400">
             <FiImage size={20} />
@@ -197,7 +180,6 @@ const QueryImageThumbnail = ({ image, isSelected, onSelect, isSelectionMode }) =
 };
 const ImageCard = ({ image, onClick, onSelect, isSelected, isSelectionMode, similarityScore, rank }) => {
   const { t } = useLanguage();
-  const [imageUrl, setImageUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -216,29 +198,19 @@ const ImageCard = ({ image, onClick, onSelect, isSelected, isSelectionMode, simi
     return 'bg-red-500';
   };
 
-  useEffect(() => {
-    let isMounted = true;
-    const loadImage = async () => {
-      try {
-        const blob = await api.download(`/images/${image.imageId}/download`);
-        const url = URL.createObjectURL(blob);
-        if (isMounted) {
-          setImageUrl(url);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(true);
-          setLoading(false);
-        }
-      }
-    };
-    if (image.imageId) loadImage();
-    return () => {
-      isMounted = false;
-      if (imageUrl) URL.revokeObjectURL(imageUrl);
-    };
-  }, [image.imageId]);
+  const token = localStorage.getItem('authToken');
+  // Use memoized URL construction for performance
+  const displayUrl = useMemo(() => {
+    if (!image?.imageId) return null;
+    // Add cache busting timestamp if needed, but browser caching is desired here
+    return `${API_BASE_URL}/images/${image.imageId}/thumbnail${token ? `?token=${token}` : ''}`;
+  }, [image?.imageId, token]);
+
+  const handleImageLoad = () => setLoading(false);
+  const handleImageError = () => {
+    setLoading(false);
+    setError(true);
+  };
 
   return (
     <div
@@ -266,19 +238,26 @@ const ImageCard = ({ image, onClick, onSelect, isSelected, isSelectionMode, simi
       </div>
 
       <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-900">
-        {loading ? (
-          <div className="w-full h-full bg-gray-200 dark:bg-gray-800 animate-pulse"></div>
-        ) : error ? (
+        {/* Loading Skeleton - Overlay */}
+        {loading && !error && (
+          <div className="absolute inset-0 z-10 w-full h-full bg-gray-200 dark:bg-gray-800 animate-pulse"></div>
+        )}
+
+        {/* Error State */}
+        {error ? (
           <div className="flex flex-col items-center justify-center w-full h-full text-gray-400 bg-gray-50 dark:bg-gray-800">
             <FiAlertTriangle size={24} className="mb-2 text-amber-500" />
             <span className="text-xs">{t('image.error')}</span>
           </div>
         ) : (
+          /* Main Image - Hidden until loaded */
           <img
-            src={imageUrl}
+            src={displayUrl}
             alt={image.filename}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${loading ? 'opacity-0' : 'opacity-100'}`}
             loading="lazy"
+            onLoad={handleImageLoad}
+            onError={handleImageError}
           />
         )}
 

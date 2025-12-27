@@ -39,6 +39,7 @@ import {
     FiPenTool
 } from 'react-icons/fi';
 import { api } from '../services/api';
+import { API_BASE_URL } from '../config/api';
 import { showToast, showAlert } from '../utils/alert';
 import { useLanguage } from '../context/LanguageContext';
 import AnnotationOverlay from '../components/AnnotationOverlay';
@@ -55,6 +56,12 @@ import {
 
 // --- Constants ---
 const IMAGES_PER_PAGE = 24;
+
+// Helper to get thumbnail URL with auth token
+const getThumbnailUrl = (imageId) => {
+    const token = localStorage.getItem('authToken');
+    return `${API_BASE_URL}/images/${imageId}/thumbnail${token ? `?token=${token}` : ''}`;
+};
 
 // Tool definitions (removed strings)
 const ANALYSIS_TOOLS = {
@@ -600,28 +607,17 @@ const ImageAnalysisPage = () => {
         }
     }, [zoomLevel]);
 
-    // Load image URLs
+    // Load image URLs - use thumbnail URLs directly for gallery display
     useEffect(() => {
-        const loadImageUrls = async () => {
-            for (const img of images) {
-                if (!imageUrls[img.id] && !loadingUrls[img.id]) {
-                    setLoadingUrls(prev => ({ ...prev, [img.id]: true }));
-                    try {
-                        const blob = await api.download(`/images/${img.id}/download`);
-                        const url = URL.createObjectURL(blob);
-                        setImageUrls(prev => ({ ...prev, [img.id]: url }));
-                        setImageBlobs(prev => ({ ...prev, [img.id]: blob }));
-                    } catch (err) {
-                        console.error(`Error loading image ${img.id}:`, err);
-                    } finally {
-                        setLoadingUrls(prev => ({ ...prev, [img.id]: false }));
-                    }
-                }
+        // Generate thumbnail URLs for all images
+        const newUrls = {};
+        for (const img of images) {
+            if (!imageUrls[img.id]) {
+                newUrls[img.id] = getThumbnailUrl(img.id);
             }
-        };
-
-        if (images.length > 0) {
-            loadImageUrls();
+        }
+        if (Object.keys(newUrls).length > 0) {
+            setImageUrls(prev => ({ ...prev, ...newUrls }));
         }
     }, [images]);
 
