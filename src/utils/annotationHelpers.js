@@ -38,17 +38,17 @@ export const normalizeRect = (rect) => {
  */
 export const getPolygonBounds = (points) => {
     if (!points || points.length === 0) return null;
-    
+
     let minX = Infinity, minY = Infinity;
     let maxX = -Infinity, maxY = -Infinity;
-    
+
     points.forEach(p => {
         minX = Math.min(minX, p.x);
         minY = Math.min(minY, p.y);
         maxX = Math.max(maxX, p.x);
         maxY = Math.max(maxY, p.y);
     });
-    
+
     return {
         x: minX,
         y: minY,
@@ -108,12 +108,12 @@ export const pointInEllipse = (point, ellipse) => {
     const cy = y + height / 2;
     const rx = width / 2;
     const ry = height / 2;
-    
+
     if (rx === 0 || ry === 0) return false;
-    
+
     const dx = point.x - cx;
     const dy = point.y - cy;
-    
+
     return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1;
 };
 
@@ -122,14 +122,14 @@ export const pointInEllipse = (point, ellipse) => {
  */
 export const pointInPolygon = (point, points) => {
     if (!points || points.length < 3) return false;
-    
+
     let inside = false;
     const n = points.length;
-    
+
     for (let i = 0, j = n - 1; i < n; j = i++) {
         const xi = points[i].x, yi = points[i].y;
         const xj = points[j].x, yj = points[j].y;
-        
+
         if (
             yi > point.y !== yj > point.y &&
             point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi
@@ -137,7 +137,7 @@ export const pointInPolygon = (point, points) => {
             inside = !inside;
         }
     }
-    
+
     return inside;
 };
 
@@ -189,7 +189,7 @@ export const HandlePositions = {
 export const getResizeHandles = (annotation, handleSize = 8) => {
     const { x, y, width, height } = normalizeRect(annotation);
     const half = handleSize / 2;
-    
+
     return {
         [HandlePositions.TOP_LEFT]: { x: x - half, y: y - half },
         [HandlePositions.TOP_CENTER]: { x: x + width / 2 - half, y: y - half },
@@ -207,7 +207,7 @@ export const getResizeHandles = (annotation, handleSize = 8) => {
  */
 export const getHandleAtPoint = (point, annotation, handleSize = 10) => {
     const handles = getResizeHandles(annotation, handleSize);
-    
+
     for (const [position, handle] of Object.entries(handles)) {
         if (
             point.x >= handle.x &&
@@ -218,7 +218,7 @@ export const getHandleAtPoint = (point, annotation, handleSize = 10) => {
             return position;
         }
     }
-    
+
     return null;
 };
 
@@ -242,9 +242,9 @@ export const getCursorForHandle = (handle) => {
 /**
  * Resize annotation based on handle drag
  */
-export const resizeAnnotation = (annotation, handle, delta, keepAspectRatio = false) => {
+export const resizeAnnotation = (annotation, handle, delta) => {
     let { x, y, width, height } = annotation;
-    
+
     switch (handle) {
         case HandlePositions.TOP_LEFT:
             x += delta.x;
@@ -281,12 +281,12 @@ export const resizeAnnotation = (annotation, handle, delta, keepAspectRatio = fa
             height += delta.y;
             break;
     }
-    
+
     // Ensure minimum size
     const minSize = 10;
     if (width < minSize) width = minSize;
     if (height < minSize) height = minSize;
-    
+
     return { ...annotation, x, y, width, height };
 };
 
@@ -298,7 +298,7 @@ export const resizeAnnotation = (annotation, handle, delta, keepAspectRatio = fa
 export const findClosestPolygonPoint = (point, points, threshold = 10) => {
     let closestIdx = -1;
     let closestDist = Infinity;
-    
+
     points.forEach((p, idx) => {
         const d = distance(point, p);
         if (d < closestDist && d < threshold) {
@@ -306,7 +306,7 @@ export const findClosestPolygonPoint = (point, points, threshold = 10) => {
             closestIdx = idx;
         }
     });
-    
+
     return closestIdx;
 };
 
@@ -352,7 +352,7 @@ export const moveAnnotation = (annotation, delta) => {
             })),
         };
     }
-    
+
     return {
         ...annotation,
         x: annotation.x + delta.x,
@@ -365,7 +365,7 @@ export const moveAnnotation = (annotation, delta) => {
  */
 export const scaleAnnotation = (annotation, scale) => {
     const center = getAnnotationCenter(annotation);
-    
+
     if (annotation.type === ShapeTypes.POLYGON) {
         return {
             ...annotation,
@@ -375,10 +375,10 @@ export const scaleAnnotation = (annotation, scale) => {
             })),
         };
     }
-    
+
     const newWidth = annotation.width * scale;
     const newHeight = annotation.height * scale;
-    
+
     return {
         ...annotation,
         x: center.x - newWidth / 2,
@@ -415,7 +415,7 @@ export const imageToScreen = (imagePoint, imageRect, zoom = 1, pan = { x: 0, y: 
  */
 export const toPercentCoords = (annotation, imageDimensions) => {
     const { width: imgW, height: imgH } = imageDimensions;
-    
+
     if (annotation.type === ShapeTypes.POLYGON) {
         return {
             ...annotation,
@@ -425,7 +425,7 @@ export const toPercentCoords = (annotation, imageDimensions) => {
             })),
         };
     }
-    
+
     return {
         ...annotation,
         x: (annotation.x / imgW) * 100,
@@ -440,7 +440,7 @@ export const toPercentCoords = (annotation, imageDimensions) => {
  */
 export const fromPercentCoords = (annotation, imageDimensions) => {
     const { width: imgW, height: imgH } = imageDimensions;
-    
+
     if (annotation.type === ShapeTypes.POLYGON) {
         return {
             ...annotation,
@@ -450,7 +450,7 @@ export const fromPercentCoords = (annotation, imageDimensions) => {
             })),
         };
     }
-    
+
     return {
         ...annotation,
         x: (annotation.x / 100) * imgW,
@@ -496,9 +496,9 @@ export const exportAnnotationsToJSON = (annotations, imageInfo) => {
 /**
  * Import annotations from JSON format
  */
-export const importAnnotationsFromJSON = (json, imageDimensions) => {
+export const importAnnotationsFromJSON = (json) => {
     if (!json || !json.annotations) return [];
-    
+
     return json.annotations.map(ann => {
         const baseAnn = {
             id: ann.id,
@@ -513,14 +513,14 @@ export const importAnnotationsFromJSON = (json, imageDimensions) => {
             confidence: ann.confidence,
             createdAt: ann.createdAt,
         };
-        
+
         if (ann.type === ShapeTypes.POLYGON) {
             return {
                 ...baseAnn,
                 points: ann.coords.points,
             };
         }
-        
+
         return {
             ...baseAnn,
             ...ann.coords,
@@ -535,7 +535,7 @@ export const importAnnotationsFromJSON = (json, imageDimensions) => {
  */
 export const isValidAnnotation = (annotation) => {
     if (!annotation || !annotation.type) return false;
-    
+
     switch (annotation.type) {
         case ShapeTypes.RECTANGLE:
         case ShapeTypes.ELLIPSE:
@@ -553,11 +553,11 @@ export const isValidAnnotation = (annotation) => {
  */
 export const normalizeAnnotation = (annotation) => {
     if (!annotation) return annotation;
-    
+
     if (annotation.type === ShapeTypes.RECTANGLE || annotation.type === ShapeTypes.ELLIPSE) {
         const normalized = normalizeRect(annotation);
         return { ...annotation, ...normalized };
     }
-    
+
     return annotation;
 };

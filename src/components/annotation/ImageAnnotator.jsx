@@ -204,7 +204,7 @@ const ImageAnnotatorInner = ({
                 actions.deleteAnnotation(clickedAnnotation.id);
             }
         }
-    }, [activeTool, annotations, selectedId, isDrawing, currentShape, getMousePosition, actions, readOnly, zoom]);
+    }, [activeTool, annotations, selectedId, isDrawing, currentShape, getMousePosition, actions, readOnly]);
     
     // Mouse move handler
     const handleMouseMove = useCallback((e) => {
@@ -251,7 +251,7 @@ const ImageAnnotatorInner = ({
     }, [isDragging, dragStart, dragType, draggedAnnotation, activeHandle, activePointIndex, activeTool, isDrawing, getMousePosition, annotations, actions]);
     
     // Mouse up handler
-    const handleMouseUp = useCallback((e) => {
+    const handleMouseUp = useCallback(() => {
         if (dragType === 'draw' && currentShape) {
             // Finish drawing (if valid)
             if (isValidAnnotation(currentShape)) {
@@ -273,7 +273,7 @@ const ImageAnnotatorInner = ({
     }, [dragType, currentShape, activeTool, actions]);
     
     // Double click to finish polygon
-    const handleDoubleClick = useCallback((e) => {
+    const handleDoubleClick = useCallback(() => {
         if (isDrawing && activeTool === ToolTypes.POLYGON && currentShape?.points?.length >= 3) {
             actions.finishDrawing();
         }
@@ -414,7 +414,7 @@ const ImageAnnotatorInner = ({
     const handleFitToScreen = useCallback(() => {
         setZoom(1);
         setPan({ x: 0, y: 0 });
-    }, []);
+    }, [setPan]);
     
     // Wheel zoom
     useEffect(() => {

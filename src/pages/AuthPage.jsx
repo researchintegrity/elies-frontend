@@ -25,7 +25,7 @@ const ErrorAlert = ({ message }) => {
 };
 
 // Modern input component with icon
-const InputField = ({ icon: Icon, label, id, ...props }) => (
+const InputField = ({ icon: IconComponent, label, id, ...props }) => (
   <div className="group">
     <label
       htmlFor={id}
@@ -35,7 +35,7 @@ const InputField = ({ icon: Icon, label, id, ...props }) => (
     </label>
     <div className="relative">
       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-        <Icon className="text-gray-400 group-focus-within:text-primary-500 transition-colors" />
+        <IconComponent className="text-gray-400 group-focus-within:text-primary-500 transition-colors" />
       </div>
       <input
         id={id}

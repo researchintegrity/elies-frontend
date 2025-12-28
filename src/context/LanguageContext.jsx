@@ -248,6 +248,7 @@ const translations = {
         'similarity.searchErrorMessage': 'Erro ao buscar imagens similares.',
         'similarity.selectOneImage': 'Selecione exatamente uma imagem para buscar similares.',
         'similarity.resultsFor': 'Resultados para',
+        'similarity.resultsCleared': 'Resultados limpos',
 
         // Batch Tag Modal
         'batchTag.title': 'Classificar Imagens',
@@ -1306,6 +1307,7 @@ const translations = {
         'similarity.searchErrorMessage': 'Error searching for similar images.',
         'similarity.selectOneImage': 'Select exactly one image to search for similar ones.',
         'similarity.resultsFor': 'Results for',
+        'similarity.resultsCleared': 'Results cleared',
 
         // Batch Tag Modal
         'batchTag.title': 'Classify Images',

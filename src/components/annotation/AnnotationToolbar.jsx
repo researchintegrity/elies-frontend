@@ -23,7 +23,7 @@ import {
 import { useAnnotation, ToolTypes } from '../../context/AnnotationContext';
 import { useLanguage } from '../../context/LanguageContext';
 
-const ToolButton = ({ icon: Icon, label, isActive, onClick, disabled, shortcut }) => (
+const ToolButton = ({ icon: IconComponent, label, isActive, onClick, disabled, shortcut }) => (
     <button
         onClick={onClick}
         disabled={disabled}
@@ -37,7 +37,7 @@ const ToolButton = ({ icon: Icon, label, isActive, onClick, disabled, shortcut }
             ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         `}
     >
-        <Icon size={18} />
+        <IconComponent size={18} />
         {shortcut && (
             <span className="absolute -bottom-0.5 -right-0.5 text-[8px] font-bold px-1 rounded bg-gray-900/70 text-white">
                 {shortcut}

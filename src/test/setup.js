@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 // src/test/setup.js
 // Test setup file for Vitest with React Testing Library
 import '@testing-library/jest-dom';

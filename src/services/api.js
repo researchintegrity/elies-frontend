@@ -265,7 +265,7 @@ export const api = {
      * @param {number} denseMethod - Dense method variant (1-5)
      * @returns {Promise<{message: string, analysis_id: string}>}
      */
-    startCopyMoveAnalysis: async (imageId, method = 'dense', denseMethod = 2) => {
+    startCopyMoveAnalysis: async (imageId, denseMethod = 2) => {
         return api.post('/analyses/copy-move/single', {
             image_id: imageId,
             method: 'dense',  // Single-image only supports dense

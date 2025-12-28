@@ -69,9 +69,10 @@ const TOOL_PARAMS_CONFIG = {
 
 // Analysis Parameters Section - shows only current tool's parameters
 const AnalysisParametersSection = ({ toolId, params, onParamsChange }) => {
+    const { t } = useLanguage();
+    
     if (!toolId || !params) return null;
 
-    const { t } = useLanguage();
     const toolConfig = TOOL_PARAMS_CONFIG[toolId];
     if (!toolConfig) return null;
 

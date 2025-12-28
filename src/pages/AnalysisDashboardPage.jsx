@@ -288,7 +288,8 @@ const ParametersDisplay = ({ parameters, sourceImageId, targetImageId, t, defaul
 
 // Filter Panel
 const FilterPanel = ({ filters, onFilterChange, onReset, t }) => {
-    const [showDateRange, setShowDateRange] = useState(false);
+    // Date range state available for future implementation
+    const [_showDateRange, _setShowDateRange] = useState(false);
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-4">

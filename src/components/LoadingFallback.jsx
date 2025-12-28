@@ -8,17 +8,12 @@ import { useLanguage } from '../context/LanguageContext';
  * Displayed while lazy-loaded pages are loading
  */
 const LoadingFallback = () => {
-    // Try to use language context, but provide fallback if not available
-    let message = 'Carregando...';
-    let subMessage = 'Aguarde um momento...';
-
-    try {
-        const { t } = useLanguage();
-        message = t('common.loading');
-        subMessage = t('common.pleaseWait');
-    } catch {
-        // Context not available, use defaults
-    }
+    // Use language context with fallback values
+    const languageContext = useLanguage();
+    const t = languageContext?.t;
+    
+    const message = t ? t('common.loading') : 'Carregando...';
+    const subMessage = t ? t('common.pleaseWait') : 'Aguarde um momento...';
 
     return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in">

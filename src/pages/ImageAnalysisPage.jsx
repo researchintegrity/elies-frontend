@@ -32,6 +32,10 @@ import {
     FiTag,
     FiX,
     FiFilter,
+    FiClock,
+    FiDatabase,
+    FiServer,
+    FiHardDrive,
     FiEdit2,
     FiLayers,
     FiTrash2,
@@ -210,9 +214,8 @@ const ImageAnalysisPage = () => {
     // Gallery State
     const [images, setImages] = useState([]);
     const [imageUrls, setImageUrls] = useState({});
-    const [, setImageBlobs] = useState({});
     const [loadingImages, setLoadingImages] = useState(true);
-    const [loadingUrls, setLoadingUrls] = useState({});
+    const [loadingUrls] = useState({});
 
     // Selection State
     const [selectedImage, setSelectedImage] = useState(null);
@@ -250,6 +253,7 @@ const ImageAnalysisPage = () => {
     const [analyzing, setAnalyzing] = useState(false);
     const [resultCanvas, setResultCanvas] = useState(null);
     const [originalCanvas, setOriginalCanvas] = useState(null);
+    const [loadedImageId, setLoadedImageId] = useState(null);
     const [metadata, setMetadata] = useState(null);
 
     // UI State
@@ -270,7 +274,7 @@ const ImageAnalysisPage = () => {
     // Annotation State
     const [annotationMode] = useState(false);
     const [showAnnotationModal, setShowAnnotationModal] = useState(false);
-    const [showAnnotations, setShowAnnotations] = useState(true); // Toggle annotations visibility
+    const [showAnnotations, setShowAnnotations] = useState(true); // Toggle annotations
     const [annotations, setAnnotations] = useState([]);
     const [annotationCanvas, setAnnotationCanvas] = useState(null); // Canvas with 100% opacity for annotation
     const [crop, setCrop] = useState(null);
@@ -285,18 +289,7 @@ const ImageAnalysisPage = () => {
     const [loadingReproduce, setLoadingReproduce] = useState(false);
 
     // Helpers
-    const getGroupColor = (type, id) => {
-        if (type !== 'copy-move') return '#EF4444'; // Red for general manipulation
-        const colors = [
-            '#3B82F6', // Blue
-            '#10B981', // Green
-            '#F59E0B', // Amber
-            '#8B5CF6', // Purple
-            '#EC4899', // Pink
-            '#06B6D4', // Cyan
-        ];
-        return colors[(id - 1) % colors.length] || '#3B82F6';
-    };
+
 
 
     // Refs
@@ -305,9 +298,51 @@ const ImageAnalysisPage = () => {
     const zoomContainerRef = useRef(null);
 
     // Fetch images when page or filters change
+    const fetchImages = useCallback(async (page = 1) => {
+        setLoadingImages(true);
+        try {
+            // Build query params with filters
+            const queryParams = { page, per_page: IMAGES_PER_PAGE };
+            if (filterSearch) queryParams.search = filterSearch;
+            if (filterDateFrom) queryParams.date_from = filterDateFrom;
+            if (filterDateTo) queryParams.date_to = filterDateTo;
+            if (filterImageType) queryParams.image_type = filterImageType;
+
+            const data = await api.get('/images', queryParams);
+
+            let imageList = [];
+            let total = 0;
+
+            if (Array.isArray(data)) {
+                imageList = data;
+                total = data.length >= IMAGES_PER_PAGE ? page * IMAGES_PER_PAGE + 1 : (page - 1) * IMAGES_PER_PAGE + data.length;
+            } else if (data && typeof data === 'object') {
+                imageList = data.items || data.images || [];
+                total = data.total || data.total_count || imageList.length;
+            }
+
+            const transformed = imageList.slice(0, IMAGES_PER_PAGE).map(img => ({
+                id: img._id,
+                filename: img.filename,
+                fileSize: img.file_size,
+                sourceType: img.source_type,
+                mimeType: img.mime_type || 'image/jpeg',
+                // Include EXIF metadata from API (try both naming conventions)
+                exifMetadata: img.exifMetadata || img.exif_metadata || null
+            }));
+
+            setImages(transformed);
+            setTotalImages(total);
+        } catch (err) {
+            console.error('Error fetching images:', err);
+        } finally {
+            setLoadingImages(false);
+        }
+    }, [filterSearch, filterDateFrom, filterDateTo, filterImageType]);
+
     useEffect(() => {
         fetchImages(galleryPage);
-    }, [galleryPage, filterSearch, filterDateFrom, filterDateTo, filterImageType]);
+    }, [galleryPage, filterSearch, filterDateFrom, filterDateTo, filterImageType, fetchImages]);
 
     // Fetch all available tags from backend (using dedicated endpoint for efficiency)
     useEffect(() => {
@@ -440,7 +475,7 @@ const ImageAnalysisPage = () => {
         const loadViewResultsData = async () => {
             setLoadingReproduce(true);
             try {
-                const { analysisId, imageId, parameters, type, results } = JSON.parse(viewResultsData);
+                const { analysisId, imageId, parameters, type } = JSON.parse(viewResultsData);
                 sessionStorage.removeItem('viewResultsAnalysis'); // Clear after reading
 
                 // Only handle screening tool analysis type
@@ -579,7 +614,7 @@ const ImageAnalysisPage = () => {
         const loadStartAnalysisData = async () => {
             setLoadingReproduce(true);
             try {
-                const { imageIds, targetPage, mode } = JSON.parse(startAnalysisData);
+                const { imageIds, targetPage } = JSON.parse(startAnalysisData);
                 sessionStorage.removeItem('startAnalysis'); // Clear after reading
 
                 // Only handle imageAnalysis target
@@ -669,7 +704,7 @@ const ImageAnalysisPage = () => {
         if (Object.keys(newUrls).length > 0) {
             setImageUrls(prev => ({ ...prev, ...newUrls }));
         }
-    }, [images]);
+    }, [images, imageUrls]);
 
     // Fetch annotations when image changes
     useEffect(() => {
@@ -703,10 +738,170 @@ const ImageAnalysisPage = () => {
         setAnnotationText('');
     }, [selectedImage]);
 
+    // Load source image when selection changes
+    useEffect(() => {
+        if (!selectedImage) {
+            setOriginalCanvas(null);
+            setResultCanvas(null);
+            setLoadedImageId(null);
+            return;
+        }
+
+        // If the same image is already loaded, don't reload
+        if (loadedImageId === selectedImage.id && originalCanvas) {
+            return;
+        }
+
+        // Use a flag to prevent race conditions if selection changes rapidly
+        let isMounted = true;
+
+        const loadSource = async () => {
+            setAnalyzing(true);
+            setResultCanvas(null); // Clear result from previous image
+            setOriginalCanvas(null); // Clear previous original
+
+            try {
+                // Download image
+                const blob = await api.download(`/images/${selectedImage.id}/download`);
+                if (!isMounted) return;
+
+                const imageUrl = URL.createObjectURL(blob);
+                const { canvas } = await loadImageToCanvas(imageUrl);
+                URL.revokeObjectURL(imageUrl); // Clean up
+
+                if (isMounted) {
+                    setOriginalCanvas(canvas);
+                    setLoadedImageId(selectedImage.id);
+                }
+            } catch (err) {
+                console.error('Failed to load source image:', err);
+                if (isMounted) {
+                    showToast(t('analysis.errorLoadImage'), 'error');
+                }
+            } finally {
+                if (isMounted) {
+                    setAnalyzing(false);
+                }
+            }
+        };
+
+        loadSource();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [selectedImage, loadedImageId, originalCanvas, t]);
+
+    // Memoize runAnalysis to prevent unnecessary re-renders
+    const runAnalysis = useCallback(async () => {
+        // Only run if we have an image, it is loaded, and matches the currently selected one
+        if (!selectedImage || !originalCanvas || selectedImage.id !== loadedImageId) return;
+
+        const tool = ANALYSIS_TOOLS[selectedTool];
+        if (!tool) return;
+
+        // For non-canvas tools, handle separately
+        if (!tool.hasCanvas) {
+            if (selectedTool === 'metadata') {
+                // Metadata logic using existing information
+                const info = getImageInfo(originalCanvas, selectedImage.mimeType);
+                // Include EXIF metadata from API if available
+                const rawExifData = selectedImage.exifMetadata || selectedImage.exif_metadata || {};
+                // Filter out sensitive/unnecessary fields
+                const fieldsToExclude = ['SourceFile', 'File:Directory', 'Directory'];
+                const exifData = Object.fromEntries(
+                    Object.entries(rawExifData).filter(([key]) => !fieldsToExclude.includes(key))
+                );
+
+                setMetadata({
+                    filename: selectedImage.filename,
+                    sourceType: selectedImage.sourceType,
+                    ...info,
+                    ...exifData
+                });
+            }
+            return;
+        }
+
+        setAnalyzing(true);
+        // Note: We DO NOT clear resultCanvas here to avoid flickering (glitch).
+        // The old result remains visible until the new one is ready.
+
+        try {
+            let result = null;
+
+            // Use a timeout to allow the UI to show the loading state (spinner)
+            // processing heavy JS can block the main thread
+            await new Promise(resolve => setTimeout(resolve, 10));
+
+            switch (selectedTool) {
+                case 'ela':
+                    result = await applyErrorLevelAnalysis(
+                        originalCanvas,
+                        params.elaQuality,
+                        params.elaScale,
+                        showAnnotationModal ? 100 : params.elaOpacity
+                    );
+                    break;
+
+                case 'noise':
+                    result = applyNoiseAnalysis(
+                        originalCanvas,
+                        params.noiseAmplitude,
+                        params.noiseEqualize,
+                        showAnnotationModal ? 100 : params.noiseOpacity
+                    );
+                    break;
+
+                case 'gradient':
+                    result = applyLuminanceGradient(
+                        originalCanvas,
+                        params.gradientIntensity,
+                        showAnnotationModal ? 1 : (params.gradientOpacity / 100),
+                        params.gradientNormalize,
+                        params.gradientEqualize
+                    );
+                    break;
+
+                case 'levelSweep':
+                    result = applyLevelSweep(
+                        originalCanvas,
+                        params.sweepPosition,
+                        params.sweepWidth,
+                        showAnnotationModal ? 100 : params.sweepOpacity
+                    );
+                    break;
+
+                case 'cloneDetection':
+                    result = applyCloneDetection(originalCanvas, {
+                        minSimilarity: params.cloneMinSimilarity,
+                        minDetail: params.cloneMinDetail,
+                        minClusterSize: params.cloneMinClusterSize,
+                        blockSize: params.cloneBlockSize,
+                        maxImageSize: params.cloneMaxImageSize,
+                        showQuantized: params.cloneShowQuantized
+                    });
+                    break;
+
+                default:
+                    break;
+            }
+
+            if (result) {
+                setResultCanvas(result);
+            }
+        } catch (err) {
+            console.error('Analysis error:', err);
+            showToast(t('analysis.error') || 'Error during analysis', 'error');
+        } finally {
+            setAnalyzing(false);
+        }
+    }, [selectedImage, originalCanvas, selectedTool, params, showAnnotationModal, t]);
+
 
     // Auto-run analysis when tool or params change (debounced)
     useEffect(() => {
-        if (!selectedImage || !imageUrls[selectedImage.id]) return;
+        if (!selectedImage || !originalCanvas) return; // Wait for image to load
 
         // Clear annotation canvas when params change to allow live updates from resultCanvas
         // This ensures that if the user changes params inside the modal, the modal sees the updated result
@@ -727,14 +922,32 @@ const ImageAnalysisPage = () => {
                 clearTimeout(analysisTimeoutRef.current);
             }
         };
-    }, [selectedImage, selectedTool, params]);
+    }, [selectedImage, originalCanvas, selectedTool, params, runAnalysis]);
 
     // Re-run analysis when modal closes to restore original user opacity
     useEffect(() => {
         if (!showAnnotationModal && selectedImage) {
             runAnalysis();
         }
-    }, [showAnnotationModal]);
+    }, [showAnnotationModal, selectedImage, runAnalysis]);
+
+    // Draw the analysis result resultCanvas (offscreen) to the visible canvas
+    useEffect(() => {
+        if (resultCanvas && resultCanvasRef.current) {
+            const canvas = resultCanvasRef.current;
+            const ctx = canvas.getContext('2d');
+
+            // Match dimensions
+            if (canvas.width !== resultCanvas.width || canvas.height !== resultCanvas.height) {
+                canvas.width = resultCanvas.width;
+                canvas.height = resultCanvas.height;
+            }
+
+            // Draw content
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(resultCanvas, 0, 0);
+        }
+    }, [resultCanvas, showOriginal]);
 
     // Escape key handler to unselect image and expand gallery
     useEffect(() => {
@@ -745,9 +958,7 @@ const ImageAnalysisPage = () => {
 
                 if (selectedImage) {
                     setSelectedImage(null);
-                    setResultCanvas(null);
-                    setOriginalCanvas(null);
-                    setAnnotations([]);
+                    // States will be cleared by the effect on selectedImage
                 }
             }
         };
@@ -833,182 +1044,7 @@ const ImageAnalysisPage = () => {
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [annotationMode, crop, selectedAnnotationId, copiedAnnotation, annotationType, groupId, annotationText, selectedImage, annotations]);
-
-
-    const fetchImages = useCallback(async (page = 1) => {
-        setLoadingImages(true);
-        try {
-            // Build query params with filters
-            const queryParams = { page, per_page: IMAGES_PER_PAGE };
-            if (filterSearch) queryParams.search = filterSearch;
-            if (filterDateFrom) queryParams.date_from = filterDateFrom;
-            if (filterDateTo) queryParams.date_to = filterDateTo;
-            if (filterImageType) queryParams.image_type = filterImageType;
-
-            const data = await api.get('/images', queryParams);
-
-            let imageList = [];
-            let total = 0;
-
-            if (Array.isArray(data)) {
-                imageList = data;
-                total = data.length >= IMAGES_PER_PAGE ? page * IMAGES_PER_PAGE + 1 : (page - 1) * IMAGES_PER_PAGE + data.length;
-            } else if (data && typeof data === 'object') {
-                imageList = data.items || data.images || [];
-                total = data.total || data.total_count || imageList.length;
-            }
-
-            const transformed = imageList.slice(0, IMAGES_PER_PAGE).map(img => ({
-                id: img._id,
-                filename: img.filename,
-                fileSize: img.file_size,
-                sourceType: img.source_type,
-                mimeType: img.mime_type || 'image/jpeg',
-                // Include EXIF metadata from API (try both naming conventions)
-                exifMetadata: img.exifMetadata || img.exif_metadata || null
-            }));
-
-            setImages(transformed);
-            setTotalImages(total);
-        } catch (err) {
-            console.error('Error fetching images:', err);
-        } finally {
-            setLoadingImages(false);
-        }
-    }, [filterSearch, filterDateFrom, filterDateTo, filterImageType]);
-
-    // Run analysis
-    const runAnalysis = async () => {
-        if (!selectedImage || !imageUrls[selectedImage.id]) return;
-
-        const tool = ANALYSIS_TOOLS[selectedTool];
-        if (!tool) return;
-
-        // For non-canvas tools, handle separately
-        if (!tool.hasCanvas) {
-            if (selectedTool === 'metadata') {
-                try {
-                    // Download full image for accurate metadata (thumbnails have reduced dimensions)
-                    const blob = await api.download(`/images/${selectedImage.id}/download`);
-                    const metadataImageUrl = URL.createObjectURL(blob);
-                    const { canvas } = await loadImageToCanvas(metadataImageUrl);
-                    URL.revokeObjectURL(metadataImageUrl);
-                    setOriginalCanvas(canvas);
-                    const info = getImageInfo(canvas, selectedImage.mimeType);
-
-                    // Include EXIF metadata from API if available
-                    const rawExifData = selectedImage.exifMetadata || selectedImage.exif_metadata || {};
-
-                    // Filter out sensitive/unnecessary fields
-                    const fieldsToExclude = ['SourceFile', 'File:Directory', 'Directory'];
-                    const exifData = Object.fromEntries(
-                        Object.entries(rawExifData).filter(([key]) => !fieldsToExclude.includes(key))
-                    );
-
-                    setMetadata({
-                        // Basic info
-                        filename: selectedImage.filename,
-                        sourceType: selectedImage.sourceType,
-                        ...info,
-                        // EXIF data from API
-                        ...exifData
-                    });
-                } catch (err) {
-                    console.error('Metadata error:', err);
-                }
-                return;
-            }
-            return;
-        }
-
-        setAnalyzing(true);
-        setResultCanvas(null);
-
-        try {
-            // For image analysis, we need the full-resolution image, not the thumbnail
-            // Download the full image blob and create an object URL for canvas loading
-            const blob = await api.download(`/images/${selectedImage.id}/download`);
-            const imageUrl = URL.createObjectURL(blob);
-            const { canvas } = await loadImageToCanvas(imageUrl);
-            URL.revokeObjectURL(imageUrl); // Clean up the blob URL after loading
-            setOriginalCanvas(canvas);
-
-            let result = null;
-
-            switch (selectedTool) {
-                case 'ela':
-                    result = await applyErrorLevelAnalysis(
-                        canvas,
-                        params.elaQuality,
-                        params.elaScale,
-                        showAnnotationModal ? 100 : params.elaOpacity
-                    );
-                    break;
-
-                case 'noise':
-                    result = applyNoiseAnalysis(
-                        canvas,
-                        params.noiseAmplitude,
-                        params.noiseEqualize,
-                        showAnnotationModal ? 100 : params.noiseOpacity
-                    );
-                    break;
-
-                case 'gradient':
-                    result = applyLuminanceGradient(
-                        canvas,
-                        params.gradientIntensity,
-                        showAnnotationModal ? 1 : (params.gradientOpacity / 100),
-                        params.gradientNormalize,
-                        params.gradientEqualize
-                    );
-                    break;
-
-                case 'levelSweep':
-                    result = applyLevelSweep(
-                        canvas,
-                        params.sweepPosition,
-                        params.sweepWidth,
-                        showAnnotationModal ? 100 : params.sweepOpacity
-                    );
-                    break;
-
-                case 'cloneDetection':
-                    result = applyCloneDetection(canvas, {
-                        minSimilarity: params.cloneMinSimilarity,
-                        minDetail: params.cloneMinDetail,
-                        minClusterSize: params.cloneMinClusterSize,
-                        blockSize: params.cloneBlockSize,
-                        maxImageSize: params.cloneMaxImageSize,
-                        showQuantized: params.cloneShowQuantized
-                    });
-                    break;
-
-                default:
-                    break;
-            }
-
-            if (result) {
-                setResultCanvas(result);
-            }
-        } catch (err) {
-            console.error('Analysis error:', err);
-            showToast(t('analysis.error') || 'Error during analysis', 'error');
-        } finally {
-            setAnalyzing(false);
-        }
-    };
-
-    // Draw result to visible canvas
-    useEffect(() => {
-        if (resultCanvas && resultCanvasRef.current && !showOriginal) {
-            const ctx = resultCanvasRef.current.getContext('2d');
-            resultCanvasRef.current.width = resultCanvas.width;
-            resultCanvasRef.current.height = resultCanvas.height;
-            ctx.drawImage(resultCanvas, 0, 0);
-        }
-    }, [resultCanvas, showOriginal]);
+    }, [annotationMode, crop, selectedAnnotationId, copiedAnnotation, annotationType, groupId, annotationText, selectedImage, annotations, t]);
 
     const totalGalleryPages = Math.ceil(totalImages / IMAGES_PER_PAGE);
     const toolList = Object.values(ANALYSIS_TOOLS);
@@ -1209,87 +1245,8 @@ const ImageAnalysisPage = () => {
         return null;
     };
 
-    // Annotation Handlers
-    const handleSaveAnnotation = async () => {
-        if (!selectedImage) return;
 
-        // If no crop, we can't save a new region unless we are editing??
-        // Assuming we creating new or updating...
-        // For update we might not need crop if we just edit text.
-        // But for now let's assume save = create new from crop OR update existing text.
 
-        let coords = null;
-        if (crop && crop.width > 0 && crop.height > 0) {
-            coords = {
-                x: crop.x,
-                y: crop.y,
-                width: crop.width,
-                height: crop.height
-            };
-        } else if (selectedAnnotationId) {
-            // Keep existing coords
-            const existing = annotations.find(a => a._id === selectedAnnotationId);
-            if (existing) coords = existing.coords;
-        }
-
-        if (!coords) {
-            showToast(t('analysis.drawRegion'), 'warning');
-            return;
-        }
-
-        const annotationData = {
-            image_id: selectedImage.id,
-            text: annotationText,
-            coords: coords,
-            type: annotationType,
-            group_id: annotationType === 'copy-move' ? parseInt(groupId) : null
-        };
-
-        try {
-            // If editing, delete old first (naive update) or use update endpoint if exists?
-            // API only has create/delete. So delete then create.
-            if (selectedAnnotationId) {
-                await api.deleteAnnotation(selectedAnnotationId);
-            }
-
-            const saved = await api.createAnnotation(annotationData);
-
-            // Optimistic update or refetch? simpler to append
-            // But we need the ID.
-            // saved should have ID.
-            const newAnno = { ...saved, ...annotationData, _id: saved._id || saved.id }; // Fallback
-
-            setAnnotations(prev => {
-                const filtered = prev.filter(a => a._id !== selectedAnnotationId);
-                return [...filtered, newAnno];
-            });
-
-            // Reset
-            setCrop(null);
-            setAnnotationText('');
-            setSelectedAnnotationId(null);
-            showToast(t('common.success'), 'success');
-        } catch (err) {
-            console.error('Error saving annotation:', err);
-            showToast(t('analysis.error'), 'error');
-        }
-    };
-
-    const handleDeleteAnnotation = async (id) => {
-        if (!confirm(t('common.confirm'))) return;
-        try {
-            await api.deleteAnnotation(id);
-            setAnnotations(prev => prev.filter(a => a._id !== id));
-            if (selectedAnnotationId === id) {
-                setSelectedAnnotationId(null);
-                setCrop(null);
-                setAnnotationText('');
-            }
-            showToast(t('common.success'), 'success');
-        } catch (err) {
-            showToast(t('analysis.error'), 'error');
-        }
-    };
 
     const handleAnnotationClick = (anno) => {
         if (!annotationMode) return;
@@ -1653,92 +1610,78 @@ const ImageAnalysisPage = () => {
                     <div className="flex-1 flex flex-col bg-gray-100 dark:bg-gray-900 min-w-0">
                         {/* Image Container */}
                         <div className="flex-1 flex items-center justify-center p-4 overflow-hidden min-h-0">
-                            {analyzing ? (
-                                <div className="text-center">
-                                    <FiRefreshCw className="w-8 h-8 text-indigo-500 animate-spin mx-auto mb-2" />
-                                    <p className="text-sm text-gray-500">{t('analysis.processing') || 'Processing...'}</p>
-                                </div>
-                            ) : ANALYSIS_TOOLS[selectedTool]?.hasCanvas ? (
-                                <div
-                                    ref={zoomContainerRef}
-                                    className={`w-full h-full flex items-center justify-center ${zoomLevel > 1 ? 'overflow-auto' : 'overflow-hidden'
-                                        }`}
-                                    style={{
-                                        cursor: zoomLevel > 1 ? 'grab' : 'default'
-                                    }}
-                                    onDoubleClick={() => setZoomLevel(1)}
-                                >
+                            {ANALYSIS_TOOLS[selectedTool]?.hasCanvas ? (
+                                <div className="relative w-full h-full">
+                                    {/* Loading Overlay */}
+                                    {/* Loading Overlay */}
+                                    <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center bg-gray-100/50 dark:bg-gray-900/50 backdrop-blur-[2px] transition-opacity duration-200 ${analyzing ? 'opacity-100 pointer-events-auto delay-200' : 'opacity-0 pointer-events-none'}`}>
+                                        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 flex flex-col items-center">
+                                            <FiRefreshCw className="w-8 h-8 text-indigo-500 animate-spin mb-2" />
+                                            <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{t('analysis.processing') || 'Processing...'}</p>
+                                        </div>
+                                    </div>
+
                                     <div
+                                        ref={zoomContainerRef}
+                                        className={`w-full h-full flex items-center justify-center ${zoomLevel > 1 ? 'overflow-auto' : 'overflow-hidden'
+                                            }`}
                                         style={{
-                                            transform: `scale(${zoomLevel})`,
-                                            transformOrigin: 'center center',
-                                            transition: 'transform 0.15s ease-out',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center'
+                                            cursor: zoomLevel > 1 ? 'grab' : 'default'
                                         }}
+                                        onDoubleClick={() => setZoomLevel(1)}
                                     >
-                                        {showOriginal && originalCanvas ? (
-                                            <AnnotationOverlay
-                                                isActive={false}
-                                                crop={crop}
-                                                onChange={setCrop}
-                                                annotations={showAnnotations ? annotations : []}
-                                                onAnnotationClick={handleAnnotationClick}
-                                                selectedAnnotationId={selectedAnnotationId}
-                                            >
-                                                <img
-                                                    src={originalCanvas.toDataURL()}
-                                                    alt="Original"
-                                                    className="rounded-lg shadow-lg"
-                                                    draggable={false}
-                                                    style={{
-                                                        maxWidth: zoomLevel === 1 ? 'calc(100vw - 450px)' : 'none',
-                                                        maxHeight: zoomLevel === 1 ? 'calc(100vh - 250px)' : 'none',
-                                                        objectFit: 'contain'
-                                                    }}
-                                                />
-                                            </AnnotationOverlay>
-                                        ) : resultCanvas ? (
-                                            <AnnotationOverlay
-                                                isActive={false}
-                                                crop={crop}
-                                                onChange={setCrop}
-                                                annotations={showAnnotations ? annotations : []}
-                                                onAnnotationClick={handleAnnotationClick}
-                                                selectedAnnotationId={selectedAnnotationId}
-                                            >
-                                                <canvas
-                                                    ref={resultCanvasRef}
-                                                    className="rounded-lg shadow-lg"
-                                                    style={{
-                                                        maxWidth: zoomLevel === 1 ? 'calc(100vw - 450px)' : 'none',
-                                                        maxHeight: zoomLevel === 1 ? 'calc(100vh - 250px)' : 'none'
-                                                    }}
-                                                />
-                                            </AnnotationOverlay>
-                                        ) : originalCanvas ? (
-                                            <AnnotationOverlay
-                                                isActive={false}
-                                                crop={crop}
-                                                onChange={setCrop}
-                                                annotations={showAnnotations ? annotations : []}
-                                                onAnnotationClick={handleAnnotationClick}
-                                                selectedAnnotationId={selectedAnnotationId}
-                                            >
-                                                <img
-                                                    src={originalCanvas.toDataURL()}
-                                                    alt="Original"
-                                                    className="rounded-lg shadow-lg opacity-50"
-                                                    draggable={false}
-                                                    style={{
-                                                        maxWidth: zoomLevel === 1 ? 'calc(100vw - 450px)' : 'none',
-                                                        maxHeight: zoomLevel === 1 ? 'calc(100vh - 250px)' : 'none',
-                                                        objectFit: 'contain'
-                                                    }}
-                                                />
-                                            </AnnotationOverlay>
-                                        ) : null}
+                                        <div
+                                            style={{
+                                                transform: `scale(${zoomLevel})`,
+                                                transformOrigin: 'center center',
+                                                transition: 'transform 0.15s ease-out',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center'
+                                            }}
+                                        >
+                                            {showOriginal && originalCanvas ? (
+                                                <AnnotationOverlay
+                                                    isActive={false}
+                                                    crop={crop}
+                                                    onChange={setCrop}
+                                                    annotations={showAnnotations ? annotations : []}
+                                                    onAnnotationClick={handleAnnotationClick}
+                                                    selectedAnnotationId={selectedAnnotationId}
+                                                >
+                                                    <img
+                                                        src={originalCanvas.toDataURL()}
+                                                        alt="Original"
+                                                        className="rounded-lg shadow-lg"
+                                                        draggable={false}
+                                                        style={{
+                                                            maxWidth: zoomLevel === 1 ? 'calc(100vw - 450px)' : 'none',
+                                                            maxHeight: zoomLevel === 1 ? 'calc(100vh - 250px)' : 'none',
+                                                            objectFit: 'contain'
+                                                        }}
+                                                    />
+                                                </AnnotationOverlay>
+                                            ) : (resultCanvas || originalCanvas) ? (
+                                                <AnnotationOverlay
+                                                    isActive={false}
+                                                    crop={crop}
+                                                    onChange={setCrop}
+                                                    annotations={showAnnotations ? annotations : []}
+                                                    onAnnotationClick={handleAnnotationClick}
+                                                    selectedAnnotationId={selectedAnnotationId}
+                                                >
+                                                    {/* If we have a result, show it. If not (first load), show original */}
+                                                    <canvas
+                                                        ref={resultCanvasRef}
+                                                        className="rounded-lg shadow-lg"
+                                                        style={{
+                                                            maxWidth: zoomLevel === 1 ? 'calc(100vw - 450px)' : 'none',
+                                                            maxHeight: zoomLevel === 1 ? 'calc(100vh - 250px)' : 'none'
+                                                        }}
+                                                    />
+                                                </AnnotationOverlay>
+                                            ) : null}
+                                        </div>
                                     </div>
                                 </div>
                             ) : (
@@ -1914,11 +1857,12 @@ const ImageAnalysisPage = () => {
                 imageId={selectedImage?.id}
                 imageName={selectedImage?.filename}
                 existingAnnotations={annotations}
+                setAnnotations={setAnnotations}
                 onClose={() => {
                     setShowAnnotationModal(false);
                     setAnnotationCanvas(null); // Clear the annotation canvas
                 }}
-                onSaveSuccess={(savedAnnotations) => {
+                onSaveSuccess={() => {
                     // Refresh annotations from API
                     if (selectedImage) {
                         api.getAnnotations(selectedImage.id)
@@ -1947,7 +1891,7 @@ const ImageAnalysisPage = () => {
                     }))
                 }
             />
-        </div>
+        </div >
     );
 };
 

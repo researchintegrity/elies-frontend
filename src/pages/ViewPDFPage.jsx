@@ -112,9 +112,8 @@ const PDFPanel = ({ doc, t }) => {
     if (doc) fetchPdf();
     return () => {
       isMounted = false;
-      if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
     };
-  }, [doc, t]);
+  }, [doc, t, pdfBlobUrl]);
 
   if (loading) {
     return (
@@ -287,7 +286,7 @@ const DocumentListRow = ({ doc, onView, onDownload, onDelete, onRemoveWatermark,
 
 // --- Main Page Component ---
 const ViewPDFPage = () => {
-  const { documents, loading, error, fetchDocuments, deleteDocument, downloadDocument } = useDocuments();
+  const { documents, loading, fetchDocuments, deleteDocument, downloadDocument } = useDocuments();
   const { t, locale } = useLanguage();
   const [viewMode, setViewMode] = useState('grid');
   const [isSplitView, setIsSplitView] = useState(false);
@@ -295,7 +294,7 @@ const ViewPDFPage = () => {
   const [sortBy, setSortBy] = useState('newest');
   const [selectedDoc, setSelectedDoc] = useState(null);
 
-  const { removeWatermark, isRemoving } = useWatermarkRemoval((doc, level) => {
+  const { removeWatermark } = useWatermarkRemoval(() => {
     fetchDocuments();
   });
 

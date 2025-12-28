@@ -198,7 +198,7 @@ export const useImages = () => {
                 img.id === image.id ? { ...img, isFlagged: updatedImage.is_flagged } : img
             ));
             return true;
-        } catch (err) {
+        } catch {
             // Revert optimistic update on error
             setImages(prev => prev.map(img =>
                 img.id === image.id ? { ...img, isFlagged: image.isFlagged } : img

@@ -179,7 +179,7 @@ const QueryImageThumbnail = ({ image, isSelected, onSelect, isSelectionMode }) =
     </div>
   );
 };
-const ImageCard = ({ image, onClick, onSelect, isSelected, isSelectionMode, similarityScore, rank, onToggleFlag }) => {
+const ImageCard = ({ image, onSelect, isSelected, isSelectionMode, similarityScore, rank, onToggleFlag }) => {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -344,6 +344,18 @@ const ImageCard = ({ image, onClick, onSelect, isSelected, isSelectionMode, simi
   );
 };
 
+// Map analysis types to page keys (matches PAGES in AppLayout)
+const analysisTypeToPageKey = {
+  'imageAnalysis': 'imageAnalysis',
+  'manipulationDetection': 'manipulationDetection',
+  'copyMoveSingle': 'copyMove',
+  'copyMoveCross': 'copyMove',
+  'provenance': 'provenance',
+  // Batch analysis types route to the same pages
+  'batchManipulation': 'manipulationDetection',
+  'batchCopyMove': 'copyMove',
+};
+
 // --- Main Page Component ---
 
 const ViewImagesPage = () => {
@@ -415,6 +427,15 @@ const ViewImagesPage = () => {
     fetchTags();
   }, []);
 
+  // Exit similarity mode
+  const handleExitSimilarityMode = useCallback(() => {
+    setSimilarityMode(false);
+    setSimilarityQueryImage(null);
+    setSimilarityResults([]);
+    setSelectedImages(new Map());
+    setSimilarityLabelFilter('all'); // Reset label filter
+  }, []);
+
   // ESC key handler
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -446,7 +467,7 @@ const ViewImagesPage = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isBatchTagModalOpen, lightboxImage, selectedIds, similarityMode, filters, searchQuery, t]);
+  }, [isBatchTagModalOpen, lightboxImage, selectedIds, similarityMode, filters, searchQuery, t, handleExitSimilarityMode]);
 
   // Convert array for rendering (already sorted from backend)
   const availableCategoriesForSimilarity = allCategories;
@@ -523,7 +544,7 @@ const ViewImagesPage = () => {
     } finally {
       setSimilarityLoading(false);
     }
-  }, [similarityTopK, similarityThreshold]);
+  }, [similarityTopK, similarityThreshold, t]);
 
   // Re-run search when parameters change (while in similarity mode)
   const handleUpdateSimilarityParams = useCallback(async () => {
@@ -531,15 +552,6 @@ const ViewImagesPage = () => {
       await handleSimilaritySearch(similarityQueryImage, similarityLabelFilter);
     }
   }, [similarityMode, similarityQueryImage, handleSimilaritySearch, similarityLabelFilter]);
-
-  // Exit similarity mode
-  const handleExitSimilarityMode = useCallback(() => {
-    setSimilarityMode(false);
-    setSimilarityQueryImage(null);
-    setSimilarityResults([]);
-    setSelectedImages(new Map());
-    setSimilarityLabelFilter('all'); // Reset label filter
-  }, []);
 
   // Track previous filter/search values to detect changes and reset pagination
   const prevFiltersRef = React.useRef({ filters, searchQuery });
@@ -664,7 +676,7 @@ const ViewImagesPage = () => {
     setLastActionWasSelect(!wasSelected);
   }, [images, filteredImages, similarityMode, allSimilarityImages, lastClickedId, selectedIds, lastActionWasSelect]);
 
-  const handleClearSelection = () => setSelectedImages(new Map());
+  const handleClearSelection = useCallback(() => setSelectedImages(new Map()), []);
 
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
@@ -737,16 +749,7 @@ const ViewImagesPage = () => {
   };
 
   // Map analysis types to page keys (matches PAGES in AppLayout)
-  const analysisTypeToPageKey = {
-    'imageAnalysis': 'imageAnalysis',
-    'manipulationDetection': 'manipulationDetection',
-    'copyMoveSingle': 'copyMove',
-    'copyMoveCross': 'copyMove',
-    'provenance': 'provenance',
-    // Batch analysis types route to the same pages
-    'batchManipulation': 'manipulationDetection',
-    'batchCopyMove': 'copyMove',
-  };
+
 
   const handleAnalyzeSelected = useCallback((analysisType) => {
     const selectedArray = Array.from(selectedImages.values());
@@ -788,7 +791,7 @@ const ViewImagesPage = () => {
     if (queryImage) {
       handleSimilaritySearch(queryImage);
     }
-  }, [selectedImages, handleSimilaritySearch]);
+  }, [selectedImages, handleSimilaritySearch, t]);
 
   // View metadata handler - opens lightbox for selected image
   const handleViewMetadata = useCallback(async () => {
@@ -828,14 +831,14 @@ const ViewImagesPage = () => {
       // The hook will notify on completion
       handleClearSelection();
     }
-  }, [selectedImages, startExtraction, fetchImages, currentPage, IMAGES_PER_PAGE, handleClearSelection]);
+  }, [selectedImages, startExtraction, fetchImages, currentPage, IMAGES_PER_PAGE, handleClearSelection, filters, searchQuery]);
 
   // Refresh gallery when extraction completes
   useEffect(() => {
     if (extractionStatus === 'completed') {
       fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE, imageType: filters.tags, dateFrom: filters.dateFrom, dateTo: filters.dateTo, search: searchQuery, sourceType: filters.sourceType });
     }
-  }, [extractionStatus, fetchImages, currentPage, IMAGES_PER_PAGE]);
+  }, [extractionStatus, fetchImages, currentPage, IMAGES_PER_PAGE, filters, searchQuery]);
 
   const handleResetFilters = () => {
     setFilters({ sourceType: 'all', dateFrom: '', dateTo: '', tags: [] });

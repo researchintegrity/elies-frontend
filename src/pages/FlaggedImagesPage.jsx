@@ -84,6 +84,17 @@ const STATUS_CONFIG = {
   failed: { color: 'red', label: 'Failed' },
 };
 
+// Analysis type mapping
+const analysisTypeToPageKey = {
+  'imageAnalysis': 'imageAnalysis',
+  'manipulationDetection': 'manipulationDetection',
+  'copyMoveSingle': 'copyMove',
+  'copyMoveCross': 'copyMove',
+  'provenance': 'provenance',
+  'batchManipulation': 'manipulationDetection',
+  'batchCopyMove': 'copyMove',
+};
+
 // Color utility
 const COLOR_CLASSES = {
   blue: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
@@ -109,7 +120,7 @@ const getFullImageUrl = (imageId) => {
 // --- Sub-Components ---
 
 // Compact Image Row for Left Panel
-const FlaggedImageRow = ({ image, isActive, isSelected, onClick, onSelect, isSelectionMode, t }) => {
+const FlaggedImageRow = ({ image, isActive, isSelected, onClick, onSelect, isSelectionMode }) => {
   const [loading, setLoading] = useState(true);
 
   const handleSelectClick = (e) => {
@@ -182,7 +193,7 @@ const FlaggedImageRow = ({ image, isActive, isSelected, onClick, onSelect, isSel
 
 
 // Tab Button
-const TabButton = ({ icon: Icon, label, isActive, onClick, count }) => (
+const TabButton = ({ icon: IconComponent, label, isActive, onClick, count }) => (
   <button
     onClick={onClick}
     className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all
@@ -191,7 +202,7 @@ const TabButton = ({ icon: Icon, label, isActive, onClick, count }) => (
         : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
       }`}
   >
-    <Icon size={16} />
+    <IconComponent size={16} />
     {label}
     {count !== undefined && count > 0 && (
       <span className={`px-1.5 py-0.5 text-[10px] rounded-full ${isActive ? 'bg-red-200 dark:bg-red-800' : 'bg-gray-200 dark:bg-gray-700'}`}>
@@ -260,8 +271,8 @@ const RelatedImageCard = ({ image, isSelected, onClick, onSelect, onToggleFlag, 
     try {
       await onToggleFlag(image);
       setIsFlagged(!isFlagged);
-    } catch (err) {
-      console.error('Error toggling flag:', err);
+    } catch {
+      // ignore
     }
   };
 
@@ -385,7 +396,7 @@ const QueryImageThumbnail = ({ image, isSelected, onSelect, isSelectionMode }) =
 };
 
 // Similarity Result Card
-const SimilarityResultCard = ({ image, onClick, onSelect, isSelected, isSelectionMode, similarityScore, rank, onToggleFlag, t }) => {
+const SimilarityResultCard = ({ image, onSelect, isSelected, isSelectionMode, similarityScore, rank, onToggleFlag, t }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -506,10 +517,8 @@ const SimilarityResultCard = ({ image, onClick, onSelect, isSelected, isSelectio
 // Detail Panel Component
 const FlaggedImageDetailPanel = ({
   image,
-  onClose,
   onUnflag,
   onNavigate,
-  onRefresh,
   selectedIds,
   onSelect,
   isSelectionMode,
@@ -591,7 +600,7 @@ const FlaggedImageDetailPanel = ({
               filename: imgData.filename || `Image ${imageId.slice(-6)}`,
               isFlagged: imgData.is_flagged || false
             });
-          } catch (err) {
+          } catch {
             // Image might be deleted, add with minimal info
             relatedImagesData.push({
               id: imageId,
@@ -629,17 +638,7 @@ const FlaggedImageDetailPanel = ({
   }, [image?.imageId]);
 
   // Handlers
-  const handleViewResults = async (analysis) => {
-    // Fetch full analysis details including results
-    try {
-      const fullAnalysis = await api.getAnalysisById(analysis._id);
-      setSelectedAnalysisForView(fullAnalysis);
-    } catch (err) {
-      console.error('Error fetching analysis details:', err);
-      // Fallback to the analysis we have
-      setSelectedAnalysisForView(analysis);
-    }
-  };
+
 
   // Handler for navigating to full results page (from inline panel)
   const handleViewFullResults = (analysis) => {
@@ -737,19 +736,7 @@ const FlaggedImageDetailPanel = ({
     }
   };
 
-  const getTargetPageForAnalysis = (type) => {
-    switch (type) {
-      case 'single_image_copy_move':
-      case 'cross_image_copy_move':
-        return 'copyMove';
-      case 'trufor':
-        return 'manipulationDetection';
-      case 'provenance':
-        return 'provenance';
-      default:
-        return 'imageAnalysis';
-    }
-  };
+
 
   if (!image) return null;
 
@@ -1363,7 +1350,7 @@ const FlaggedImagesPage = ({ onNavigate }) => {
   const [similarityQueryImage, setSimilarityQueryImage] = useState(null);
   const [similarityResults, setSimilarityResults] = useState([]);
   const [similarityLoading, setSimilarityLoading] = useState(false);
-  const [similarityTopK, setSimilarityTopK] = useState(20);
+  const [similarityTopK] = useState(20);
   const [similarityThreshold, setSimilarityThreshold] = useState(0.5);
   const SIMILARITY_PER_PAGE = 12;
   const [similarityPage, setSimilarityPage] = useState(1);
@@ -1434,7 +1421,7 @@ const FlaggedImagesPage = ({ onNavigate }) => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, searchQuery, dateFrom, dateTo, selectedTag]);
+  }, [currentPage, searchQuery, dateFrom, dateTo, selectedTag, selectedImage]);
 
   useEffect(() => {
     fetchFlaggedImages();
@@ -1449,12 +1436,12 @@ const FlaggedImagesPage = ({ onNavigate }) => {
   const hasActiveFilters = dateFrom || dateTo || selectedTag;
 
   // Clear all filters
-  const handleClearFilters = () => {
+  const handleClearFilters = useCallback(() => {
     setDateFrom('');
     setDateTo('');
     setSelectedTag('');
     setSearchQuery('');
-  };
+  }, []);
 
   // All similarity images (for selection purposes)
   const allSimilarityImages = useMemo(() => {
@@ -1609,22 +1596,12 @@ const FlaggedImagesPage = ({ onNavigate }) => {
     }
   };
 
-  const handleCompare = () => {
-    if (selectedIds.size === 2) {
-      const selectedArray = Array.from(selectedImages.values());
-      sessionStorage.setItem('startAnalysis', JSON.stringify({
-        imageIds: selectedArray.map(img => img.imageId),
-        targetPage: 'copyMove',
-        mode: 'cross'
-      }));
-      window.location.reload();
-    }
-  };
 
-  const handleClearSelection = () => {
+
+  const handleClearSelection = useCallback(() => {
     setSelectedImages(new Map());
     setLastClickedId(null);
-  };
+  }, []);
 
   // Delete selected images
   const handleDeleteSelected = async () => {
@@ -1685,15 +1662,7 @@ const FlaggedImagesPage = ({ onNavigate }) => {
   };
 
   // Analyze selected images
-  const analysisTypeToPageKey = {
-    'imageAnalysis': 'imageAnalysis',
-    'manipulationDetection': 'manipulationDetection',
-    'copyMoveSingle': 'copyMove',
-    'copyMoveCross': 'copyMove',
-    'provenance': 'provenance',
-    'batchManipulation': 'manipulationDetection',
-    'batchCopyMove': 'copyMove',
-  };
+
 
   const handleAnalyzeSelected = useCallback((analysisType) => {
     const selectedArray = Array.from(selectedImages.values());
@@ -1816,7 +1785,7 @@ const FlaggedImagesPage = ({ onNavigate }) => {
     } else if (result.success && result.pending) {
       handleClearSelection();
     }
-  }, [selectedImages, startExtraction, fetchFlaggedImages]);
+  }, [selectedImages, startExtraction, fetchFlaggedImages, handleClearSelection]);
 
   // Refresh when extraction completes
   useEffect(() => {

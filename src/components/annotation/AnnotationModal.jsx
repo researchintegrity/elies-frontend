@@ -252,7 +252,7 @@ const AnnotationModalInner = ({
                 actions.deleteAnnotation(clickedAnnotation.id);
             }
         }
-    }, [activeTool, annotations, selectedId, isDrawing, currentShape, getMousePosition, actions, zoom]);
+    }, [activeTool, annotations, selectedId, isDrawing, currentShape, getMousePosition, actions]);
 
     const handleMouseMove = useCallback((e) => {
         const pos = getMousePosition(e);

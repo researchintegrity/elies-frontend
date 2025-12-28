@@ -584,7 +584,7 @@ const CopyMovePage = ({ onNavigate }) => {
         const loadViewResultsData = async () => {
             setLoadingReproduce(true);
             try {
-                const { analysisId, imageId, targetImageId, parameters, type, results } = JSON.parse(viewResultsData);
+                const { analysisId, imageId, targetImageId, type } = JSON.parse(viewResultsData);
                 sessionStorage.removeItem('viewResultsAnalysis'); // Clear after reading
 
                 // Only handle copy-move types
@@ -956,7 +956,7 @@ const CopyMovePage = ({ onNavigate }) => {
         try {
             let response;
             if (mode === 'single') {
-                response = await api.startCopyMoveAnalysis(sourceImage.id, 'dense', denseMethod);
+                response = await api.startCopyMoveAnalysis(sourceImage.id, parseInt(denseMethod, 10));
             } else {
                 response = await api.startCrossImageCopyMoveAnalysis(sourceImage.id, targetImage.id, methodType, denseMethod, descriptor);
             }
@@ -994,7 +994,7 @@ const CopyMovePage = ({ onNavigate }) => {
         const submissionResults = await Promise.all(
             batchImages.map(async (image) => {
                 try {
-                    const response = await api.startCopyMoveAnalysis(image.id, 'dense', denseMethod);
+                    const response = await api.startCopyMoveAnalysis(image.id, parseInt(denseMethod, 10));
                     return { imageId: image.id, analysisId: response.analysis_id, status: 'processing' };
                 } catch (err) {
                     console.error(`Error submitting analysis for ${image.id}:`, err);

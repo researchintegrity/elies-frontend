@@ -265,7 +265,7 @@ const ResultsViewer = ({ analysisId, status, results, statusMessage, t }) => {
             if (predMapUrl) URL.revokeObjectURL(predMapUrl);
             if (confMapUrl) URL.revokeObjectURL(confMapUrl);
         };
-    }, [status, results, analysisId, hasResults, hasPredMap, hasConfMap]);
+    }, [status, results, analysisId, hasResults, hasPredMap, hasConfMap, predMapUrl, confMapUrl]);
 
     if (status === 'pending' || status === 'processing') {
         return (
@@ -527,7 +527,7 @@ const ManipulationDetectionPage = ({ onNavigate }) => {
         const loadViewResultsData = async () => {
             setLoadingReproduce(true);
             try {
-                const { analysisId, imageId, parameters, type, results } = JSON.parse(viewResultsData);
+                const { analysisId, imageId, type } = JSON.parse(viewResultsData);
                 sessionStorage.removeItem('viewResultsAnalysis'); // Clear after reading
 
                 // Only handle trufor type
@@ -567,9 +567,7 @@ const ManipulationDetectionPage = ({ onNavigate }) => {
                             });
 
                             // Set integrity score if available
-                            if (analysisData.results.integrity_score !== undefined) {
-                                setIntegrityScore(analysisData.results.integrity_score);
-                            }
+
                         } else {
                             // If no results info, assume both images exist
                             setAnalysisResults({
@@ -827,7 +825,7 @@ const ManipulationDetectionPage = ({ onNavigate }) => {
 
         // Step 1: Submit all analyses in parallel (Celery manages the queue)
         const submissionResults = await Promise.all(
-            batchImages.map(async (image, idx) => {
+            batchImages.map(async (image) => {
                 try {
                     const response = await api.startManipulationAnalysis(image.id, { save_noiseprint: saveNoiseprint });
                     return { imageId: image.id, analysisId: response.analysis_id, status: 'processing' };

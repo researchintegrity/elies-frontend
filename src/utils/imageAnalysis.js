@@ -35,7 +35,7 @@ export async function loadImageToCanvas(imageUrl) {
         img.crossOrigin = 'anonymous';
         img.onload = () => {
             const canvas = createOffscreenCanvas(img.naturalWidth, img.naturalHeight);
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
             ctx.drawImage(img, 0, 0);
             resolve({ canvas, ctx, width: img.naturalWidth, height: img.naturalHeight });
         };
@@ -482,7 +482,7 @@ export function applyCloneDetection(canvas, options = {}) {
 
     // Create working canvas at scaled size
     const workCanvas = createOffscreenCanvas(width, height);
-    const workCtx = workCanvas.getContext('2d');
+    const workCtx = workCanvas.getContext('2d', { willReadFrequently: true });
     workCtx.drawImage(canvas, 0, 0, width, height);
     const imageData = workCtx.getImageData(0, 0, width, height);
     const data = imageData.data;

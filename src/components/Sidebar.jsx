@@ -60,24 +60,24 @@ const Sidebar = ({ activePage, onNavigate, pages, isCollapsed = false, onToggle 
     </div>
   );
 
-  const NavItem = ({ pageKey, icon: Icon, label, onClick }) => (
+  const NavItem = ({ pageKey, icon: IconComponent, label, onClick }) => (
     <button
       className={getItemClass(pageKey)}
       onClick={onClick || (() => onNavigate(pageKey))}
       title={isCollapsed ? label : undefined}
     >
       <ActiveIndicator pageKey={pageKey} />
-      <Icon className={getIconClass(pageKey)} />
+      <IconComponent className={getIconClass(pageKey)} />
       {!isCollapsed && <span className="truncate">{label}</span>}
     </button>
   );
 
-  const DisabledItem = ({ icon: Icon, label }) => (
+  const DisabledItem = ({ icon: IconComponent, label }) => (
     <button
       className={`flex items-center ${isCollapsed ? 'justify-center px-2' : 'gap-3 px-4'} py-3 rounded-xl w-full text-sm font-medium text-gray-500 dark:text-gray-500 cursor-not-allowed opacity-60`}
       title={isCollapsed ? label : undefined}
     >
-      <Icon className="w-5 h-5" />
+      <IconComponent className="w-5 h-5" />
       {!isCollapsed && (
         <>
           <span>{label}</span>

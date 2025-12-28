@@ -15,7 +15,7 @@ import {
 } from '../../utils/annotationHelpers';
 
 // Resize Handle Component
-const ResizeHandle = ({ position, x, y, size = 8, onMouseDown, cursor }) => (
+const ResizeHandle = ({ x, y, size = 8, onMouseDown, cursor }) => (
     <rect
         x={x}
         y={y}

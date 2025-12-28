@@ -21,7 +21,7 @@ const formatBytes = (bytes, decimals = 2) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 };
 
-const StatCard = ({ icon: Icon, title, value, subtitle, color = 'primary' }) => {
+const StatCard = ({ icon: IconComponent, title, value, subtitle, color = 'primary' }) => {
   const colorClasses = {
     primary: 'from-primary-500 to-primary-600',
     green: 'from-green-500 to-green-600',
@@ -40,7 +40,7 @@ const StatCard = ({ icon: Icon, title, value, subtitle, color = 'primary' }) => 
           )}
         </div>
         <div className={`p-3 rounded-xl bg-gradient-to-br ${colorClasses[color]} shadow-lg`}>
-          <Icon className="w-6 h-6 text-white" />
+          <IconComponent className="w-6 h-6 text-white" />
         </div>
       </div>
     </div>

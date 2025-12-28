@@ -309,7 +309,7 @@ const ProvenancePage = () => {
     const [images, setImages] = useState([]);
     const [imageUrls, setImageUrls] = useState({});
     const [loadingImages, setLoadingImages] = useState(true);
-    const [loadingUrls, setLoadingUrls] = useState({});
+    const [loadingUrls] = useState({});
     const [errorImages, setErrorImages] = useState(null);
 
     // Selection State
@@ -468,7 +468,7 @@ const ProvenancePage = () => {
                                 validImageIds.push(imgId);
                             } catch (err) {
                                 deletedCount++;
-                                console.warn(`Image ${imgId} no longer exists`);
+                                console.warn(`Image ${imgId} no longer exists`, err);
                             }
                         }
 
@@ -521,7 +521,7 @@ const ProvenancePage = () => {
         const loadViewResultsData = async () => {
             setLoadingReproduce(true); // Reuse loading state
             try {
-                const { analysisId, imageId, parameters, type, results } = JSON.parse(viewResultsData);
+                const { analysisId, imageId, parameters, type } = JSON.parse(viewResultsData);
                 sessionStorage.removeItem('viewResultsAnalysis'); // Clear after reading
 
                 // Only handle provenance type
@@ -602,7 +602,7 @@ const ProvenancePage = () => {
         const loadStartAnalysisData = async () => {
             setLoadingReproduce(true);
             try {
-                const { imageIds, targetPage, mode } = JSON.parse(startAnalysisData);
+                const { imageIds, targetPage } = JSON.parse(startAnalysisData);
                 sessionStorage.removeItem('startAnalysis'); // Clear after reading
 
                 // Only handle provenance target
@@ -651,82 +651,7 @@ const ProvenancePage = () => {
         loadStartAnalysisData();
     }, [t]);
 
-    // Fetch images with filters
-    useEffect(() => {
-        fetchImages(galleryPage, galleryFilters);
-    }, [galleryPage, galleryFilters]);
-
-    // Reset to page 1 when filters change
-    const prevGalleryFiltersRef = useRef(galleryFilters);
-    useEffect(() => {
-        const prev = prevGalleryFiltersRef.current;
-        if (JSON.stringify(prev) !== JSON.stringify(galleryFilters) && galleryPage !== 1) {
-            setGalleryPage(1);
-        }
-        prevGalleryFiltersRef.current = galleryFilters;
-    }, [galleryFilters, galleryPage]);
-
-    // Load image URLs - use thumbnail URLs directly
-    useEffect(() => {
-        // Generate thumbnail URLs for all images
-        const newUrls = {};
-        for (const img of images) {
-            if (!imageUrls[img.id]) {
-                newUrls[img.id] = getThumbnailUrl(img.id);
-            }
-        }
-        if (Object.keys(newUrls).length > 0) {
-            setImageUrls(prev => ({ ...prev, ...newUrls }));
-        }
-    }, [images]);
-
-    // Poll for analysis status
-    useEffect(() => {
-        if (analysisId && analyzing) {
-            pollIntervalRef.current = setInterval(async () => {
-                try {
-                    const result = await api.getAnalysisById(analysisId);
-                    setAnalysisStatus(result.status);
-
-                    if (result.status === 'completed') {
-                        console.log('Provenance API response:', JSON.stringify(result, null, 2));
-                        setAnalysisResults(result.results || {});
-                        setAnalyzing(false);
-                        clearInterval(pollIntervalRef.current);
-                        showToast(t('provenance.completed'), 'success');
-                    } else if (result.status === 'failed') {
-                        setAnalyzing(false);
-                        clearInterval(pollIntervalRef.current);
-                        showAlert(t('common.error'), result.error || t('provenance.failed'), 'error');
-                    }
-                } catch (err) {
-                    console.error('Error polling analysis:', err);
-                }
-            }, POLL_INTERVAL);
-        }
-
-        return () => {
-            if (pollIntervalRef.current) {
-                clearInterval(pollIntervalRef.current);
-            }
-        };
-    }, [analysisId, analyzing, t]);
-
-    // Load thumbnail URLs for analysis results (graph nodes) that might not be in the current gallery page
-    useEffect(() => {
-        if (!analysisResults?.graph?.nodes) return;
-
-        const newUrls = {};
-        for (const node of analysisResults.graph.nodes) {
-            if (!imageUrls[node.id]) {
-                newUrls[node.id] = getThumbnailUrl(node.id);
-            }
-        }
-        if (Object.keys(newUrls).length > 0) {
-            setImageUrls(prev => ({ ...prev, ...newUrls }));
-        }
-    }, [analysisResults]);
-
+    // Fetch images function - defined before useEffect that uses it
     const fetchImages = useCallback(async (page = 1, filters = {}) => {
         setLoadingImages(true);
         setErrorImages(null);
@@ -783,6 +708,83 @@ const ProvenancePage = () => {
             setLoadingImages(false);
         }
     }, []);
+
+    // Fetch images with filters
+    useEffect(() => {
+        fetchImages(galleryPage, galleryFilters);
+    }, [galleryPage, galleryFilters, fetchImages]);
+
+    // Reset to page 1 when filters change
+    const prevGalleryFiltersRef = useRef(galleryFilters);
+    useEffect(() => {
+        const prev = prevGalleryFiltersRef.current;
+        if (JSON.stringify(prev) !== JSON.stringify(galleryFilters) && galleryPage !== 1) {
+            setGalleryPage(1);
+        }
+        prevGalleryFiltersRef.current = galleryFilters;
+    }, [galleryFilters, galleryPage]);
+
+    // Load image URLs - use thumbnail URLs directly
+    useEffect(() => {
+        // Generate thumbnail URLs for all images
+        const newUrls = {};
+        for (const img of images) {
+            if (!imageUrls[img.id]) {
+                newUrls[img.id] = getThumbnailUrl(img.id);
+            }
+        }
+
+        if (Object.keys(newUrls).length > 0) {
+            setImageUrls(prev => ({ ...prev, ...newUrls }));
+        }
+    }, [images, imageUrls]);
+
+    // Poll for analysis status
+    useEffect(() => {
+        if (analysisId && analyzing) {
+            pollIntervalRef.current = setInterval(async () => {
+                try {
+                    const result = await api.getAnalysisById(analysisId);
+                    setAnalysisStatus(result.status);
+
+                    if (result.status === 'completed') {
+                        console.log('Provenance API response:', JSON.stringify(result, null, 2));
+                        setAnalysisResults(result.results || {});
+                        setAnalyzing(false);
+                        clearInterval(pollIntervalRef.current);
+                        showToast(t('provenance.completed'), 'success');
+                    } else if (result.status === 'failed') {
+                        setAnalyzing(false);
+                        clearInterval(pollIntervalRef.current);
+                        showAlert(t('common.error'), result.error || t('provenance.failed'), 'error');
+                    }
+                } catch (err) {
+                    console.error('Error polling analysis:', err);
+                }
+            }, POLL_INTERVAL);
+        }
+
+        return () => {
+            if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+            }
+        };
+    }, [analysisId, analyzing, t]);
+
+    // Load thumbnail URLs for analysis results (graph nodes) that might not be in the current gallery page
+    useEffect(() => {
+        if (!analysisResults?.graph?.nodes) return;
+
+        const newUrls = {};
+        for (const node of analysisResults.graph.nodes) {
+            if (!imageUrls[node.id]) {
+                newUrls[node.id] = getThumbnailUrl(node.id);
+            }
+        }
+        if (Object.keys(newUrls).length > 0) {
+            setImageUrls(prev => ({ ...prev, ...newUrls }));
+        }
+    }, [analysisResults, imageUrls]);
 
     // Fetch filter gallery images with server-side filtering and pagination
     const fetchFilterGalleryImages = useCallback(async (page = 1) => {
@@ -856,7 +858,7 @@ const ProvenancePage = () => {
         if (filterMode !== 'all' && filterMode !== 'similarity') {
             fetchFilterGalleryImages(filterGridPage);
         }
-    }, [filterMode, filterGridPage, filterTags, filterDateFrom, filterDateTo, filterSearch]);
+    }, [filterMode, filterGridPage, filterTags, filterDateFrom, filterDateTo, filterSearch, fetchFilterGalleryImages]);
 
     // Reset filter grid page when filters change
     const prevFilterState = useRef({ filterMode, filterTags, filterDateFrom, filterDateTo, filterSearch });
@@ -889,7 +891,7 @@ const ProvenancePage = () => {
         if (Object.keys(newUrls).length > 0) {
             setFilterGalleryUrls(prev => ({ ...prev, ...newUrls }));
         }
-    }, [similarityResults]);
+    }, [similarityResults, imageUrls, filterGalleryUrls]);
 
     const handleAnalyze = async () => {
         if (!selectedImage) {
@@ -1277,7 +1279,7 @@ const ProvenancePage = () => {
                                         { mode: 'date', icon: FiCalendar, label: t('provenance.filterByDate'), hasActiveFilter: filterDateFrom !== '' || filterDateTo !== '' },
                                         { mode: 'manual', icon: FiCheck, label: t('provenance.filterManual'), hasActiveFilter: manuallySelectedIds.length > 0 },
                                         { mode: 'all', icon: FiGrid, label: t('provenance.filterAll'), hasActiveFilter: false },
-                                    ].map(({ mode, icon: Icon, label, hasActiveFilter }) => (
+                                    ].map(({ mode, label, hasActiveFilter, icon: Icon }) => (
                                         <button
                                             key={mode}
                                             onClick={() => {
@@ -1518,6 +1520,7 @@ const ProvenancePage = () => {
                                                         <button
                                                             onClick={() => {
                                                                 setSimilarityResults([]);
+                                                                setManuallySelectedIds([]); // Also clear selections
                                                                 setFilterGridPage(1);
                                                                 showToast(t('similarity.resultsCleared') || 'Results cleared', 'info');
                                                             }}
