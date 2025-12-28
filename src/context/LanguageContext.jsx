@@ -1042,6 +1042,9 @@ const translations = {
         'flagged.newManipulation': 'Manipulação',
         'flagged.newCopyMove': 'Copy-Move',
         'flagged.newForensics': 'Forense',
+        'flagged.selectAnalysis': 'Selecione uma análise',
+        'flagged.selectAnalysisHint': 'Escolha da lista para ver detalhes',
+        'flagged.runCrossAnalysis': 'Executar Análise Cruzada',
         // Related Tab
         'flagged.relatedImages': 'Imagens Relacionadas',
         'flagged.noRelated': 'Nenhuma imagem relacionada encontrada',
@@ -2096,6 +2099,9 @@ const translations = {
         'flagged.newManipulation': 'Manipulation',
         'flagged.newCopyMove': 'Copy-Move',
         'flagged.newForensics': 'Forensics',
+        'flagged.selectAnalysis': 'Select an analysis',
+        'flagged.selectAnalysisHint': 'Choose from the list to view details',
+        'flagged.runCrossAnalysis': 'Run Cross-Image Analysis',
         // Related Tab
         'flagged.relatedImages': 'Related Images',
         'flagged.noRelated': 'No related images found',
