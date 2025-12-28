@@ -3,6 +3,7 @@ import React, { useState, Suspense, lazy } from 'react';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import LoadingFallback from './components/LoadingFallback';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useLanguage } from './context/LanguageContext';
 
 // ✅ CODE SPLITTING: Lazy load all pages
@@ -151,11 +152,13 @@ function AppLayout() {
         <div className="flex-1 flex flex-col px-8 py-6 overflow-y-auto scrollbar-custom">
           <Topbar />
 
-          {/* Page Content with Suspense */}
+          {/* Page Content with Suspense and Error Boundary */}
           <div className="flex-1 animate-fade-in">
-            <Suspense fallback={<LoadingFallback />}>
-              {renderActivePage()}
-            </Suspense>
+            <ErrorBoundary>
+              <Suspense fallback={<LoadingFallback />}>
+                {renderActivePage()}
+              </Suspense>
+            </ErrorBoundary>
           </div>
         </div>
       </main>
