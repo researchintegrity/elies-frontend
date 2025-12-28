@@ -125,6 +125,7 @@ const UploadImagePage = () => {
         </div>
 
         {/* Dropzone or File List */}
+        <input {...getInputProps()} />
         {!hasFiles ? (
           <div
             {...getRootProps()}
@@ -136,7 +137,6 @@ const UploadImagePage = () => {
                 : 'bg-gray-50 dark:bg-dark-card/50 border-gray-300 dark:border-gray-700 hover:bg-primary-500/5 hover:border-primary-500 hover:-translate-y-0.5'
               }`}
           >
-            <input {...getInputProps()} />
             <div className="flex flex-col items-center gap-4">
               <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4
                 transition-all duration-300 hover:scale-110 hover:bg-primary-500/20">
