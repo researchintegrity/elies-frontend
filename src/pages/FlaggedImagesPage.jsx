@@ -54,6 +54,8 @@ import BatchTagModal from '../components/BatchTagModal';
 import LightboxModal from '../components/common/LightboxModal';
 import { usePanelExtraction } from '../hooks/usePanelExtraction';
 import { showToast, showConfirm, showAlert } from '../utils/alert';
+import { AnalysisDetailsPanel, TypeBadge, StatusBadge } from '../components/analysis';
+import ProvenanceGraph from '../components/ProvenanceGraph';
 
 // --- Constants ---
 const IMAGES_PER_PAGE = 12;
@@ -524,6 +526,9 @@ const FlaggedImageDetailPanel = ({
   const [showAnalyzeMenu, setShowAnalyzeMenu] = useState(false);
   const analyzeMenuRef = useRef(null);
 
+  // State for inline analysis details view
+  const [selectedAnalysisForView, setSelectedAnalysisForView] = useState(null);
+
   // Analysis options for dropdown
   const analysisOptions = [
     { key: 'imageAnalysis', icon: FiImage, label: t('analyze.imageAnalysis') || 'Image Analysis' },
@@ -614,31 +619,71 @@ const FlaggedImageDetailPanel = ({
   }, [image?.imageId]);
 
   // Handlers
-  const handleViewResults = (analysis) => {
-    // Store data and navigate to appropriate page
-    const targetPage = getTargetPageForAnalysis(analysis.type);
-    sessionStorage.setItem('viewResultsAnalysis', JSON.stringify({
-      analysisId: analysis._id,
-      targetPage: targetPage,
-    }));
+  const handleViewResults = async (analysis) => {
+    // Fetch full analysis details including results
+    try {
+      const fullAnalysis = await api.getAnalysisById(analysis._id);
+      setSelectedAnalysisForView(fullAnalysis);
+    } catch (err) {
+      console.error('Error fetching analysis details:', err);
+      // Fallback to the analysis we have
+      setSelectedAnalysisForView(analysis);
+    }
+  };
 
-    if (onNavigate) {
-      onNavigate(targetPage);
-    } else {
+  // Handler for navigating to full results page (from inline panel)
+  const handleViewFullResults = (analysis) => {
+    // Map analysis types to page keys (matches AnalysisDashboardPage)
+    const typeToPageKey = {
+      'trufor': 'manipulationDetection',
+      'single_image_copy_move': 'copyMove',
+      'cross_image_copy_move': 'copyMove',
+      'provenance': 'provenance',
+      'cbir_search': 'cbirSearch',
+      'external': 'imageAnalysis'
+    };
+
+    const pageKey = typeToPageKey[analysis.type];
+    if (pageKey && analysis.status === 'completed') {
+      // Store analysis data for viewing results
+      const viewResultsData = {
+        analysisId: analysis._id,
+        imageId: analysis.source_image_id,
+        targetImageId: analysis.target_image_id || null,
+        parameters: analysis.parameters,
+        type: analysis.type,
+        results: analysis.results || {},
+        targetPage: pageKey
+      };
+      sessionStorage.setItem('viewResultsAnalysis', JSON.stringify(viewResultsData));
+      // Navigate by refreshing
       window.location.reload();
     }
   };
 
   const handleReproduce = (analysis) => {
-    const targetPage = getTargetPageForAnalysis(analysis.type);
-    sessionStorage.setItem('reproduceAnalysis', JSON.stringify({
-      analysisId: analysis._id,
-      targetPage: targetPage,
-    }));
+    // Map analysis types to page keys (matches AnalysisDashboardPage)
+    const typeToPageKey = {
+      'trufor': 'manipulationDetection',
+      'single_image_copy_move': 'copyMove',
+      'cross_image_copy_move': 'copyMove',
+      'provenance': 'provenance',
+      'cbir_search': 'cbirSearch',
+      'external': 'imageAnalysis'
+    };
 
-    if (onNavigate) {
-      onNavigate(targetPage);
-    } else {
+    const pageKey = typeToPageKey[analysis.type];
+    if (pageKey && analysis.source_image_id) {
+      // Store parameters and target page in sessionStorage
+      const reproduceData = {
+        imageId: analysis.source_image_id,
+        targetImageId: analysis.target_image_id || null,
+        parameters: analysis.parameters,
+        type: analysis.type,
+        targetPage: pageKey
+      };
+      sessionStorage.setItem('reproduceAnalysis', JSON.stringify(reproduceData));
+      // Navigate by refreshing
       window.location.reload();
     }
   };
@@ -922,61 +967,79 @@ const FlaggedImageDetailPanel = ({
 
         {/* Analysis Tab */}
         {activeTab === TAB_ANALYSIS && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-                {t('flagged.analysisHistory') || 'Analysis History'} ({analyses.length})
-              </h4>
-            </div>
-
-            {/* Start New Analysis Buttons */}
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => handleStartNewAnalysis('manipulationDetection')}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
-              >
-                <FiZap size={12} />
-                {t('flagged.newManipulation') || 'Manipulation'}
-              </button>
-              <button
-                onClick={() => handleStartNewAnalysis('copyMove')}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
-              >
-                <FiCopy size={12} />
-                {t('flagged.newCopyMove') || 'Copy-Move'}
-              </button>
-              <button
-                onClick={() => handleStartNewAnalysis('imageAnalysis')}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-              >
-                <FiImage size={12} />
-                {t('flagged.newForensics') || 'Forensics'}
-              </button>
-            </div>
-
-            {loadingAnalyses ? (
-              <div className="space-y-2">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
-                ))}
-              </div>
-            ) : analyses.length === 0 ? (
-              <div className="text-center py-8 text-gray-400">
-                <FiActivity size={32} className="mx-auto mb-2 opacity-50" />
-                <p className="text-sm">{t('flagged.noAnalyses') || 'No analyses performed yet'}</p>
+          <div className="h-full flex flex-col -m-4">
+            {/* Show inline AnalysisDetailsPanel when an analysis is selected */}
+            {selectedAnalysisForView ? (
+              <div className="flex-1 flex flex-col min-h-0">
+                <AnalysisDetailsPanel
+                  analysis={selectedAnalysisForView}
+                  onClose={() => setSelectedAnalysisForView(null)}
+                  onReproduce={handleReproduce}
+                  onViewResults={handleViewFullResults}
+                  t={t}
+                  locale={locale}
+                  embedded={true}
+                  ProvenanceGraph={ProvenanceGraph}
+                />
               </div>
             ) : (
-              <div className="space-y-2">
-                {analyses.map(analysis => (
-                  <AnalysisRow
-                    key={analysis._id}
-                    analysis={analysis}
-                    onViewResults={handleViewResults}
-                    onReproduce={handleReproduce}
-                    t={t}
-                    locale={locale}
-                  />
-                ))}
+              <div className="p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {t('flagged.analysisHistory') || 'Analysis History'} ({analyses.length})
+                  </h4>
+                </div>
+
+                {/* Start New Analysis Buttons */}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handleStartNewAnalysis('manipulationDetection')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+                  >
+                    <FiZap size={12} />
+                    {t('flagged.newManipulation') || 'Manipulation'}
+                  </button>
+                  <button
+                    onClick={() => handleStartNewAnalysis('copyMove')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+                  >
+                    <FiCopy size={12} />
+                    {t('flagged.newCopyMove') || 'Copy-Move'}
+                  </button>
+                  <button
+                    onClick={() => handleStartNewAnalysis('imageAnalysis')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    <FiImage size={12} />
+                    {t('flagged.newForensics') || 'Forensics'}
+                  </button>
+                </div>
+
+                {loadingAnalyses ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+                    ))}
+                  </div>
+                ) : analyses.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <FiActivity size={32} className="mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">{t('flagged.noAnalyses') || 'No analyses performed yet'}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {analyses.map(analysis => (
+                      <AnalysisRow
+                        key={analysis._id}
+                        analysis={analysis}
+                        onViewResults={handleViewResults}
+                        onReproduce={handleReproduce}
+                        t={t}
+                        locale={locale}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
