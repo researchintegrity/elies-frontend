@@ -90,15 +90,17 @@ const PDFPanel = ({ doc, t }) => {
 
   useEffect(() => {
     let isMounted = true;
+    let blobUrl = null;
+
     const fetchPdf = async () => {
       try {
         setLoading(true);
         setError(null);
         setPdfBlobUrl(null);
         const blob = await api.download(`/documents/${doc.id}/download`);
-        const url = URL.createObjectURL(blob);
+        blobUrl = URL.createObjectURL(blob);
         if (isMounted) {
-          setPdfBlobUrl(url);
+          setPdfBlobUrl(blobUrl);
           setLoading(false);
         }
       } catch (err) {
@@ -110,10 +112,15 @@ const PDFPanel = ({ doc, t }) => {
       }
     };
     if (doc) fetchPdf();
+
     return () => {
       isMounted = false;
+      // Revoke blob URL to prevent memory leaks
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
     };
-  }, [doc, t, pdfBlobUrl]);
+  }, [doc, t]);
 
   if (loading) {
     return (
