@@ -54,6 +54,7 @@ import { SkeletonCard, EmptyState } from '../components/common';
 import AnnotationModal from '../components/annotation/AnnotationModal';
 import BatchTagModal from '../components/BatchTagModal';
 import LightboxModal from '../components/common/LightboxModal';
+import ImageMetadataSidebar from '../components/common/ImageMetadataSidebar';
 import { usePanelExtraction } from '../hooks/usePanelExtraction';
 import { showToast, showConfirm, showAlert } from '../utils/alert';
 import { AnalysisDetailsPanel, TypeBadge, StatusBadge } from '../components/analysis';
@@ -1895,7 +1896,15 @@ const FlaggedImagesPage = ({ onNavigate }) => {
           setLightboxUrl(null);
         }}
         title={lightboxImage?.filename}
-      />
+      >
+        <ImageMetadataSidebar
+          image={lightboxImage}
+          t={t}
+          locale={locale}
+          onTagAdd={handleAddTag}
+          onTagRemove={handleRemoveTag}
+        />
+      </LightboxModal>
 
       {/* Selection Toolbar */}
       <SelectionToolbar
