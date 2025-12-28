@@ -72,7 +72,7 @@ const ANALYSIS_TYPE_CONFIG = {
   cross_image_copy_move: { icon: FiLayers, color: 'indigo', label: 'Copy-Move (Cross)' },
   trufor: { icon: FiZap, color: 'amber', label: 'Manipulation Detection' },
   provenance: { icon: FiTarget, color: 'purple', label: 'Provenance' },
-  external: { icon: FiExternalLink, color: 'gray', label: 'External Tool' },
+  screening_tool: { icon: FiExternalLink, color: 'gray', label: 'Screening Tool' },
 };
 
 // Status configurations
@@ -202,7 +202,7 @@ const TabButton = ({ icon: Icon, label, isActive, onClick, count }) => (
 
 // Analysis Row
 const AnalysisRow = ({ analysis, onViewResults, onReproduce, t, locale }) => {
-  const config = ANALYSIS_TYPE_CONFIG[analysis.type] || ANALYSIS_TYPE_CONFIG.external;
+  const config = ANALYSIS_TYPE_CONFIG[analysis.type] || ANALYSIS_TYPE_CONFIG.screening_tool;
   const statusConfig = STATUS_CONFIG[analysis.status] || STATUS_CONFIG.pending;
   const Icon = config.icon;
 
@@ -649,7 +649,7 @@ const FlaggedImageDetailPanel = ({
       'cross_image_copy_move': 'copyMove',
       'provenance': 'provenance',
       'cbir_search': 'cbirSearch',
-      'external': 'imageAnalysis'
+      'screening_tool': 'imageAnalysis'
     };
 
     const pageKey = typeToPageKey[analysis.type];
@@ -678,7 +678,7 @@ const FlaggedImageDetailPanel = ({
       'cross_image_copy_move': 'copyMove',
       'provenance': 'provenance',
       'cbir_search': 'cbirSearch',
-      'external': 'imageAnalysis'
+      'screening_tool': 'imageAnalysis'
     };
 
     const pageKey = typeToPageKey[analysis.type];

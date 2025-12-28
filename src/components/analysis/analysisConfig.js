@@ -48,15 +48,15 @@ export const ANALYSIS_TYPE_CONFIG = {
         color: 'orange',
         labelKey: 'analysisDashboard.types.provenance'
     },
-    external: {
+    screening_tool: {
         icon: FiExternalLink,
         color: 'gray',
-        labelKey: 'analysisDashboard.types.external'
+        labelKey: 'analysisDashboard.types.screeningTool'
     }
 };
 
-// External analysis subtype icons (for Image Analysis page tools)
-export const EXTERNAL_SUBTYPE_CONFIG = {
+// Screening tool subtype icons (for Image Analysis page tools)
+export const SCREENING_TOOL_SUBTYPE_CONFIG = {
     ela: { icon: FiZap, label: 'Error Level Analysis', color: 'amber' },
     noise: { icon: FiActivity, label: 'Noise Analysis', color: 'teal' },
     gradient: { icon: FiSun, label: 'Luminance Gradient', color: 'yellow' },

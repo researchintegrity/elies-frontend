@@ -333,8 +333,8 @@ const ImageAnalysisPage = () => {
                 const { imageId, parameters, type } = JSON.parse(reproduceData);
                 sessionStorage.removeItem('reproduceAnalysis'); // Clear after reading
 
-                // Only handle external analysis type
-                if (type !== 'external') {
+                // Only handle screening tool analysis type
+                if (type !== 'screening_tool') {
                     setLoadingReproduce(false);
                     return;
                 }
@@ -443,8 +443,8 @@ const ImageAnalysisPage = () => {
                 const { analysisId, imageId, parameters, type, results } = JSON.parse(viewResultsData);
                 sessionStorage.removeItem('viewResultsAnalysis'); // Clear after reading
 
-                // Only handle external analysis type
-                if (type !== 'external') {
+                // Only handle screening tool analysis type
+                if (type !== 'screening_tool') {
                     setLoadingReproduce(false);
                     return;
                 }

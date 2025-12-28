@@ -93,15 +93,15 @@ const ANALYSIS_TYPE_CONFIG = {
         color: 'orange',
         labelKey: 'analysisDashboard.types.provenance'
     },
-    external: {
+    screening_tool: {
         icon: FiExternalLink,
         color: 'gray',
-        labelKey: 'analysisDashboard.types.external'
+        labelKey: 'analysisDashboard.types.screeningTool'
     }
 };
 
-// External analysis subtype icons (for Image Analysis page tools)
-const EXTERNAL_SUBTYPE_CONFIG = {
+// Screening tool subtype icons (for Image Analysis page tools)
+const SCREENING_TOOL_SUBTYPE_CONFIG = {
     ela: { icon: FiZap, label: 'Error Level Analysis', color: 'amber' },
     noise: { icon: FiActivity, label: 'Noise Analysis', color: 'teal' },
     gradient: { icon: FiSun, label: 'Luminance Gradient', color: 'yellow' },
@@ -168,9 +168,9 @@ const SkeletonRow = () => (
 
 // Type Badge
 const TypeBadge = ({ type, subtype, t }) => {
-    // For external analyses, show the subtype with its specific icon/color
-    if (type === 'external' && subtype && EXTERNAL_SUBTYPE_CONFIG[subtype]) {
-        const subtypeConfig = EXTERNAL_SUBTYPE_CONFIG[subtype];
+    // For screening tool analyses, show the subtype with its specific icon/color
+    if (type === 'screening_tool' && subtype && SCREENING_TOOL_SUBTYPE_CONFIG[subtype]) {
+        const subtypeConfig = SCREENING_TOOL_SUBTYPE_CONFIG[subtype];
         const Icon = subtypeConfig.icon;
         return (
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${COLOR_CLASSES[subtypeConfig.color]}`}>
@@ -180,7 +180,7 @@ const TypeBadge = ({ type, subtype, t }) => {
         );
     }
 
-    const config = ANALYSIS_TYPE_CONFIG[type] || ANALYSIS_TYPE_CONFIG.external;
+    const config = ANALYSIS_TYPE_CONFIG[type] || ANALYSIS_TYPE_CONFIG.screening_tool;
     const Icon = config.icon;
 
     return (
@@ -314,7 +314,7 @@ const FilterPanel = ({ filters, onFilterChange, onReset, t }) => {
                         <option value="cross_image_copy_move">{t('analysisDashboard.types.crossCopyMove')}</option>
                         <option value="trufor">{t('analysisDashboard.types.trufor')}</option>
                         <option value="provenance">{t('analysisDashboard.types.provenance')}</option>
-                        <option value="external">{t('analysisDashboard.types.external')}</option>
+                        <option value="screening_tool">{t('analysisDashboard.types.screeningTool')}</option>
                     </select>
                 </div>
 
@@ -374,7 +374,7 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, onViewResults, onFi
     const [imageError, setImageError] = useState(false);
 
     const createdDate = new Date(analysis.created_at);
-    const typeConfig = ANALYSIS_TYPE_CONFIG[analysis.type] || ANALYSIS_TYPE_CONFIG.external;
+    const typeConfig = ANALYSIS_TYPE_CONFIG[analysis.type] || ANALYSIS_TYPE_CONFIG.screening_tool;
     const TypeIcon = typeConfig.icon;
 
     return (
@@ -514,7 +514,7 @@ const AnalysisCard = ({ analysis, onViewDetails, onReproduce, onViewResults, isA
     const [imageError, setImageError] = useState(false);
 
     const createdDate = new Date(analysis.created_at);
-    const typeConfig = ANALYSIS_TYPE_CONFIG[analysis.type] || ANALYSIS_TYPE_CONFIG.external;
+    const typeConfig = ANALYSIS_TYPE_CONFIG[analysis.type] || ANALYSIS_TYPE_CONFIG.screening_tool;
     const TypeIcon = typeConfig.icon;
 
     return (
@@ -633,7 +633,7 @@ const AnalysisCard = ({ analysis, onViewDetails, onReproduce, onViewResults, isA
 
 // Compact List Row for Split View - uses thumbnail URL for fast loading
 const AnalysisListRowCompact = ({ analysis, isActive, onClick, onFilterByImage, isFilterActive, t, locale, batchMode, isSelected, onToggleSelect }) => {
-    const typeConfig = ANALYSIS_TYPE_CONFIG[analysis.type] || ANALYSIS_TYPE_CONFIG.external;
+    const typeConfig = ANALYSIS_TYPE_CONFIG[analysis.type] || ANALYSIS_TYPE_CONFIG.screening_tool;
     const TypeIcon = typeConfig.icon;
     const createdDate = new Date(analysis.created_at);
 
@@ -1309,7 +1309,7 @@ const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale })
                 'noiseprint': 'noiseprint',
                 'matches_image': 'matches',      // Copy-move: stored as matches_image, API expects 'matches'
                 'clusters_image': 'clusters',    // Copy-move: stored as clusters_image, API expects 'clusters'
-                'result_image': 'result_image'   // External: stored and API both use 'result_image'
+                'result_image': 'result_image'   // Screening tool: stored and API both use 'result_image'
             };
 
             for (const [resultKey, apiType] of Object.entries(resultTypeMapping)) {
@@ -1687,7 +1687,7 @@ const AnalysisDashboardPage = () => {
             'cross_image_copy_move': 'copyMove',
             'provenance': 'provenance',
             'cbir_search': 'cbirSearch',
-            'external': 'imageAnalysis'
+            'screening_tool': 'imageAnalysis'
         };
 
         const pageKey = typeToPageKey[analysis.type];
@@ -1721,7 +1721,7 @@ const AnalysisDashboardPage = () => {
             'cross_image_copy_move': 'copyMove',
             'provenance': 'provenance',
             'cbir_search': 'cbirSearch',
-            'external': 'imageAnalysis'
+            'screening_tool': 'imageAnalysis'
         };
 
         const pageKey = typeToPageKey[analysis.type];

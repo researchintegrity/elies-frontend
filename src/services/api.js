@@ -338,19 +338,19 @@ export const api = {
     },
 
     /**
-     * Save an external analysis result
-     * Allows storing results from external tools with optional file upload
+     * Save a screening tool analysis result
+     * Allows storing results from screening tools with optional file upload
      * @param {Object} data - Analysis data
-     * @param {string} data.source_image_id - Source image ID (required)
-     * @param {string} data.tool_name - Name of the external tool (required)
-     * @param {string} data.tool_version - Version of the external tool
+     * @param{string} data.source_image_id - Source image ID (required)
+     * @param {string} data.tool_name - Name of the screening tool (required)
+     * @param {string} data.tool_version - Version of the screening tool
      * @param {string} data.description - Description of the analysis
      * @param {Object} data.parameters - Parameters used for the analysis
      * @param {Object} data.metrics - Analysis metrics/results
      * @param {File} data.result_file - Optional result file to upload
      * @returns {Promise<{success: boolean, message: string, analysis_id: string}>}
      */
-    saveExternalAnalysis: async (data) => {
+    saveScreeningToolAnalysis: async (data) => {
         const formData = new FormData();
         formData.append('source_image_id', data.source_image_id);
         formData.append('tool_name', data.tool_name);
@@ -374,7 +374,7 @@ export const api = {
         // Use getHeaders(true) for multipart form data (no Content-Type header)
         const headers = getHeaders(true);
 
-        const response = await fetch(`${API_BASE_URL}/analyses/external`, {
+        const response = await fetch(`${API_BASE_URL}/analyses/screening-tool`, {
             method: 'POST',
             headers,
             body: formData
@@ -414,7 +414,7 @@ export const api = {
         // Use getHeaders(true) for multipart form data (no Content-Type header)
         const headers = getHeaders(true);
 
-        const response = await fetch(`${API_BASE_URL}/analyses/external`, {
+        const response = await fetch(`${API_BASE_URL}/analyses/screening-tool`, {
             method: 'POST',
             headers,
             body: formData

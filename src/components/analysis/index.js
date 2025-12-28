@@ -9,7 +9,7 @@ export { default as StatusBadge } from './StatusBadge';
 export { default as ParametersDisplay } from './ParametersDisplay';
 export {
     ANALYSIS_TYPE_CONFIG,
-    EXTERNAL_SUBTYPE_CONFIG,
+    SCREENING_TOOL_SUBTYPE_CONFIG,
     STATUS_CONFIG,
     COLOR_CLASSES
 } from './analysisConfig';
