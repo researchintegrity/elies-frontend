@@ -1058,28 +1058,40 @@ const FlaggedImageDetailPanel = ({
               </div>
 
               {/* Start New Analysis Buttons */}
-              <div className="flex-none p-2 border-b border-gray-200 dark:border-gray-800 space-y-1">
+              <div className="flex-none p-2 border-b border-gray-200 dark:border-gray-800 relative z-20">
                 <button
-                  onClick={() => handleStartNewAnalysis('manipulationDetection')}
-                  className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+                  onClick={() => setShowAnalyzeMenu(!showAnalyzeMenu)}
+                  className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
                 >
-                  <FiZap size={10} />
-                  {t('flagged.newManipulation') || 'Manipulation'}
+                  <span className="flex items-center gap-1.5">
+                    <FiPlus size={14} />
+                    {t('analyze.startNewAnalysis') || 'New Analysis'}
+                  </span>
+                  <FiChevronDown size={14} className={`transition-transform duration-200 ${showAnalyzeMenu ? 'rotate-180' : ''}`} />
                 </button>
-                <button
-                  onClick={() => handleStartNewAnalysis('copyMove')}
-                  className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
-                >
-                  <FiCopy size={10} />
-                  {t('flagged.newCopyMove') || 'Copy-Move'}
-                </button>
-                <button
-                  onClick={() => handleStartNewAnalysis('imageAnalysis')}
-                  className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                >
-                  <FiImage size={10} />
-                  {t('flagged.newForensics') || 'Forensics'}
-                </button>
+
+                {showAnalyzeMenu && (
+                  <div
+                    ref={analyzeMenuRef}
+                    className="absolute top-full left-2 right-2 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50 text-left"
+                  >
+                    <div className="py-1">
+                      {analysisOptions.map((option) => (
+                        <button
+                          key={option.key}
+                          onClick={() => {
+                            handleStartNewAnalysis(option.key);
+                            setShowAnalyzeMenu(false);
+                          }}
+                          className="w-full px-3 py-2 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 group border-b border-gray-100 dark:border-gray-800 last:border-0"
+                        >
+                          <option.icon size={14} className="text-gray-400 group-hover:text-indigo-500 transition-colors" />
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Analysis List */}

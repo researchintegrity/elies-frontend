@@ -171,6 +171,7 @@ const translations = {
 
         // Analyze Menu Options
         'analyze.selectAnalysis': 'Selecione a Análise',
+        'analyze.startNewAnalysis': 'Nova Análise',
         'analyze.imageAnalysis': 'Análise de Imagem',
         'analyze.manipulationDetection': 'Detecção de Manipulação',
         'analyze.copyMoveSingle': 'Copy-Move (Imagem Única)',
@@ -1228,6 +1229,7 @@ const translations = {
 
         // Analyze Menu Options
         'analyze.selectAnalysis': 'Select Analysis',
+        'analyze.startNewAnalysis': 'New Analysis',
         'analyze.imageAnalysis': 'Image Analysis',
         'analyze.manipulationDetection': 'Manipulation Detection',
         'analyze.copyMoveSingle': 'Copy-Move (Single Image)',
