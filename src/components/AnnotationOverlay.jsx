@@ -56,7 +56,7 @@ const AnnotationOverlay = ({
             </ReactCrop>
 
             {/* Existing Annotations Layer */}
-            <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-[150]">
+            <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-10">
                 {annotations.map(anno => {
                     const { x, y, width, height } = anno.coords || {};
                     const color = getGroupColor(anno.type, anno.group_id);

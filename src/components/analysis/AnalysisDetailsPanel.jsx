@@ -306,7 +306,7 @@ const AnalysisDetailsPanel = ({
                         <img
                             src={sourceUrl}
                             alt="Source"
-                            className="w-full h-full object-contain p-4"
+                            className="w-full h-full object-contain p-12"
                             onError={() => setSourceError(true)}
                         />
                     ) : (
@@ -327,7 +327,7 @@ const AnalysisDetailsPanel = ({
                         <img
                             src={targetUrl}
                             alt="Target"
-                            className="w-full h-full object-contain p-4"
+                            className="w-full h-full object-contain p-12"
                             onError={() => setTargetError(true)}
                         />
                     ) : (
@@ -336,7 +336,7 @@ const AnalysisDetailsPanel = ({
                         </div>
                     )
                 ) : activeTab === 'comparison' ? (
-                    <div className="w-full h-full flex flex-row items-center justify-center p-4 gap-4">
+                    <div className="w-full h-full flex flex-row items-center justify-center p-8 gap-8">
                         {/* Source Side */}
                         <div className="flex-1 h-full flex flex-col items-center overflow-hidden">
                             <span className="mb-2 text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2">
@@ -391,7 +391,7 @@ const AnalysisDetailsPanel = ({
                         </div>
                     ) : resultUrl ? (
                         <div className="relative w-full h-full group">
-                            <img src={resultUrl} alt="Result" className="w-full h-full object-contain p-4" />
+                            <img src={resultUrl} alt="Result" className="w-full h-full object-contain p-12" />
 
                             {/* Result Type Badge */}
                             {availableResults.length > 0 && (

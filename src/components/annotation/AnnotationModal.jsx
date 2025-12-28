@@ -367,6 +367,7 @@ const AnnotationModalInner = ({
             if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
 
             if (e.key === 'Escape') {
+                e.stopPropagation(); // Prevent bubbling to parent (FlaggedImagesPage)
                 if (isDrawing) {
                     actions.cancelDrawing();
                 } else if (selectedId) {
@@ -547,7 +548,7 @@ const AnnotationModalInner = ({
     }, [annotations, imageSize, imageId, imageName]);
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col bg-gray-900">
+        <div className="fixed inset-0 z-[200] flex flex-col bg-gray-900">
             {/* Header */}
             <div className="flex-none flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
                 <div className="flex items-center gap-3">

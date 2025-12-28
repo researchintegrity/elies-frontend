@@ -42,12 +42,14 @@ import {
   FiArrowLeft,
   FiTag,
   FiGrid,
+  FiPlus,
 } from 'react-icons/fi';
 import { useLanguage } from '../context/LanguageContext';
 import { useImages } from '../hooks/useImages';
 import api, { API_BASE_URL } from '../services/api';
 import SelectionToolbar from '../components/SelectionToolbar';
 import TagInput from '../components/TagInput';
+import AnnotationOverlay from '../components/AnnotationOverlay';
 import { SkeletonCard, EmptyState } from '../components/common';
 import AnnotationModal from '../components/annotation/AnnotationModal';
 import BatchTagModal from '../components/BatchTagModal';
@@ -512,6 +514,8 @@ const FlaggedImageDetailPanel = ({
   isSelectionMode,
   onAddTag,
   onRemoveTag,
+  annotationModalOpen,
+  setAnnotationModalOpen,
   t,
   locale
 }) => {
@@ -522,12 +526,17 @@ const FlaggedImageDetailPanel = ({
   const [loadingAnalyses, setLoadingAnalyses] = useState(false);
   const [loadingAnnotations, setLoadingAnnotations] = useState(false);
   const [imageExpanded, setImageExpanded] = useState(false);
-  const [annotationModalOpen, setAnnotationModalOpen] = useState(false);
+  // State for inline analysis details view
   const [showAnalyzeMenu, setShowAnalyzeMenu] = useState(false);
   const analyzeMenuRef = useRef(null);
 
   // State for inline analysis details view
   const [selectedAnalysisForView, setSelectedAnalysisForView] = useState(null);
+
+  // Reset selected analysis and active tab when image changes
+  useEffect(() => {
+    setSelectedAnalysisForView(null);
+  }, [image?.imageId]);
 
   // Analysis options for dropdown
   const analysisOptions = [
@@ -745,9 +754,9 @@ const FlaggedImageDetailPanel = ({
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800">
-      {/* Header */}
-      <div className="flex-none p-4 border-b border-gray-200 dark:border-gray-800">
-        <div className="flex items-center justify-between mb-2">
+      {/* Header - Compact, no image */}
+      <div className="flex-none px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {/* Selection Checkbox for Main Image */}
             <div
@@ -776,26 +785,10 @@ const FlaggedImageDetailPanel = ({
             </button>
           </div>
         </div>
-
-        {/* Image Preview */}
-        <div className={`group relative rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 ${imageExpanded ? 'aspect-auto max-h-[50vh]' : 'h-48'}`}>
-
-          <img
-            src={getFullImageUrl(image.imageId)}
-            alt={image.filename}
-            className="w-full h-full object-contain"
-          />
-          <button
-            onClick={() => setImageExpanded(!imageExpanded)}
-            className="absolute bottom-2 right-2 p-1.5 rounded bg-black/50 text-white hover:bg-black/70 transition-colors"
-          >
-            {imageExpanded ? <FiMinimize2 size={14} /> : <FiMaximize2 size={14} />}
-          </button>
-        </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex-none flex gap-1 p-2 border-b border-gray-200 dark:border-gray-800 overflow-x-auto">
+      {/* Tabs - Right after header */}
+      <div className="flex-none flex gap-1 px-4 py-2 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
         <TabButton
           icon={FiInfo}
           label={t('flagged.tabs.details') || 'Details'}
@@ -826,91 +819,108 @@ const FlaggedImageDetailPanel = ({
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto">
         {/* Details Tab */}
         {activeTab === TAB_DETAILS && (
-          <div className="space-y-4">
-            {/* Metadata */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-                <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">{t('flagged.origin') || 'Origin'}</span>
-                <span className="text-sm font-medium text-gray-900 dark:text-white capitalize">{image.sourceType}</span>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-                <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">{t('flagged.uploaded') || 'Uploaded'}</span>
-                <span className="text-sm font-medium text-gray-900 dark:text-white">{new Date(image.uploadedDate).toLocaleDateString(locale)}</span>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-                <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">{t('flagged.fileSize') || 'File Size'}</span>
-                <span className="text-sm font-medium text-gray-900 dark:text-white">{(image.fileSize / 1024).toFixed(1)} KB</span>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-                <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">{t('flagged.format') || 'Format'}</span>
-                <span className="text-sm font-medium text-gray-900 dark:text-white uppercase">{image.filename.split('.').pop()}</span>
-              </div>
-            </div>
-
-            {/* Tags */}
-            {/* Tags */}
-            <div>
-              <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{t('flagged.tags') || 'Tags'}</h4>
-              <TagInput
-                tags={image.imageType || []}
-                onAdd={(tag) => onAddTag(image, tag)}
-                onRemove={(tag) => onRemoveTag(image, tag)}
+          <div className="h-full flex flex-col">
+            {/* Image Preview - Now in Details tab */}
+            <div className={`flex-shrink-0 ${imageExpanded ? 'flex-1 min-h-[300px]' : 'h-64'} bg-gray-100 dark:bg-gray-800 relative`}>
+              <img
+                src={getFullImageUrl(image.imageId)}
+                alt={image.filename}
+                className="w-full h-full object-contain"
               />
+              <button
+                onClick={() => setImageExpanded(!imageExpanded)}
+                className="absolute bottom-3 right-3 p-2 rounded-lg bg-black/50 text-white hover:bg-black/70 transition-colors"
+              >
+                {imageExpanded ? <FiMinimize2 size={16} /> : <FiMaximize2 size={16} />}
+              </button>
             </div>
 
-            {/* Quick Actions */}
-            <div>
-              <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{t('flagged.quickActions') || 'Quick Actions'}</h4>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={handleOpenAnnotation}
-                  className="flex items-center justify-center gap-2 p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors text-sm font-medium"
-                >
-                  <FiEdit3 size={16} />
-                  {t('flagged.annotate') || 'Annotate'}
-                </button>
+            {/* Metadata and Actions */}
+            <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+              {/* Metadata Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">{t('flagged.origin') || 'Origin'}</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white capitalize">{image.sourceType}</span>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">{t('flagged.uploaded') || 'Uploaded'}</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">{new Date(image.uploadedDate).toLocaleDateString(locale)}</span>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">{t('flagged.fileSize') || 'File Size'}</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">{(image.fileSize / 1024).toFixed(1)} KB</span>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">{t('flagged.format') || 'Format'}</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white uppercase">{image.filename.split('.').pop()}</span>
+                </div>
+              </div>
 
-                {/* Analyze Dropdown */}
-                <div className="relative" ref={analyzeMenuRef}>
+              {/* Tags */}
+              <div>
+                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{t('flagged.tags') || 'Tags'}</h4>
+                <TagInput
+                  tags={image.imageType || []}
+                  onAdd={(tag) => onAddTag(image, tag)}
+                  onRemove={(tag) => onRemoveTag(image, tag)}
+                />
+              </div>
+
+              {/* Quick Actions */}
+              <div>
+                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{t('flagged.quickActions') || 'Quick Actions'}</h4>
+                <div className="grid grid-cols-2 gap-2">
                   <button
-                    onClick={() => setShowAnalyzeMenu(!showAnalyzeMenu)}
-                    className={`w-full flex items-center justify-center gap-2 p-3 rounded-lg text-sm font-medium transition-colors ${showAnalyzeMenu
-                      ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300'
-                      : 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50'
-                      }`}
+                    onClick={handleOpenAnnotation}
+                    className="flex items-center justify-center gap-2 p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors text-sm font-medium"
                   >
-                    <FiBarChart2 size={16} />
-                    {t('selection.analyze') || 'Analyze'}
-                    <FiChevronDown size={14} className={`transition-transform ${showAnalyzeMenu ? 'rotate-180' : ''}`} />
+                    <FiEdit3 size={16} />
+                    {t('flagged.annotate') || 'Annotate'}
                   </button>
 
-                  {/* Dropdown Menu */}
-                  {showAnalyzeMenu && (
-                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
-                      <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
-                        {t('analyze.selectAnalysis') || 'Select Analysis'}
+                  {/* Analyze Dropdown */}
+                  <div className="relative" ref={analyzeMenuRef}>
+                    <button
+                      onClick={() => setShowAnalyzeMenu(!showAnalyzeMenu)}
+                      className={`w-full flex items-center justify-center gap-2 p-3 rounded-lg text-sm font-medium transition-colors ${showAnalyzeMenu
+                        ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50'
+                        }`}
+                    >
+                      <FiBarChart2 size={16} />
+                      {t('selection.analyze') || 'Analyze'}
+                      <FiChevronDown size={14} className={`transition-transform ${showAnalyzeMenu ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    {showAnalyzeMenu && (
+                      <div className="absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                        <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700">
+                          {t('analyze.selectAnalysis') || 'Select Analysis'}
+                        </div>
+                        {analysisOptions.map((option) => {
+                          const Icon = option.icon;
+                          return (
+                            <button
+                              key={option.key}
+                              onClick={() => {
+                                setShowAnalyzeMenu(false);
+                                handleStartNewAnalysis(option.key);
+                              }}
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700 dark:text-gray-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
+                            >
+                              <Icon className="text-lg flex-shrink-0" />
+                              <span className="text-sm font-medium">{option.label}</span>
+                            </button>
+                          );
+                        })}
                       </div>
-                      {analysisOptions.map((option) => {
-                        const Icon = option.icon;
-                        return (
-                          <button
-                            key={option.key}
-                            onClick={() => {
-                              setShowAnalyzeMenu(false);
-                              handleStartNewAnalysis(option.key);
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700 dark:text-gray-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
-                          >
-                            <Icon className="text-lg flex-shrink-0" />
-                            <span className="text-sm font-medium">{option.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -919,8 +929,9 @@ const FlaggedImageDetailPanel = ({
 
         {/* Annotations Tab */}
         {activeTab === TAB_ANNOTATIONS && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="h-full flex flex-col">
+            {/* Header */}
+            <div className="flex-none flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
               <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
                 {t('flagged.annotations') || 'Annotations'} ({annotations.length})
               </h4>
@@ -933,44 +944,212 @@ const FlaggedImageDetailPanel = ({
               </button>
             </div>
 
-            {loadingAnnotations ? (
-              <div className="space-y-2">
-                {[1, 2].map(i => (
-                  <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
-                ))}
-              </div>
-            ) : annotations.length === 0 ? (
-              <div className="text-center py-8 text-gray-400">
-                <FiEdit3 size={32} className="mx-auto mb-2 opacity-50" />
-                <p className="text-sm">{t('flagged.noAnnotations') || 'No annotations yet'}</p>
-                <button
-                  onClick={handleOpenAnnotation}
-                  className="mt-3 px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            {/* Image with Annotation Overlays */}
+            <div className="flex-1 flex items-center justify-center bg-gray-100 dark:bg-gray-800 p-4 overflow-hidden">
+              <div className="relative max-h-[50vh] max-w-full flex items-center justify-center">
+                <AnnotationOverlay
+                  isActive={false}
+                  annotations={annotations.map(a => {
+                    // Normalize annotations to ensure 'coords' exists
+                    if (a.coords) return a;
+                    // Fallback for regions (convert 0-1 to %)
+                    if (a.regions && a.regions.length > 0) {
+                      const r = a.regions[0];
+                      if (r.type === 'rect' || r.type === 'rectangle') {
+                        return {
+                          ...a,
+                          type: 'rectangle', // Ensure type matches what Overlay expects
+                          coords: {
+                            x: (r.x || 0) * 100,
+                            y: (r.y || 0) * 100,
+                            width: (r.width || 0) * 100,
+                            height: (r.height || 0) * 100
+                          }
+                        };
+                      }
+                    }
+                    return a;
+                  })}
+                  onAnnotationClick={() => handleOpenAnnotation()}
                 >
-                  {t('flagged.addAnnotation') || 'Add Annotation'}
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {annotations.map(anno => (
-                  <div key={anno._id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <p className="text-sm text-gray-900 dark:text-white">{anno.text || t('flagged.noDescription') || 'No description'}</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {anno.type || 'manipulation'} • {new Date(anno.created_at).toLocaleDateString(locale)}
-                    </p>
+                  <img
+                    src={getFullImageUrl(image.imageId)}
+                    alt={image.filename}
+                    className="max-h-[50vh] max-w-full object-contain rounded shadow-sm"
+                    draggable={false}
+                  />
+                </AnnotationOverlay>
+
+                {/* Empty state overlay */}
+                {annotations.length === 0 && !loadingAnnotations && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="bg-black/60 backdrop-blur-sm p-4 rounded-xl text-center text-white pointer-events-auto">
+                      <FiEdit3 size={24} className="mx-auto mb-2 opacity-80" />
+                      <p className="text-sm font-medium mb-2">{t('flagged.noAnnotations') || 'No annotations'}</p>
+                      <button
+                        onClick={handleOpenAnnotation}
+                        className="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                      >
+                        {t('flagged.addAnnotation') || 'Add Annotation'}
+                      </button>
+                    </div>
                   </div>
-                ))}
+                )}
+
+                {/* Loading overlay */}
+                {loadingAnnotations && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-black/50 backdrop-blur-sm rounded">
+                    <FiRefreshCw className="animate-spin text-indigo-600 dark:text-indigo-400" size={32} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Annotation List - Compact list below image */}
+            {annotations.length > 0 && (
+              <div className="flex-none max-h-28 overflow-y-auto p-3 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+                <div className="flex flex-wrap gap-2">
+                  {annotations.map((anno, index) => {
+                    // Match color logic from AnnotationOverlay
+                    const getGroupColor = (type, id) => {
+                      if (type !== 'copy-move') return '#EF4444'; // Red for general manipulation
+                      const colors = [
+                        '#3B82F6', // Blue
+                        '#10B981', // Green
+                        '#F59E0B', // Amber
+                        '#8B5CF6', // Purple
+                        '#EC4899', // Pink
+                        '#06B6D4', // Cyan
+                      ];
+                      return colors[((id || 1) - 1) % colors.length] || '#3B82F6';
+                    };
+                    const color = getGroupColor(anno.type, anno.group_id);
+                    return (
+                      <div
+                        key={anno._id}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full text-xs"
+                      >
+                        <span
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: color }}
+                        />
+                        <span className="text-gray-700 dark:text-gray-300 truncate max-w-[150px]">
+                          {anno.text || anno.type || `Annotation ${index + 1}`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
         )}
 
-        {/* Analysis Tab */}
+        {/* Analysis Tab - Split View Layout */}
         {activeTab === TAB_ANALYSIS && (
-          <div className="h-full flex flex-col -m-4">
-            {/* Show inline AnalysisDetailsPanel when an analysis is selected */}
-            {selectedAnalysisForView ? (
-              <div className="flex-1 flex flex-col min-h-0">
+          <div className="h-full flex">
+            {/* Left Sidebar - Analysis List */}
+            <div className="w-56 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 flex flex-col bg-gray-50 dark:bg-gray-900/50">
+              {/* Header */}
+              <div className="flex-none p-3 border-b border-gray-200 dark:border-gray-800">
+                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  {t('flagged.analysisHistory') || 'Analysis History'} ({analyses.length})
+                </h4>
+              </div>
+
+              {/* Start New Analysis Buttons */}
+              <div className="flex-none p-2 border-b border-gray-200 dark:border-gray-800 space-y-1">
+                <button
+                  onClick={() => handleStartNewAnalysis('manipulationDetection')}
+                  className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+                >
+                  <FiZap size={10} />
+                  {t('flagged.newManipulation') || 'Manipulation'}
+                </button>
+                <button
+                  onClick={() => handleStartNewAnalysis('copyMove')}
+                  className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+                >
+                  <FiCopy size={10} />
+                  {t('flagged.newCopyMove') || 'Copy-Move'}
+                </button>
+                <button
+                  onClick={() => handleStartNewAnalysis('imageAnalysis')}
+                  className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  <FiImage size={10} />
+                  {t('flagged.newForensics') || 'Forensics'}
+                </button>
+              </div>
+
+              {/* Analysis List */}
+              <div className="flex-1 overflow-y-auto">
+                {loadingAnalyses ? (
+                  <div className="p-2 space-y-1">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    ))}
+                  </div>
+                ) : analyses.length === 0 ? (
+                  <div className="text-center py-6 px-3 text-gray-400">
+                    <FiActivity size={24} className="mx-auto mb-2 opacity-50" />
+                    <p className="text-xs">{t('flagged.noAnalyses') || 'No analyses yet'}</p>
+                  </div>
+                ) : (
+                  <div className="p-1 space-y-1">
+                    {analyses.map(analysis => {
+                      const isActive = selectedAnalysisForView?._id === analysis._id;
+                      const getTypeIcon = (type) => {
+                        switch (type) {
+                          case 'trufor': return <FiZap size={12} />;
+                          case 'single_image_copy_move':
+                          case 'cross_image_copy_move': return <FiCopy size={12} />;
+                          case 'provenance': return <FiLink size={12} />;
+                          default: return <FiImage size={12} />;
+                        }
+                      };
+                      const getStatusColor = (status) => {
+                        switch (status) {
+                          case 'completed': return 'text-green-500';
+                          case 'failed': return 'text-red-500';
+                          case 'processing': return 'text-yellow-500';
+                          default: return 'text-gray-400';
+                        }
+                      };
+                      return (
+                        <button
+                          key={analysis._id}
+                          onClick={() => setSelectedAnalysisForView(analysis)}
+                          className={`w-full flex items-center gap-2 p-2 rounded-lg text-left transition-colors ${isActive
+                            ? 'bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-300 dark:border-indigo-700'
+                            : 'hover:bg-gray-100 dark:hover:bg-gray-800 border border-transparent'
+                            }`}
+                        >
+                          <span className={getStatusColor(analysis.status)}>
+                            {getTypeIcon(analysis.type)}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-xs font-medium truncate ${isActive ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-700 dark:text-gray-300'}`}>
+                              {analysis.type?.replace(/_/g, ' ') || 'Analysis'}
+                            </p>
+                            <p className="text-[10px] text-gray-500 truncate">
+                              {new Date(analysis.created_at).toLocaleDateString(locale)}
+                            </p>
+                          </div>
+                          {analysis.status === 'completed' && (
+                            <FiCheck size={12} className="text-green-500 flex-shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Panel - Analysis Details */}
+            <div className="flex-1 min-w-0 flex flex-col">
+              {selectedAnalysisForView ? (
                 <AnalysisDetailsPanel
                   analysis={selectedAnalysisForView}
                   onClose={() => setSelectedAnalysisForView(null)}
@@ -981,109 +1160,111 @@ const FlaggedImageDetailPanel = ({
                   embedded={true}
                   ProvenanceGraph={ProvenanceGraph}
                 />
-              </div>
-            ) : (
-              <div className="p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {t('flagged.analysisHistory') || 'Analysis History'} ({analyses.length})
-                  </h4>
+              ) : (
+                <div className="h-full flex items-center justify-center text-gray-400">
+                  <div className="text-center">
+                    <FiActivity size={40} className="mx-auto mb-3 opacity-50" />
+                    <p className="text-sm font-medium">{t('flagged.selectAnalysis') || 'Select an analysis'}</p>
+                    <p className="text-xs mt-1">{t('flagged.selectAnalysisHint') || 'Choose from the list to view details'}</p>
+                  </div>
                 </div>
-
-                {/* Start New Analysis Buttons */}
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => handleStartNewAnalysis('manipulationDetection')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
-                  >
-                    <FiZap size={12} />
-                    {t('flagged.newManipulation') || 'Manipulation'}
-                  </button>
-                  <button
-                    onClick={() => handleStartNewAnalysis('copyMove')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
-                  >
-                    <FiCopy size={12} />
-                    {t('flagged.newCopyMove') || 'Copy-Move'}
-                  </button>
-                  <button
-                    onClick={() => handleStartNewAnalysis('imageAnalysis')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                  >
-                    <FiImage size={12} />
-                    {t('flagged.newForensics') || 'Forensics'}
-                  </button>
-                </div>
-
-                {loadingAnalyses ? (
-                  <div className="space-y-2">
-                    {[1, 2, 3].map(i => (
-                      <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
-                    ))}
-                  </div>
-                ) : analyses.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">
-                    <FiActivity size={32} className="mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">{t('flagged.noAnalyses') || 'No analyses performed yet'}</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {analyses.map(analysis => (
-                      <AnalysisRow
-                        key={analysis._id}
-                        analysis={analysis}
-                        onViewResults={handleViewResults}
-                        onReproduce={handleReproduce}
-                        t={t}
-                        locale={locale}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
-
         {/* Related Tab */}
         {activeTab === TAB_RELATED && (
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-              {t('flagged.relatedImages') || 'Related Images'} ({relatedImages.length})
-            </h4>
-
-            {relatedImages.length === 0 ? (
-              <div className="text-center py-8 text-gray-400">
-                <FiLink size={32} className="mx-auto mb-2 opacity-50" />
-                <p className="text-sm">{t('flagged.noRelated') || 'No related images found'}</p>
-                <p className="text-xs mt-1">{t('flagged.noRelatedHint') || 'Run cross-image analysis to find relationships'}</p>
-              </div>
-            ) : (
-              <>
-                {/* Description of what related means */}
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  {t('flagged.relatedDescription') || 'These images share content or have been analyzed together via cross-image copy-move detection or provenance analysis.'}
+          <div className="h-full flex flex-col p-4">
+            {/* Header */}
+            <div className="flex-none flex items-center justify-between mb-4">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {t('flagged.relatedImages') || 'Related Images'} ({relatedImages.length})
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {t('flagged.relatedDescription') || 'Images linked via cross-image analysis or manual linking'}
                 </p>
-                <div className="grid grid-cols-3 gap-2">
+              </div>
+              <button
+                onClick={() => {
+                  // TODO: Open image picker modal to add related images
+                  console.log('Add related image - feature to be implemented');
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                <FiPlus size={12} />
+                {t('flagged.addRelated') || 'Add Related'}
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto">
+              {relatedImages.length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <FiLink size={40} className="mx-auto mb-3 opacity-50" />
+                  <p className="text-sm font-medium">{t('flagged.noRelated') || 'No related images'}</p>
+                  <p className="text-xs mt-1 max-w-[250px] mx-auto">
+                    {t('flagged.noRelatedHint') || 'Run cross-image analysis to find relationships, or manually add related images'}
+                  </p>
+                  <button
+                    onClick={() => handleStartNewAnalysis('copyMove')}
+                    className="mt-4 flex items-center gap-1.5 px-4 py-2 mx-auto text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 transition-colors"
+                  >
+                    <FiCopy size={12} />
+                    {t('flagged.runCrossAnalysis') || 'Run Cross-Image Analysis'}
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {relatedImages.map(img => (
-                    <RelatedImageCard
-                      key={img.id}
-                      image={img}
-                      isSelected={selectedIds?.has(img.imageId || img.id)}
-                      onClick={() => {/* Could navigate to this image */ }}
-                      onSelect={onSelect}
-                      onToggleFlag={async (image) => {
-                        await api.patch(`/images/${image.imageId}/flag`);
-                        // Refresh the main flagged images list
-                        if (onRefresh) onRefresh();
-                      }}
-                      isSelectionMode={isSelectionMode}
-                      t={t}
-                    />
+                    <div key={img.id} className="group relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                      {/* Image Thumbnail */}
+                      <div className="aspect-square bg-gray-100 dark:bg-gray-900">
+                        <img
+                          src={`${API_BASE_URL}/images/${img.imageId || img.id}/thumbnail?token=${localStorage.getItem('authToken')}`}
+                          alt={img.filename}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </div>
+
+                      {/* Overlay with actions */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* Unlink button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // TODO: Call API to unlink this image
+                            console.log('Unlink image:', img.id);
+                          }}
+                          className="absolute top-2 right-2 p-1.5 rounded bg-red-500/80 text-white hover:bg-red-600 transition-colors"
+                          title={t('flagged.unlinkImage') || 'Unlink image'}
+                        >
+                          <FiX size={12} />
+                        </button>
+
+                        {/* Info at bottom */}
+                        <div className="absolute bottom-0 left-0 right-0 p-2">
+                          <p className="text-xs text-white truncate font-medium">{img.filename}</p>
+                          {img.relationshipType && (
+                            <span className="inline-block mt-1 px-1.5 py-0.5 text-[10px] bg-white/20 text-white rounded">
+                              {img.relationshipType}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Flag indicator */}
+                      {img.isFlagged && (
+                        <div className="absolute top-2 left-2 p-1 rounded bg-red-500 text-white">
+                          <FiFlag size={10} />
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
-              </>
-            )}
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -1098,7 +1279,7 @@ const FlaggedImageDetailPanel = ({
         onClose={() => setAnnotationModalOpen(false)}
         onSaveSuccess={handleAnnotationSaveSuccess}
       />
-    </div>
+    </div >
   );
 };
 
@@ -1145,11 +1326,17 @@ const FlaggedImagesPage = ({ onNavigate }) => {
   // Selected image for detail panel
   const [selectedImage, setSelectedImage] = useState(null);
 
+  // Gallery collapse state - minimizes when image is selected
+  const [isGalleryMinimized, setIsGalleryMinimized] = useState(false);
+
   // Selection state for batch operations
   const [selectedImages, setSelectedImages] = useState(new Map());
   const selectedIds = useMemo(() => new Set(selectedImages.keys()), [selectedImages]);
   const [lastClickedId, setLastClickedId] = useState(null);
   const [lastActionWasSelect, setLastActionWasSelect] = useState(true);
+
+  // Annotation Modal State (Lifted from detail panel for ESC handling)
+  const [annotationModalOpen, setAnnotationModalOpen] = useState(false);
 
   // Batch Tag Modal
   const [isBatchTagModalOpen, setIsBatchTagModalOpen] = useState(false);
@@ -1299,6 +1486,7 @@ const FlaggedImagesPage = ({ onNavigate }) => {
   // Handlers
   const handleImageClick = useCallback((image) => {
     setSelectedImage(image);
+    setIsGalleryMinimized(true); // Collapse gallery when image selected
   }, []);
 
   // Selection handler with shift-click range support
@@ -1644,7 +1832,7 @@ const FlaggedImagesPage = ({ onNavigate }) => {
       }
 
       if (e.key === 'Escape') {
-        const modalOpen = isBatchTagModalOpen || lightboxImage;
+        const modalOpen = isBatchTagModalOpen || lightboxImage || annotationModalOpen;
         if (modalOpen) {
           // If modal is open, let it close first
           if (lightboxImage) setLightboxImage(null);
@@ -1653,8 +1841,13 @@ const FlaggedImagesPage = ({ onNavigate }) => {
           return;
         }
 
+        // Priority order for ESC: selection -> selected image -> similarity mode -> filters
         if (selectedIds.size > 0) {
           handleClearSelection();
+        } else if (selectedImage) {
+          // Deselect image and expand gallery
+          setSelectedImage(null);
+          setIsGalleryMinimized(false);
         } else if (similarityMode) {
           handleExitSimilarityMode();
         } else if (hasActiveFilters || searchQuery) {
@@ -1665,9 +1858,10 @@ const FlaggedImagesPage = ({ onNavigate }) => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
-    isBatchTagModalOpen, lightboxImage,
+    isBatchTagModalOpen, lightboxImage, selectedImage,
     similarityMode, selectedIds, hasActiveFilters, searchQuery,
-    handleExitSimilarityMode, handleClearSelection, handleClearFilters
+    handleExitSimilarityMode, handleClearSelection, handleClearFilters,
+    annotationModalOpen
   ]);
 
   return (
@@ -1956,18 +2150,29 @@ const FlaggedImagesPage = ({ onNavigate }) => {
           )}
         </div>
       )}
-
       {/* Main Content - Split View */}
       {!similarityMode && (
         <div className="flex-1 flex overflow-hidden">
-          {/* Left Panel - Image List */}
-          <div className="w-72 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 flex flex-col bg-gray-50 dark:bg-gray-900/50">
+          {/* Left Panel - Collapsible Image List */}
+          <div
+            className={`flex-shrink-0 border-r border-gray-200 dark:border-gray-800 flex flex-col bg-gray-50 dark:bg-gray-900/50 transition-all duration-300 ease-in-out ${isGalleryMinimized ? 'w-16' : 'w-72'
+              }`}
+          >
             {/* List Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                {t('flagged.imageList') || 'Images'}
-              </span>
-              {pagination.total > IMAGES_PER_PAGE && (
+            <div className="flex items-center justify-between px-2 py-3 border-b border-gray-200 dark:border-gray-800">
+              {!isGalleryMinimized && (
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2">
+                  {t('flagged.imageList') || 'Images'}
+                </span>
+              )}
+              <button
+                onClick={() => setIsGalleryMinimized(!isGalleryMinimized)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors mx-auto"
+                title={isGalleryMinimized ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse')}
+              >
+                {isGalleryMinimized ? <FiChevronRight size={16} /> : <FiChevronLeft size={16} />}
+              </button>
+              {!isGalleryMinimized && pagination.total > IMAGES_PER_PAGE && (
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => handlePageChange(currentPage - 1)}
@@ -1989,28 +2194,51 @@ const FlaggedImagesPage = ({ onNavigate }) => {
             </div>
 
             {/* Image List */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            <div className={`flex-1 overflow-y-auto ${isGalleryMinimized ? 'p-1 space-y-1' : 'p-2 space-y-1'}`}>
               {loading ? (
                 [...Array(8)].map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 p-2">
-                    <div className="w-12 h-12 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-3/4" />
-                      <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-1/2" />
-                    </div>
+                  <div key={i} className={`${isGalleryMinimized ? 'w-12 h-12 mx-auto' : 'flex items-center gap-3 p-2'}`}>
+                    <div className={`${isGalleryMinimized ? 'w-12 h-12' : 'w-12 h-12'} rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse`} />
+                    {!isGalleryMinimized && (
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-3/4" />
+                        <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-1/2" />
+                      </div>
+                    )}
                   </div>
                 ))
               ) : error ? (
                 <div className="text-center py-8 text-red-500">
                   <FiAlertTriangle size={24} className="mx-auto mb-2" />
-                  <p className="text-sm">{t('flagged.error') || 'Error loading'}</p>
+                  {!isGalleryMinimized && <p className="text-sm">{t('flagged.error') || 'Error loading'}</p>}
                 </div>
               ) : filteredImages.length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
                   <FiFlag size={24} className="mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">{t('flagged.empty') || 'No flagged images'}</p>
+                  {!isGalleryMinimized && <p className="text-sm">{t('flagged.empty') || 'No flagged images'}</p>}
                 </div>
+              ) : isGalleryMinimized ? (
+                // Minimized view: thumbnails only
+                filteredImages.map(image => (
+                  <button
+                    key={image.id}
+                    onClick={() => handleImageClick(image)}
+                    className={`w-12 h-12 mx-auto block rounded-lg overflow-hidden border-2 transition-all ${selectedImage?.id === image.id
+                      ? 'border-red-500 ring-2 ring-red-500/30'
+                      : 'border-transparent hover:border-gray-300'
+                      }`}
+                    title={image.filename}
+                  >
+                    <img
+                      src={`${API_BASE_URL}/images/${image.imageId}/thumbnail?token=${localStorage.getItem('authToken')}`}
+                      alt={image.filename}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  </button>
+                ))
               ) : (
+                // Expanded view: full row
                 filteredImages.map(image => (
                   <FlaggedImageRow
                     key={image.id}
@@ -2026,8 +2254,8 @@ const FlaggedImagesPage = ({ onNavigate }) => {
               )}
             </div>
 
-            {/* Pagination Footer - only show when multiple pages */}
-            {pagination.totalPages > 1 && (
+            {/* Pagination Footer - only show when expanded and multiple pages */}
+            {!isGalleryMinimized && pagination.totalPages > 1 && (
               <div className="flex-none border-t border-gray-200 dark:border-gray-800 px-3 py-3 bg-white dark:bg-gray-900">
                 <div className="flex items-center justify-center gap-2">
                   <button
@@ -2057,7 +2285,7 @@ const FlaggedImagesPage = ({ onNavigate }) => {
             {selectedImage ? (
               <FlaggedImageDetailPanel
                 image={selectedImage}
-                onClose={() => setSelectedImage(null)}
+                onClose={() => { setSelectedImage(null); setIsGalleryMinimized(false); }}
                 onUnflag={handleUnflag}
                 onNavigate={onNavigate}
                 onRefresh={fetchFlaggedImages}
@@ -2066,6 +2294,8 @@ const FlaggedImagesPage = ({ onNavigate }) => {
                 isSelectionMode={selectedIds.size > 0}
                 onAddTag={handleAddTag}
                 onRemoveTag={handleRemoveTag}
+                annotationModalOpen={annotationModalOpen}
+                setAnnotationModalOpen={setAnnotationModalOpen}
                 t={t}
                 locale={locale}
               />

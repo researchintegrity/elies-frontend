@@ -67,10 +67,10 @@ const ProvenanceGraph = ({
     useEffect(() => {
         const handleResize = () => {
             if (containerRef.current) {
-                const { width: containerWidth } = containerRef.current.getBoundingClientRect();
+                const { width, height } = containerRef.current.getBoundingClientRect();
                 setDimensions({
-                    width: containerWidth,
-                    height: Math.max(400, containerWidth * 0.6),
+                    width,
+                    height: height > 0 ? height : Math.max(400, width * 0.6),
                 });
             }
         };
@@ -325,7 +325,7 @@ const ProvenanceGraph = ({
     }
 
     return (
-        <div ref={containerRef} className="relative w-full bg-gray-50 dark:bg-gray-900 rounded-xl overflow-hidden">
+        <div ref={containerRef} className="relative w-full h-full bg-gray-50 dark:bg-gray-900 rounded-xl overflow-hidden">
             {/* Zoom Controls */}
             <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
                 <button
