@@ -60,7 +60,9 @@ import { showToast, showConfirm, showAlert } from '../utils/alert';
 import { AnalysisDetailsPanel, TypeBadge, StatusBadge } from '../components/analysis';
 import ProvenanceGraph from '../components/ProvenanceGraph';
 import RelationshipGraph from '../components/RelationshipGraph';
+
 import AddRelatedImageModal from '../components/AddRelatedImageModal';
+import RemoveRelationshipModal from '../components/RemoveRelationshipModal';
 
 // --- Constants ---
 const IMAGES_PER_PAGE = 12;
@@ -534,10 +536,13 @@ const FlaggedImageDetailPanel = ({
   const [activeTab, setActiveTab] = useState(TAB_DETAILS);
   const [analyses, setAnalyses] = useState([]);
   const [annotations, setAnnotations] = useState([]);
-  const [relatedImages, setRelatedImages] = useState([]);
+  /* relatedImages replaced by relationshipGraph */
+  // const [relatedImages, setRelatedImages] = useState([]);
   const [loadingAnalyses, setLoadingAnalyses] = useState(false);
   const [loadingAnnotations, setLoadingAnnotations] = useState(false);
   const [loadingRelationshipGraph, setLoadingRelationshipGraph] = useState(false);
+  const [selectedRelatedNode, setSelectedRelatedNode] = useState(null);
+  const [showRemoveConfirmModal, setShowRemoveConfirmModal] = useState(false);
   const [relationshipGraph, setRelationshipGraph] = useState(null);
   const [showAddRelatedModal, setShowAddRelatedModal] = useState(false);
   const [graphDepth, setGraphDepth] = useState(5);
@@ -616,7 +621,7 @@ const FlaggedImageDetailPanel = ({
             });
           }
         }
-        setRelatedImages(relatedImagesData);
+        // setRelatedImages(relatedImagesData); // Removed: state variable no longer exists
       } catch (err) {
         console.error('Error fetching analyses:', err);
       } finally {
@@ -1211,13 +1216,39 @@ const FlaggedImageDetailPanel = ({
                   {t('flagged.relatedDescription') || 'Images linked via cross-image analysis or manual linking'}
                 </p>
               </div>
-              <button
-                onClick={() => setShowAddRelatedModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-              >
-                <FiPlus size={12} />
-                {t('flagged.addRelated') || 'Add Related'}
-              </button>
+              <div className="flex gap-2">
+                {selectedRelatedNode && selectedRelatedNode.id !== image.imageId && (() => {
+                  const directEdge = relationshipGraph.edges.find(e =>
+                    (e.source === image.imageId && e.target === selectedRelatedNode.id) ||
+                    (e.target === image.imageId && e.source === selectedRelatedNode.id)
+                  );
+
+                  return (
+                    <button
+                      onClick={() => {
+                        if (!directEdge) return;
+                        setShowRemoveConfirmModal(true);
+                      }}
+                      disabled={!directEdge}
+                      title={directEdge ? (t('relationship.removeRelationship') || 'Remove relationship') : (t('relationship.indirectRelationship') || 'Cannot remove indirect relationship')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors ${directEdge
+                        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50'
+                        : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed opacity-60'
+                        }`}
+                    >
+                      <FiTrash2 size={12} />
+                      {t('common.remove') || 'Remove'}
+                    </button>
+                  );
+                })()}
+                <button
+                  onClick={() => setShowAddRelatedModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  <FiPlus size={12} />
+                  {t('flagged.addRelated') || 'Add Related'}
+                </button>
+              </div>
             </div>
 
             {/* Add Related Modal */}
@@ -1230,10 +1261,51 @@ const FlaggedImageDetailPanel = ({
                 showToast.success(`Linked ${count} image${count !== 1 ? 's' : ''} as related`);
                 // Refresh the relationship graph
                 setLoadingRelationshipGraph(true);
-                api.getRelationshipGraph(image.imageId)
+                api.getRelationshipGraph(image.imageId, graphDepth) // Use current depth
                   .then(data => setRelationshipGraph(data))
                   .catch(console.error)
                   .finally(() => setLoadingRelationshipGraph(false));
+              }}
+            />
+
+            {/* Remove Relationship Modal */}
+            <RemoveRelationshipModal
+              isOpen={showRemoveConfirmModal}
+              onClose={() => setShowRemoveConfirmModal(false)}
+              sourceImage={image}
+              targetNode={selectedRelatedNode}
+              isRemoving={loadingRelationshipGraph}
+              onConfirm={async () => {
+                if (!selectedRelatedNode || !image) return;
+
+                // Find edge again (safe)
+                const edge = relationshipGraph.edges.find(e =>
+                  (e.source === image.imageId && e.target === selectedRelatedNode.id) ||
+                  (e.target === image.imageId && e.source === selectedRelatedNode.id)
+                );
+
+                if (!edge || !edge.id) {
+                  showToast.error("Cannot remove: Relationship ID missing");
+                  setShowRemoveConfirmModal(false);
+                  return;
+                }
+
+                try {
+                  setLoadingRelationshipGraph(true);
+                  await api.removeRelationship(edge.id);
+                  showToast.success(t('flagged.relationshipRemoved') || "Relationship removed");
+
+                  // Refresh graph
+                  const data = await api.getRelationshipGraph(image.imageId, graphDepth);
+                  setRelationshipGraph(data);
+                  setSelectedRelatedNode(null);
+                  setShowRemoveConfirmModal(false);
+                } catch (error) {
+                  console.error("Failed to remove relationship", error);
+                  showToast.error(t('flagged.removeRelationshipError') || "Failed to remove relationship");
+                } finally {
+                  setLoadingRelationshipGraph(false);
+                }
               }}
             />
 
@@ -1254,18 +1326,17 @@ const FlaggedImageDetailPanel = ({
                   onDepthChange={setGraphDepth}
                   totalNodesCount={relationshipGraph.total_nodes_count || 0}
                   onNodeClick={(node) => {
+                    // Toggle selection
+                    setSelectedRelatedNode(prev => (prev?.id === node.id ? null : node));
+
                     if (node.id !== image.imageId) {
-                      // Navigate to the clicked related image
-                      const relatedImg = {
-                        id: node.id,
-                        imageId: node.id,
-                        filename: node.label,
-                        isFlagged: node.is_flagged
-                      };
-                      // If node is flagged, it should be in the flagged list
-                      if (node.is_flagged) {
-                        showToast.info(`Navigating to ${node.label}`);
-                      }
+                      // Navigate logic... kept but maybe secondary to selection?
+                      // If we want to navigate on click, selection might be tricky.
+                      // Let's allow selection on click. Double click to navigate?
+                      // Or Selection is primary.
+                      // Current code navigates on click.
+                      // Updated: Click selects. Navigation info in toast.
+                      // Or just select.
                     }
                   }}
                 />
