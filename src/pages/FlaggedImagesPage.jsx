@@ -63,6 +63,7 @@ import RelationshipGraph from '../components/RelationshipGraph';
 
 import AddRelatedImageModal from '../components/AddRelatedImageModal';
 import RemoveRelationshipModal from '../components/RemoveRelationshipModal';
+import DualImageComparisonModal from '../components/annotation/DualImageComparisonModal';
 
 // --- Constants ---
 const IMAGES_PER_PAGE = 12;
@@ -547,6 +548,7 @@ const FlaggedImageDetailPanel = ({
   const [showAddRelatedModal, setShowAddRelatedModal] = useState(false);
   const [graphDepth, setGraphDepth] = useState(5);
   const [imageExpanded, setImageExpanded] = useState(false);
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
   // State for inline analysis details view
   const [showAnalyzeMenu, setShowAnalyzeMenu] = useState(false);
   const analyzeMenuRef = useRef(null);
@@ -1248,6 +1250,14 @@ const FlaggedImageDetailPanel = ({
                   <FiPlus size={12} />
                   {t('flagged.addRelated') || 'Add Related'}
                 </button>
+                <button
+                  onClick={() => setShowComparisonModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                  title="Compare this image with another and add cross-image annotations"
+                >
+                  <FiLayers size={12} />
+                  {t('flagged.compareImages') || 'Compare Images'}
+                </button>
               </div>
             </div>
 
@@ -1262,6 +1272,22 @@ const FlaggedImageDetailPanel = ({
                 // Refresh the relationship graph
                 setLoadingRelationshipGraph(true);
                 api.getRelationshipGraph(image.imageId, graphDepth) // Use current depth
+                  .then(data => setRelationshipGraph(data))
+                  .catch(console.error)
+                  .finally(() => setLoadingRelationshipGraph(false));
+              }}
+            />
+
+            {/* Dual Image Comparison Modal */}
+            <DualImageComparisonModal
+              isOpen={showComparisonModal}
+              selectedImage={image ? { id: image.imageId, filename: image.filename } : null}
+              onClose={() => setShowComparisonModal(false)}
+              onSaveSuccess={() => {
+                showToast(t('flagged.annotationsSaved') || 'Annotations saved successfully', 'success');
+                // Refresh the relationship graph
+                setLoadingRelationshipGraph(true);
+                api.getRelationshipGraph(image.imageId, graphDepth)
                   .then(data => setRelationshipGraph(data))
                   .catch(console.error)
                   .finally(() => setLoadingRelationshipGraph(false));

@@ -176,6 +176,49 @@ export const api = {
         return api.post(`/images/${imageId}/annotations/sync`, { annotations });
     },
 
+    /**
+     * Create multiple annotations at once (for linked cross-image pairs)
+     * @param {Array} annotations - Array of annotation objects
+     * @returns {Promise<Array>} Array of created annotations
+     */
+    createAnnotationsBatch: async (annotations) => {
+        return api.post('/annotations/batch', { annotations });
+    },
+
+    /**
+     * Get annotations by link ID (for cross-image annotation pairs)
+     * @param {string} linkId - Link ID to query
+     * @returns {Promise<Array>} Array of linked annotations
+     */
+    getAnnotationsByLinkId: async (linkId) => {
+        return api.get(`/annotations?link_id=${linkId}`);
+    },
+
+    /**
+     * Get IDs of images linked to a specific image via annotations
+     * @param {string} imageId - Image ID
+     * @returns {Promise<string[]>} List of linked image IDs
+     */
+    getLinkedImages: async (imageId) => {
+        return api.get(`/annotations/linked-images/${imageId}`);
+    },
+
+    /**
+     * Get paginated list of user's images
+     * @param {Object} params - Query parameters
+     * @param {number} params.page - Page number (default: 1)
+     * @param {number} params.perPage - Items per page (default: 24)
+     * @param {boolean} params.flagged - Filter by flagged status
+     * @returns {Promise<Object>} Paginated image response
+     */
+    getImages: async (params = {}) => {
+        const queryParams = {};
+        if (params.page) queryParams.page = params.page;
+        if (params.perPage) queryParams.per_page = params.perPage;
+        if (params.flagged !== undefined) queryParams.flagged = params.flagged;
+        return api.get('/images', queryParams);
+    },
+
     // --- Documents ---
 
     getWatermarkRemovalStatus: async (documentId) => {
