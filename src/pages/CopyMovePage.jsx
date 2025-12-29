@@ -33,7 +33,8 @@ import {
     FiTarget,
     FiSearch,
     FiTag,
-    FiCalendar
+    FiCalendar,
+    FiLink
 } from 'react-icons/fi';
 import { useImages } from '../hooks/useImages';
 import { useLanguage } from '../context/LanguageContext';
@@ -428,6 +429,8 @@ const CopyMovePage = ({ onNavigate }) => {
     const [analysisResults, setAnalysisResults] = useState(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [loadingReproduce, setLoadingReproduce] = useState(false);
+    const [isLinkingAsRelated, setIsLinkingAsRelated] = useState(false);
+    const [linkedAsRelated, setLinkedAsRelated] = useState(false);
 
     // Batch analysis state
     const [batchMode, setBatchMode] = useState(false);
@@ -1583,6 +1586,55 @@ const CopyMovePage = ({ onNavigate }) => {
                             /* Single Result View */
                             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
                                 {analysisId ? <ResultsViewer analysisId={analysisId} status={analysisStatus} results={analysisResults} t={t} /> : <IllustratedGuide t={t} />}
+
+                                {/* Mark as Related button for cross-image analysis */}
+                                {mode === 'cross' && sourceImage && targetImage && analysisStatus === 'completed' && (
+                                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                        <button
+                                            onClick={async () => {
+                                                setIsLinkingAsRelated(true);
+                                                try {
+                                                    await api.createRelationship(
+                                                        sourceImage.id,
+                                                        targetImage.id,
+                                                        'cross_copy_move',
+                                                        1.0,
+                                                        { analysis_id: analysisId }
+                                                    );
+                                                    setLinkedAsRelated(true);
+                                                    showToast(t('copyMove.linkedAsRelated') || 'Images linked as related', 'success');
+                                                } catch (err) {
+                                                    console.error('Error linking as related:', err);
+                                                    showToast(t('copyMove.linkError') || 'Failed to link images', 'error');
+                                                } finally {
+                                                    setIsLinkingAsRelated(false);
+                                                }
+                                            }}
+                                            disabled={isLinkingAsRelated || linkedAsRelated}
+                                            className={`flex items-center justify-center gap-2 w-full px-4 py-3 rounded-lg text-sm font-medium transition-colors ${linkedAsRelated
+                                                    ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800'
+                                                    : 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-800'
+                                                }`}
+                                        >
+                                            {linkedAsRelated ? (
+                                                <>
+                                                    <FiCheck size={16} />
+                                                    {t('copyMove.linkedAsRelatedDone') || 'Images linked as related'}
+                                                </>
+                                            ) : isLinkingAsRelated ? (
+                                                <>
+                                                    <FiLoader className="animate-spin" size={16} />
+                                                    {t('copyMove.linking') || 'Linking...'}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <FiLink size={16} />
+                                                    {t('copyMove.markAsRelated') || 'Mark these images as related'}
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

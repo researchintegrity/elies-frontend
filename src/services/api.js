@@ -505,7 +505,7 @@ export const api = {
      * @param {number} maxDepth - Maximum BFS depth (1-5, default: 3)
      * @returns {Promise<{query_image_id: string, nodes: Array, edges: Array, mst_edges: Array}>}
      */
-    getRelationshipGraph: async (imageId, maxDepth = 3) => {
+    getRelationshipGraph: async (imageId, maxDepth = 5) => {
         return api.get(`/relationships/image/${imageId}/graph`, { max_depth: maxDepth });
     },
 };

@@ -10,7 +10,8 @@ import {
   FiChevronRight,
   FiZap,
   FiTarget,
-  FiLayers
+  FiLayers,
+  FiLink
 } from 'react-icons/fi';
 import { api } from '../services/api';
 import { API_BASE_URL } from '../config/api';
@@ -74,10 +75,11 @@ const SourceImageCard = ({ image, isSelected, onClick, imageUrl, loading, error 
 );
 
 // Result Card for Search Results - uses thumbnail URL for fast loading
-const ResultCard = ({ result, rank, onClick, t }) => {
+const ResultCard = ({ result, rank, onClick, onMarkAsRelated, t }) => {
   // Use thumbnail URL directly - browser handles caching
   const imageUrl = result?.image_id ? getThumbnailUrl(result.image_id) : null;
   const [error, setError] = useState(false);
+  const [linkingAsRelated, setLinkingAsRelated] = useState(false);
 
   const similarityPercent = (result.similarity_score * 100).toFixed(1);
   const getSimilarityTone = (score) => {
@@ -163,6 +165,23 @@ const ResultCard = ({ result, rank, onClick, t }) => {
             {result.file_size ? `${(result.file_size / 1024).toFixed(0)} KB` : ''}
           </span>
         </div>
+
+        {/* Mark as Related Button */}
+        {onMarkAsRelated && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setLinkingAsRelated(true);
+              onMarkAsRelated(result)
+                .finally(() => setLinkingAsRelated(false));
+            }}
+            disabled={linkingAsRelated}
+            className="w-full mt-2 flex items-center justify-center gap-1.5 px-2 py-1.5 text-[10px] font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg transition-colors disabled:opacity-50"
+          >
+            <FiLink size={10} />
+            {linkingAsRelated ? t('cbir.linking') || 'Linking...' : t('cbir.markAsRelated') || 'Mark as Related'}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -806,6 +825,20 @@ const CBIRSearchPage = () => {
                           setLightboxUrl(url);
                           setLightboxIsResult(true);
                         }}
+                        onMarkAsRelated={selectedImage ? async (res) => {
+                          try {
+                            await api.createRelationship(
+                              selectedImage.id,
+                              res.image_id,
+                              'similarity',
+                              res.similarity_score || 1.0
+                            );
+                            showToast(t('cbir.linkedAsRelated') || 'Linked as related image', 'success');
+                          } catch (err) {
+                            console.error('Error linking as related:', err);
+                            showToast(t('cbir.linkError') || 'Failed to link images', 'error');
+                          }
+                        } : null}
                         t={t}
                       />
                     ))}

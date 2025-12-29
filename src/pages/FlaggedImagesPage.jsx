@@ -60,6 +60,7 @@ import { showToast, showConfirm, showAlert } from '../utils/alert';
 import { AnalysisDetailsPanel, TypeBadge, StatusBadge } from '../components/analysis';
 import ProvenanceGraph from '../components/ProvenanceGraph';
 import RelationshipGraph from '../components/RelationshipGraph';
+import AddRelatedImageModal from '../components/AddRelatedImageModal';
 
 // --- Constants ---
 const IMAGES_PER_PAGE = 12;
@@ -538,6 +539,8 @@ const FlaggedImageDetailPanel = ({
   const [loadingAnnotations, setLoadingAnnotations] = useState(false);
   const [loadingRelationshipGraph, setLoadingRelationshipGraph] = useState(false);
   const [relationshipGraph, setRelationshipGraph] = useState(null);
+  const [showAddRelatedModal, setShowAddRelatedModal] = useState(false);
+  const [graphDepth, setGraphDepth] = useState(5);
   const [imageExpanded, setImageExpanded] = useState(false);
   // State for inline analysis details view
   const [showAnalyzeMenu, setShowAnalyzeMenu] = useState(false);
@@ -623,13 +626,13 @@ const FlaggedImageDetailPanel = ({
     fetchAnalyses();
   }, [image?.imageId]);
 
-  // Fetch relationship graph when Related tab is active
+  // Fetch relationship graph when Related tab is active or depth changes
   useEffect(() => {
     const fetchRelationshipGraph = async () => {
       if (!image?.imageId || activeTab !== TAB_RELATED) return;
       setLoadingRelationshipGraph(true);
       try {
-        const graphData = await api.getRelationshipGraph(image.imageId);
+        const graphData = await api.getRelationshipGraph(image.imageId, graphDepth);
         setRelationshipGraph(graphData);
       } catch (err) {
         console.error('Error fetching relationship graph:', err);
@@ -639,7 +642,7 @@ const FlaggedImageDetailPanel = ({
       }
     };
     fetchRelationshipGraph();
-  }, [image?.imageId, activeTab]);
+  }, [image?.imageId, activeTab, graphDepth]);
 
   // Fetch annotations for this image
   useEffect(() => {
@@ -823,7 +826,9 @@ const FlaggedImageDetailPanel = ({
           label={t('flagged.tabs.related') || 'Related'}
           isActive={activeTab === TAB_RELATED}
           onClick={() => setActiveTab(TAB_RELATED)}
-          count={relatedImages.length}
+          count={relationshipGraph?.total_nodes_count > 1
+            ? relationshipGraph.total_nodes_count - 1
+            : (relationshipGraph?.nodes?.length > 1 ? relationshipGraph.nodes.length - 1 : 0)}
         />
       </div>
 
@@ -1207,16 +1212,30 @@ const FlaggedImageDetailPanel = ({
                 </p>
               </div>
               <button
-                onClick={async () => {
-                  // TODO: Open image picker modal to add related images
-                  showToast.info('Feature coming soon: Add related images from gallery');
-                }}
+                onClick={() => setShowAddRelatedModal(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
               >
                 <FiPlus size={12} />
                 {t('flagged.addRelated') || 'Add Related'}
               </button>
             </div>
+
+            {/* Add Related Modal */}
+            <AddRelatedImageModal
+              isOpen={showAddRelatedModal}
+              onClose={() => setShowAddRelatedModal(false)}
+              currentImageId={image.imageId}
+              currentImageFilename={image.filename}
+              onRelationshipsCreated={(count) => {
+                showToast.success(`Linked ${count} image${count !== 1 ? 's' : ''} as related`);
+                // Refresh the relationship graph
+                setLoadingRelationshipGraph(true);
+                api.getRelationshipGraph(image.imageId)
+                  .then(data => setRelationshipGraph(data))
+                  .catch(console.error)
+                  .finally(() => setLoadingRelationshipGraph(false));
+              }}
+            />
 
             {/* Graph Content */}
             <div className="flex-1 min-h-[400px]">
@@ -1231,6 +1250,9 @@ const FlaggedImageDetailPanel = ({
                   mstEdges={relationshipGraph.mst_edges}
                   queryImageId={image.imageId}
                   getImageUrl={getThumbnailUrl}
+                  currentDepth={graphDepth}
+                  onDepthChange={setGraphDepth}
+                  totalNodesCount={relationshipGraph.total_nodes_count || 0}
                   onNodeClick={(node) => {
                     if (node.id !== image.imageId) {
                       // Navigate to the clicked related image

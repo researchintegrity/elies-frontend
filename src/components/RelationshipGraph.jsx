@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import * as d3 from 'd3';
-import { FiZoomIn, FiZoomOut, FiMaximize2 } from 'react-icons/fi';
+import { FiZoomIn, FiZoomOut, FiMaximize2, FiSliders } from 'react-icons/fi';
 import { useLanguage } from '../context/LanguageContext';
 
 /**
@@ -8,19 +8,23 @@ import { useLanguage } from '../context/LanguageContext';
  * 
  * Displays a relationship graph with:
  * - Nodes as circular image thumbnails
- * - MST edges (darker, solid) for Maximum Spanning Tree
- * - Non-MST edges (lighter, dashed) for additional relationships
+ * - MST edges (darker, solid) for Maximum Spanning Tree - used for clustering
+ * - Non-MST edges (lighter, dashed) for additional relationships - visual only
  * - Interactive pan/zoom
+ * - Tightness control slider
  * - Node selection for details
  */
 const RelationshipGraph = ({
     nodes = [],
     edges = [],          // All edges
-    mstEdges = [],       // Maximum Spanning Tree edges (render darker)
+    mstEdges = [],       // Maximum Spanning Tree edges (render darker, used for clustering)
     queryImageId,        // Starting/selected image
     getImageUrl,
     onNodeClick,
     onRemoveRelationship,
+    onDepthChange,       // Callback when user changes depth
+    currentDepth = 5,    // Current BFS depth setting
+    totalNodesCount = 0, // Total related images in full graph
     width = 800,
     height = 500,
     gravity = 0.02,
@@ -28,8 +32,12 @@ const RelationshipGraph = ({
     const { t } = useLanguage();
     const svgRef = useRef(null);
     const containerRef = useRef(null);
+    const simulationRef = useRef(null);
     const [dimensions, setDimensions] = useState({ width, height });
     const [selectedNode, setSelectedNode] = useState(null);
+    const [tightness, setTightness] = useState(50); // 0-100 slider value
+    const [showControls, setShowControls] = useState(false);
+    const [depthValue, setDepthValue] = useState(currentDepth === 0 ? 21 : currentDepth); // Local state for depth slider
 
     // Create MST edge lookup for efficient checking
     const mstEdgeSet = useMemo(() => {
@@ -43,7 +51,7 @@ const RelationshipGraph = ({
 
     // Process nodes and edges for D3
     const graphData = useMemo(() => {
-        if (!nodes || !nodes.length) return { nodes: [], links: [] };
+        if (!nodes || !nodes.length) return { nodes: [], links: [], mstLinks: [] };
 
         // Create a map of node IDs
         const nodeMap = new Map(nodes.map((n, i) => [n.id, i]));
@@ -53,24 +61,41 @@ const RelationshipGraph = ({
             isQuery: n.id === queryImageId || n.is_query,
         }));
 
-        // Process edges and mark MST status
-        const processedLinks = edges
+        // Process all edges - use is_mst_edge from API or fall back to mstEdges prop check
+        const allLinks = edges
             .map(e => {
                 const source = e.source;
                 const target = e.target;
                 const edgeKey = [source, target].sort().join('-');
+
+                // Prefer is_mst_edge from API, fall back to mstEdges prop lookup
+                const isMst = e.is_mst_edge !== undefined
+                    ? e.is_mst_edge
+                    : mstEdgeSet.has(edgeKey);
+
                 return {
                     source,
                     target,
                     weight: e.weight || 1.0,
                     sourceType: e.source_type || 'manual',
-                    isMstEdge: mstEdgeSet.has(edgeKey),
+                    isMstEdge: isMst,
                 };
             })
             .filter(e => e.source && e.target && nodeMap.has(e.source) && nodeMap.has(e.target));
 
-        return { nodes: processedNodes, links: processedLinks };
+        // Only MST edges affect the force simulation for clustering
+        const mstLinks = allLinks.filter(l => l.isMstEdge);
+
+        // Log for debugging
+        console.log(`Graph: ${allLinks.length} edges (${mstLinks.length} MST, ${allLinks.length - mstLinks.length} non-MST)`);
+
+        return { nodes: processedNodes, links: allLinks, mstLinks };
     }, [nodes, edges, mstEdgeSet, queryImageId]);
+
+    // Sync local depthValue when prop changes
+    useEffect(() => {
+        setDepthValue(currentDepth === 0 ? 21 : currentDepth);
+    }, [currentDepth]);
 
     // Handle container resize
     useEffect(() => {
@@ -88,6 +113,23 @@ const RelationshipGraph = ({
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+
+    // Update simulation when tightness changes
+    useEffect(() => {
+        if (simulationRef.current) {
+            // Map tightness (0-100) to distance (200-50) - inverse relationship
+            const linkDistance = 200 - (tightness * 1.5);
+            // Map tightness to link strength (0.1-0.8)
+            const linkStrength = 0.1 + (tightness / 100) * 0.7;
+
+            simulationRef.current
+                .force('link')
+                .distance(linkDistance)
+                .strength(linkStrength);
+
+            simulationRef.current.alpha(0.3).restart();
+        }
+    }, [tightness]);
 
     // D3 visualization
     useEffect(() => {
@@ -138,6 +180,34 @@ const RelationshipGraph = ({
         feMerge.append('feMergeNode').attr('in', 'offsetBlur');
         feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
 
+        // Add glow filter for selected node
+        const glowFilter = defs.append('filter')
+            .attr('id', 'rel-glow')
+            .attr('height', '150%')
+            .attr('width', '150%')
+            .attr('x', '-25%')
+            .attr('y', '-25%');
+
+        glowFilter.append('feGaussianBlur')
+            .attr('in', 'SourceAlpha')
+            .attr('stdDeviation', 4)
+            .attr('result', 'blur');
+
+        glowFilter.append('feFlood')
+            .attr('flood-color', '#f59e0b')
+            .attr('flood-opacity', 0.8)
+            .attr('result', 'color');
+
+        glowFilter.append('feComposite')
+            .attr('in', 'color')
+            .attr('in2', 'blur')
+            .attr('operator', 'in')
+            .attr('result', 'shadow');
+
+        const glowMerge = glowFilter.append('feMerge');
+        glowMerge.append('feMergeNode').attr('in', 'shadow');
+        glowMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+
         // Create container group for zoom
         const g = svg.append('g');
 
@@ -150,17 +220,23 @@ const RelationshipGraph = ({
 
         svg.call(zoom);
 
-        // Create force simulation
+        // Calculate initial distances based on tightness
+        const linkDistance = 200 - (tightness * 1.5);
+        const linkStrength = 0.1 + (tightness / 100) * 0.7;
+
+        // Create force simulation - ONLY using MST edges for link force
         const simulation = d3.forceSimulation(graphData.nodes)
-            .force('link', d3.forceLink(graphData.links)
+            .force('link', d3.forceLink(graphData.mstLinks)  // Only MST edges affect clustering
                 .id(d => d.id)
-                .distance(120)
-                .strength(0.5))
+                .distance(linkDistance)
+                .strength(linkStrength))
             .force('charge', d3.forceManyBody().strength(-300))
             .force('center', d3.forceCenter(w / 2, h / 2))
             .force('x', d3.forceX(w / 2).strength(gravity))
             .force('y', d3.forceY(h / 2).strength(gravity))
             .force('collision', d3.forceCollide().radius(40));
+
+        simulationRef.current = simulation;
 
         // Separate MST and non-MST edges for different rendering
         const nonMstLinks = graphData.links.filter(l => !l.isMstEdge);
@@ -175,7 +251,7 @@ const RelationshipGraph = ({
             .append('line')
             .attr('stroke', '#cbd5e1')
             .attr('stroke-width', 1.5)
-            .attr('stroke-opacity', 0.5)
+            .attr('stroke-opacity', 0.4)
             .attr('stroke-dasharray', '4,4');
 
         // Create MST edges (darker, solid) - rendered on top
@@ -225,16 +301,16 @@ const RelationshipGraph = ({
                     d.fy = null;
                 }));
 
-        // Node circles with images
+        // Node circles with images - AMBER/GOLD for selected image instead of red
         node.append('circle')
             .attr('r', d => d.isQuery ? 35 : 28)
             .attr('fill', d => {
                 const imageUrl = getImageUrl ? getImageUrl(d.id) : null;
-                return imageUrl ? `url(#rel-img-${d.id})` : (d.isQuery ? '#ef4444' : '#6366f1');
+                return imageUrl ? `url(#rel-img-${d.id})` : (d.isQuery ? '#f59e0b' : '#6366f1');
             })
-            .attr('stroke', d => d.isQuery ? '#ef4444' : (d.is_flagged ? '#ef4444' : '#e2e8f0'))
+            .attr('stroke', d => d.isQuery ? '#f59e0b' : (d.is_flagged ? '#ef4444' : '#e2e8f0'))
             .attr('stroke-width', d => d.isQuery ? 4 : (d.is_flagged ? 3 : 2))
-            .attr('filter', 'url(#rel-drop-shadow)')
+            .attr('filter', d => d.isQuery ? 'url(#rel-glow)' : 'url(#rel-drop-shadow)')
             .on('click', (event, d) => {
                 event.stopPropagation();
                 setSelectedNode(d);
@@ -255,13 +331,13 @@ const RelationshipGraph = ({
                     .attr('stroke-width', d.isQuery ? 4 : (d.is_flagged ? 3 : 2));
             });
 
-        // Query badge
+        // Query badge - AMBER/GOLD color
         node.filter(d => d.isQuery)
             .append('circle')
             .attr('r', 10)
             .attr('cx', 25)
             .attr('cy', -25)
-            .attr('fill', '#ef4444')
+            .attr('fill', '#f59e0b')
             .attr('stroke', '#fff')
             .attr('stroke-width', 2);
 
@@ -325,6 +401,7 @@ const RelationshipGraph = ({
         // Cleanup
         return () => {
             simulation.stop();
+            simulationRef.current = null;
         };
     }, [graphData, dimensions, getImageUrl, onNodeClick, gravity]);
 
@@ -392,12 +469,101 @@ const RelationshipGraph = ({
                 >
                     <FiMaximize2 className="w-5 h-5 text-gray-600 dark:text-gray-300" />
                 </button>
+                <button
+                    onClick={() => setShowControls(!showControls)}
+                    className={`p-2 rounded-lg shadow-md transition-colors ${showControls
+                        ? 'bg-indigo-500 text-white'
+                        : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                    title="Graph Settings"
+                >
+                    <FiSliders className={`w-5 h-5 ${showControls ? 'text-white' : 'text-gray-600 dark:text-gray-300'}`} />
+                </button>
+            </div>
+
+            {/* Graph Settings Panel */}
+            {showControls && (
+                <div className="absolute top-4 right-16 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-20 w-64 animate-in fade-in slide-in-from-right-4">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                        {t('relationship.graphSettings') || 'Graph Settings'}
+                    </h3>
+                    <div className="space-y-4">
+                        {/* Tightness Slider */}
+                        <div>
+                            <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
+                                {t('relationship.tightness') || 'Cluster Tightness'}
+                            </label>
+                            <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={tightness}
+                                onChange={(e) => setTightness(Number(e.target.value))}
+                                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                            />
+                            <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                                <span>{t('relationship.loose') || 'Loose'}</span>
+                                <span>{t('relationship.tight') || 'Tight'}</span>
+                            </div>
+                        </div>
+
+                        {/* Depth Slider - 1-20 are normal depths, 21 means unlimited (sent as 0 to API) */}
+                        {onDepthChange && (
+                            <div>
+                                <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
+                                    {t('relationship.graphDepth') || 'Graph Depth'}
+                                    <span className="ml-2 text-indigo-500 font-medium">
+                                        {depthValue === 21 ? (t('relationship.unlimited') || 'All') : depthValue}
+                                    </span>
+                                </label>
+                                <input
+                                    type="range"
+                                    min="1"
+                                    max="21"
+                                    value={depthValue}
+                                    onChange={(e) => setDepthValue(Number(e.target.value))}
+                                    onMouseUp={() => onDepthChange(depthValue === 21 ? 0 : depthValue)}
+                                    onTouchEnd={() => onDepthChange(depthValue === 21 ? 0 : depthValue)}
+                                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                />
+                                <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                                    <span>1</span>
+                                    <span>{t('relationship.levels') || 'levels'}</span>
+                                    <span>{t('relationship.all') || 'All'}</span>
+                                </div>
+                                <p className="text-[10px] text-gray-400 mt-1">
+                                    {t('relationship.depthHint') || 'Slide to "All" for unlimited depth'}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Graph Info Overlay */}
+            <div className="absolute top-4 left-4 bg-white/90 dark:bg-gray-800/90 px-3 py-2 rounded-lg shadow-sm backdrop-blur-sm border border-gray-100 dark:border-gray-700 pointer-events-none">
+                <div className="text-xs space-y-1">
+                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                        <span className="font-medium">{t('relationship.depth') || 'Depth'}:</span>
+                        <span>{currentDepth === 0 ? (t('relationship.unlimited') || 'All') : currentDepth}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                        <span className="font-medium">{t('relationship.visible') || 'Visible'}:</span>
+                        <span>{nodes.length > 0 ? nodes.length - 1 : 0}</span>
+                    </div>
+                    {totalNodesCount > 0 && totalNodesCount > nodes.length && (
+                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-1 mt-1">
+                            <span className="font-medium">{t('relationship.total') || 'Total'}:</span>
+                            <span>{totalNodesCount - 1}</span>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Legend */}
             <div className="absolute bottom-4 left-4 flex flex-col gap-2 bg-white/90 dark:bg-gray-800/90 px-3 py-2 rounded-lg shadow-md text-xs">
                 <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-full bg-red-500 border-2 border-white" />
+                    <div className="w-4 h-4 rounded-full bg-amber-500 border-2 border-white shadow-sm" style={{ boxShadow: '0 0 8px rgba(245, 158, 11, 0.6)' }} />
                     <span className="text-gray-600 dark:text-gray-300">{t('relationship.selectedImage') || 'Selected'}</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -453,7 +619,7 @@ const RelationshipGraph = ({
 
                             <div className="flex gap-2 pt-1">
                                 {selectedNode.isQuery ? (
-                                    <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-md font-medium">
+                                    <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-md font-medium">
                                         {t('relationship.selectedImage') || 'Selected'}
                                     </span>
                                 ) : (
