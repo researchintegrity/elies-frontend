@@ -1350,7 +1350,7 @@ const FlaggedImagesPage = ({ onNavigate }) => {
   const [similarityQueryImage, setSimilarityQueryImage] = useState(null);
   const [similarityResults, setSimilarityResults] = useState([]);
   const [similarityLoading, setSimilarityLoading] = useState(false);
-  const [similarityTopK] = useState(20);
+  const [similarityTopK, setSimilarityTopK] = useState(20);
   const [similarityThreshold, setSimilarityThreshold] = useState(0.5);
   const SIMILARITY_PER_PAGE = 12;
   const [similarityPage, setSimilarityPage] = useState(1);
@@ -1917,6 +1917,22 @@ const FlaggedImagesPage = ({ onNavigate }) => {
 
             <div className="flex items-center gap-4">
               {/* Controls */}
+              {/* Top-K Slider */}
+              <div className="flex items-center gap-3 bg-white dark:bg-gray-800 px-3 py-2 rounded-lg border border-amber-200 dark:border-amber-800 shadow-sm">
+                <label className="text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">Top-K:</label>
+                <input
+                  type="range"
+                  min="5"
+                  max="50"
+                  step="5"
+                  value={similarityTopK}
+                  onChange={(e) => setSimilarityTopK(Number(e.target.value))}
+                  className="w-24 accent-amber-500"
+                />
+                <span className="text-sm font-semibold text-gray-900 dark:text-white w-8">{similarityTopK}</span>
+              </div>
+
+              {/* Threshold Slider */}
               <div className="flex items-center gap-3 bg-white dark:bg-gray-800 px-3 py-2 rounded-lg border border-amber-200 dark:border-amber-800 shadow-sm">
                 <label className="text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{t('similarity.threshold') || 'Threshold'}:</label>
                 <input
