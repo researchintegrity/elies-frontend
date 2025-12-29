@@ -21,7 +21,7 @@ const RelationshipGraph = ({
     queryImageId,        // Starting/selected image
     getImageUrl,
     onNodeClick,
-    onRemoveRelationship,
+    // onRemoveRelationship, // Unused for now
     onDepthChange,       // Callback when user changes depth
     currentDepth = 5,    // Current BFS depth setting
     totalNodesCount = 0, // Total related images in full graph
@@ -125,7 +125,7 @@ const RelationshipGraph = ({
             simulationRef.current
                 .force('link')
                 .distance(linkDistance)
-                .strength(linkStrength);
+                .strength(d => d.isMstEdge ? linkStrength : 0);
 
             simulationRef.current.alpha(0.3).restart();
         }
@@ -225,11 +225,12 @@ const RelationshipGraph = ({
         const linkStrength = 0.1 + (tightness / 100) * 0.7;
 
         // Create force simulation - ONLY using MST edges for link force
+        // Create force simulation - Process ALL edges so D3 resolves references, but only MST edges exert force
         const simulation = d3.forceSimulation(graphData.nodes)
-            .force('link', d3.forceLink(graphData.mstLinks)  // Only MST edges affect clustering
+            .force('link', d3.forceLink(graphData.links)
                 .id(d => d.id)
                 .distance(linkDistance)
-                .strength(linkStrength))
+                .strength(d => d.isMstEdge ? linkStrength : 0))
             .force('charge', d3.forceManyBody().strength(-300))
             .force('center', d3.forceCenter(w / 2, h / 2))
             .force('x', d3.forceX(w / 2).strength(gravity))
