@@ -457,7 +457,59 @@ export const api = {
     getFlaggedImages: async (params = {}) => {
         return api.get('/images', { ...params, flagged: true });
     },
+
+    // --- Image Relationships ---
+
+    /**
+     * Create a relationship between two images
+     * @param {string} image1Id - First image ID
+     * @param {string} image2Id - Second image ID
+     * @param {string} sourceType - Relationship source ('manual', 'provenance', 'cross_copy_move', 'similarity')
+     * @param {number} weight - Relationship strength (0-1, default: 1.0)
+     * @param {Object} metadata - Optional additional context
+     * @returns {Promise<Object>} Created relationship object
+     */
+    createRelationship: async (image1Id, image2Id, sourceType = 'manual', weight = 1.0, metadata = null) => {
+        return api.post('/relationships', {
+            image1_id: image1Id,
+            image2_id: image2Id,
+            source_type: sourceType,
+            weight,
+            metadata
+        });
+    },
+
+    /**
+     * Remove a relationship by ID
+     * @param {string} relationshipId - Relationship ID to remove
+     * @returns {Promise<Object>} Success message
+     */
+    removeRelationship: async (relationshipId) => {
+        return api.delete(`/relationships/${relationshipId}`);
+    },
+
+    /**
+     * Get all relationships for an image
+     * @param {string} imageId - Image ID to get relationships for
+     * @param {boolean} includeDetails - Include related image details (default: true)
+     * @returns {Promise<Array>} List of relationship objects
+     */
+    getRelationships: async (imageId, includeDetails = true) => {
+        return api.get(`/relationships/image/${imageId}`, { include_details: includeDetails });
+    },
+
+    /**
+     * Get relationship graph for visualization
+     * Uses BFS to build a graph from the starting image up to max_depth
+     * @param {string} imageId - Starting image ID
+     * @param {number} maxDepth - Maximum BFS depth (1-5, default: 3)
+     * @returns {Promise<{query_image_id: string, nodes: Array, edges: Array, mst_edges: Array}>}
+     */
+    getRelationshipGraph: async (imageId, maxDepth = 3) => {
+        return api.get(`/relationships/image/${imageId}/graph`, { max_depth: maxDepth });
+    },
 };
 
 export { API_BASE_URL };
 export default api;
+

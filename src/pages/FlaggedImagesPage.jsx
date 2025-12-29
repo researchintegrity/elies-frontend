@@ -59,6 +59,7 @@ import { usePanelExtraction } from '../hooks/usePanelExtraction';
 import { showToast, showConfirm, showAlert } from '../utils/alert';
 import { AnalysisDetailsPanel, TypeBadge, StatusBadge } from '../components/analysis';
 import ProvenanceGraph from '../components/ProvenanceGraph';
+import RelationshipGraph from '../components/RelationshipGraph';
 
 // --- Constants ---
 const IMAGES_PER_PAGE = 12;
@@ -535,6 +536,8 @@ const FlaggedImageDetailPanel = ({
   const [relatedImages, setRelatedImages] = useState([]);
   const [loadingAnalyses, setLoadingAnalyses] = useState(false);
   const [loadingAnnotations, setLoadingAnnotations] = useState(false);
+  const [loadingRelationshipGraph, setLoadingRelationshipGraph] = useState(false);
+  const [relationshipGraph, setRelationshipGraph] = useState(null);
   const [imageExpanded, setImageExpanded] = useState(false);
   // State for inline analysis details view
   const [showAnalyzeMenu, setShowAnalyzeMenu] = useState(false);
@@ -619,6 +622,24 @@ const FlaggedImageDetailPanel = ({
     };
     fetchAnalyses();
   }, [image?.imageId]);
+
+  // Fetch relationship graph when Related tab is active
+  useEffect(() => {
+    const fetchRelationshipGraph = async () => {
+      if (!image?.imageId || activeTab !== TAB_RELATED) return;
+      setLoadingRelationshipGraph(true);
+      try {
+        const graphData = await api.getRelationshipGraph(image.imageId);
+        setRelationshipGraph(graphData);
+      } catch (err) {
+        console.error('Error fetching relationship graph:', err);
+        setRelationshipGraph(null);
+      } finally {
+        setLoadingRelationshipGraph(false);
+      }
+    };
+    fetchRelationshipGraph();
+  }, [image?.imageId, activeTab]);
 
   // Fetch annotations for this image
   useEffect(() => {
@@ -1174,21 +1195,21 @@ const FlaggedImageDetailPanel = ({
         )}
         {/* Related Tab */}
         {activeTab === TAB_RELATED && (
-          <div className="h-full flex flex-col p-4">
+          <div className="h-full flex flex-col">
             {/* Header */}
-            <div className="flex-none flex items-center justify-between mb-4">
+            <div className="flex-none flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-                  {t('flagged.relatedImages') || 'Related Images'} ({relatedImages.length})
+                  {t('flagged.relatedImages') || 'Related Images'} ({relationshipGraph?.nodes?.length > 1 ? relationshipGraph.nodes.length - 1 : 0})
                 </h4>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {t('flagged.relatedDescription') || 'Images linked via cross-image analysis or manual linking'}
                 </p>
               </div>
               <button
-                onClick={() => {
+                onClick={async () => {
                   // TODO: Open image picker modal to add related images
-                  console.log('Add related image - feature to be implemented');
+                  showToast.info('Feature coming soon: Add related images from gallery');
                 }}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
               >
@@ -1197,71 +1218,51 @@ const FlaggedImageDetailPanel = ({
               </button>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto">
-              {relatedImages.length === 0 ? (
-                <div className="text-center py-12 text-gray-400">
-                  <FiLink size={40} className="mx-auto mb-3 opacity-50" />
-                  <p className="text-sm font-medium">{t('flagged.noRelated') || 'No related images'}</p>
-                  <p className="text-xs mt-1 max-w-[250px] mx-auto">
-                    {t('flagged.noRelatedHint') || 'Run cross-image analysis to find relationships, or manually add related images'}
-                  </p>
-                  <button
-                    onClick={() => handleStartNewAnalysis('copyMove')}
-                    className="mt-4 flex items-center gap-1.5 px-4 py-2 mx-auto text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 transition-colors"
-                  >
-                    <FiCopy size={12} />
-                    {t('flagged.runCrossAnalysis') || 'Run Cross-Image Analysis'}
-                  </button>
+            {/* Graph Content */}
+            <div className="flex-1 min-h-[400px]">
+              {loadingRelationshipGraph ? (
+                <div className="h-full flex items-center justify-center">
+                  <FiRefreshCw className="animate-spin text-indigo-600 dark:text-indigo-400" size={32} />
                 </div>
+              ) : relationshipGraph && relationshipGraph.nodes && relationshipGraph.nodes.length > 1 ? (
+                <RelationshipGraph
+                  nodes={relationshipGraph.nodes}
+                  edges={relationshipGraph.edges}
+                  mstEdges={relationshipGraph.mst_edges}
+                  queryImageId={image.imageId}
+                  getImageUrl={getThumbnailUrl}
+                  onNodeClick={(node) => {
+                    if (node.id !== image.imageId) {
+                      // Navigate to the clicked related image
+                      const relatedImg = {
+                        id: node.id,
+                        imageId: node.id,
+                        filename: node.label,
+                        isFlagged: node.is_flagged
+                      };
+                      // If node is flagged, it should be in the flagged list
+                      if (node.is_flagged) {
+                        showToast.info(`Navigating to ${node.label}`);
+                      }
+                    }
+                  }}
+                />
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {relatedImages.map(img => (
-                    <div key={img.id} className="group relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                      {/* Image Thumbnail */}
-                      <div className="aspect-square bg-gray-100 dark:bg-gray-900">
-                        <img
-                          src={`${API_BASE_URL}/images/${img.imageId || img.id}/thumbnail?token=${localStorage.getItem('authToken')}`}
-                          alt={img.filename}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      </div>
-
-                      {/* Overlay with actions */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                        {/* Unlink button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // TODO: Call API to unlink this image
-                            console.log('Unlink image:', img.id);
-                          }}
-                          className="absolute top-2 right-2 p-1.5 rounded bg-red-500/80 text-white hover:bg-red-600 transition-colors"
-                          title={t('flagged.unlinkImage') || 'Unlink image'}
-                        >
-                          <FiX size={12} />
-                        </button>
-
-                        {/* Info at bottom */}
-                        <div className="absolute bottom-0 left-0 right-0 p-2">
-                          <p className="text-xs text-white truncate font-medium">{img.filename}</p>
-                          {img.relationshipType && (
-                            <span className="inline-block mt-1 px-1.5 py-0.5 text-[10px] bg-white/20 text-white rounded">
-                              {img.relationshipType}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Flag indicator */}
-                      {img.isFlagged && (
-                        <div className="absolute top-2 left-2 p-1 rounded bg-red-500 text-white">
-                          <FiFlag size={10} />
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <div className="h-full flex items-center justify-center text-center py-12 text-gray-400">
+                  <div>
+                    <FiLink size={40} className="mx-auto mb-3 opacity-50" />
+                    <p className="text-sm font-medium">{t('flagged.noRelated') || 'No related images'}</p>
+                    <p className="text-xs mt-1 max-w-[250px] mx-auto">
+                      {t('flagged.noRelatedHint') || 'Run cross-image analysis to find relationships, or manually add related images'}
+                    </p>
+                    <button
+                      onClick={() => handleStartNewAnalysis('copyMove')}
+                      className="mt-4 flex items-center gap-1.5 px-4 py-2 mx-auto text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 transition-colors"
+                    >
+                      <FiCopy size={12} />
+                      {t('flagged.runCrossAnalysis') || 'Run Cross-Image Analysis'}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
