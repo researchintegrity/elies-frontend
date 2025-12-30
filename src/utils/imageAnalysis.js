@@ -32,14 +32,14 @@ export function createOffscreenCanvas(width, height) {
 export async function loadImageToCanvas(imageUrl) {
     return new Promise((resolve, reject) => {
         const img = new Image();
-        img.crossOrigin = 'anonymous';
+        img.crossOrigin = 'anonymous'; // Enable CORS for analysis
         img.onload = () => {
             const canvas = createOffscreenCanvas(img.naturalWidth, img.naturalHeight);
             const ctx = canvas.getContext('2d', { willReadFrequently: true });
             ctx.drawImage(img, 0, 0);
             resolve({ canvas, ctx, width: img.naturalWidth, height: img.naturalHeight });
         };
-        img.onerror = reject;
+        img.onerror = () => reject(new Error(`Failed to load image: ${imageUrl}`));
         img.src = imageUrl;
     });
 }

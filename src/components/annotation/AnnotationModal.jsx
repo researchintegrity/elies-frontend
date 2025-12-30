@@ -35,8 +35,9 @@ import {
 import SVGAnnotationLayer from './SVGAnnotationLayer';
 import AnnotationToolbar from './AnnotationToolbar';
 import LabelsPanel from './LabelsPanel';
+import AnnotationLeftPanel from './AnnotationLeftPanel';
 import { useLanguage } from '../../context/LanguageContext';
-import { api } from '../../services/api';
+import { api, API_BASE_URL } from '../../services/api';
 import { showToast } from '../../utils/alert';
 
 // Helper component for hotkey display
@@ -85,6 +86,13 @@ const AnnotationModalInner = ({
     const [showAnalysisOverlay, setShowAnalysisOverlay] = useState(false);
     const [analysisOpacity, setAnalysisOpacity] = useState(1.0); // Start at 100% opacity
 
+    // Left Panel State
+    const [showLeftPanel, setShowLeftPanel] = useState(false);
+    const [leftPanelWidth, setLeftPanelWidth] = useState(280);
+    const [leftPanelHistory, setLeftPanelHistory] = useState([]);
+    const [selectedHistoryAnalysis, setSelectedHistoryAnalysis] = useState(null);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
     // Interaction state
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState(null);
@@ -97,9 +105,77 @@ const AnnotationModalInner = ({
     useEffect(() => {
         if (imageId) {
             actions.setImage({ id: imageId });
+            loadAnalysisHistory();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [imageId]);
+
+    // Load analysis history
+    const loadAnalysisHistory = async () => {
+        if (!imageId) return;
+        setIsLoadingHistory(true);
+        try {
+            const history = await api.getAnalysesByImage(imageId);
+            // Filter only relevant types for single image annotation
+            // Explicitly excluding 'provenance' and 'cross_image_copy_move'
+            const relevantTypes = ['manipulationDetection', 'single_image_copy_move', 'imageAnalysis', 'ela', 'noiseprint', 'noise', 'gradient', 'levelSweep', 'cloneDetection', 'metadata'];
+            const filtered = history.filter(h => relevantTypes.includes(h.type) || relevantTypes.includes(h.analysis_subtype));
+            setLeftPanelHistory(filtered);
+        } catch (err) {
+            console.error('Failed to load analysis history:', err);
+        } finally {
+            setIsLoadingHistory(false);
+        }
+    };
+
+    // Handle selecting an analysis from history
+    const handleSelectHistoryAnalysis = async (analysis) => {
+        if (analysis.status === 'completed') {
+            setIsLoadingHistory(true);
+            try {
+                // Determine result type more robustly (similar to AnalysisDetailsPanel)
+                let resultType = 'result'; // default
+                let apiType = 'result';
+
+                if (analysis.results) {
+                    if (analysis.results.pred_map) {
+                        apiType = 'pred_map';
+                    } else if (analysis.results.result_image) {
+                        apiType = 'result_image';
+                    } else if (analysis.results.noiseprint) {
+                        apiType = 'noiseprint';
+                    } else if (analysis.results.matches_image) {
+                        apiType = 'matches';
+                    } else if (analysis.results.clusters_image) {
+                        apiType = 'clusters';
+                    } else if (analysis.results.conf_map) {
+                        apiType = 'conf_map';
+                    }
+                }
+
+                // Use direct URL with token for simplicity and speed
+                const token = localStorage.getItem('authToken');
+                const objectUrl = `${API_BASE_URL}/analyses/${analysis._id}/results/${apiType}/download${token ? `?token=${token}` : ''}`;
+
+                setSelectedHistoryAnalysis({ ...analysis, overlayUrl: objectUrl });
+                setShowAnalysisOverlay(true);
+            } catch (err) {
+                console.error("Failed to load analysis result selection:", err);
+            } finally {
+                setIsLoadingHistory(false);
+            }
+        } else {
+            setSelectedHistoryAnalysis(analysis);
+        }
+    };
+
+    // Clear history selection when a new live analysis comes in
+    useEffect(() => {
+        if (analysisCanvas) {
+            setSelectedHistoryAnalysis(null);
+            setShowAnalysisOverlay(true);
+        }
+    }, [analysisCanvas]);
 
     // Load existing annotations
     useEffect(() => {
@@ -640,58 +716,122 @@ const AnnotationModalInner = ({
 
             {/* Content */}
             <div className="flex-1 flex overflow-hidden">
+                {/* Left Panel */}
+                <AnnotationLeftPanel
+                    isOpen={showLeftPanel}
+                    onToggle={() => setShowLeftPanel(!showLeftPanel)}
+                    width={leftPanelWidth}
+                    onResize={setLeftPanelWidth}
+                    analysisHistory={leftPanelHistory}
+                    selectedAnalysis={selectedHistoryAnalysis}
+                    onSelectAnalysis={handleSelectHistoryAnalysis}
+                    isLoadingHistory={isLoadingHistory}
+                />
+
                 {/* Image Area */}
                 <div
                     ref={containerRef}
-                    className="flex-1 overflow-auto flex items-center justify-center p-6 bg-gray-900"
+                    className="flex-1 overflow-auto flex items-center justify-center p-6 bg-gray-900 transition-all"
                 >
                     <div
-                        className="relative"
+                        className="relative flex items-start justify-center"
                         style={{
                             transform: `scale(${zoom})`,
-                            transformOrigin: 'center center',
+                            transformOrigin: 'top center',
                             transition: 'transform 0.1s ease-out',
                         }}
                     >
-                        <img
-                            ref={imageRef}
-                            src={imageUrl}
-                            alt="Annotation target"
-                            onLoad={handleImageLoad}
-                            className="max-w-full rounded-lg shadow-2xl select-none"
-                            draggable={false}
-                            style={{
-                                maxWidth: zoom === 1 ? 'calc(100vw - 350px)' : 'none',
-                                maxHeight: zoom === 1 ? 'calc(100vh - 180px)' : 'none',
-                            }}
-                        />
+                        {selectedHistoryAnalysis?.overlayUrl ? (
+                            /* Side-by-Side Comparison View */
+                            <div className="flex gap-4">
+                                {/* Original Image (Left) */}
+                                <div className="relative">
+                                    <img
+                                        src={imageUrl}
+                                        alt="Original"
+                                        onLoad={handleImageLoad}
+                                        className="rounded-lg shadow-2xl select-none"
+                                        draggable={false}
+                                    />
+                                    <div className="absolute top-2 left-2 px-2 py-1 bg-black/60 text-white text-xs rounded pointer-events-none border border-white/20">
+                                        Original
+                                    </div>
 
-                        {/* Analysis Overlay */}
-                        {imageLoaded && showAnalysisOverlay && analysisCanvas && (
-                            <img
-                                src={analysisCanvas.toDataURL()}
-                                alt="Analysis overlay"
-                                className="absolute inset-0 w-full h-full rounded-lg pointer-events-none"
-                                style={{
-                                    opacity: analysisOpacity,
-                                    mixBlendMode: 'normal',
-                                }}
-                            />
-                        )}
+                                    {/* Annotations Layer (Only on Original) */}
+                                    {imageLoaded && (
+                                        <SVGAnnotationLayer
+                                            width={imageSize.width}
+                                            height={imageSize.height}
+                                            onMouseDown={handleMouseDown}
+                                            onMouseMove={handleMouseMove}
+                                            onMouseUp={handleMouseUp}
+                                            onMouseLeave={handleMouseLeave}
+                                            onDoubleClick={handleDoubleClick}
+                                            onAnnotationMouseDown={handleAnnotationMouseDown}
+                                            onHandleMouseDown={handleHandleMouseDown}
+                                            onPolygonPointMouseDown={handlePolygonPointMouseDown}
+                                        />
+                                    )}
+                                </div>
 
-                        {imageLoaded && (
-                            <SVGAnnotationLayer
-                                width={imageSize.width}
-                                height={imageSize.height}
-                                onMouseDown={handleMouseDown}
-                                onMouseMove={handleMouseMove}
-                                onMouseUp={handleMouseUp}
-                                onMouseLeave={handleMouseLeave}
-                                onDoubleClick={handleDoubleClick}
-                                onAnnotationMouseDown={handleAnnotationMouseDown}
-                                onHandleMouseDown={handleHandleMouseDown}
-                                onPolygonPointMouseDown={handlePolygonPointMouseDown}
-                            />
+                                {/* Analysis Result (Right) */}
+                                <div className="relative">
+                                    <img
+                                        src={selectedHistoryAnalysis.overlayUrl}
+                                        alt="Analysis Result"
+                                        crossOrigin="anonymous"
+                                        className="rounded-lg shadow-2xl select-none"
+                                        draggable={false}
+                                    />
+                                    <div className="absolute top-2 left-2 px-2 py-1 bg-black/60 text-white text-xs rounded pointer-events-none border border-white/20">
+                                        {selectedHistoryAnalysis.subType || 'Analysis Result'}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            /* Standard Single View (with optional Overlay) */
+                            <div className="relative">
+                                <img
+                                    ref={imageRef}
+                                    src={imageUrl}
+                                    alt="Annotation target"
+                                    onLoad={handleImageLoad}
+                                    className="max-w-full rounded-lg shadow-2xl select-none"
+                                    draggable={false}
+                                    style={{
+                                        maxWidth: zoom === 1 ? 'calc(100vw - 350px)' : 'none',
+                                        maxHeight: zoom === 1 ? 'calc(100vh - 180px)' : 'none',
+                                    }}
+                                />
+
+                                {/* Live Analysis Overlay (Prop-based) */}
+                                {imageLoaded && showAnalysisOverlay && analysisCanvas && (
+                                    <img
+                                        src={analysisCanvas.toDataURL()}
+                                        alt="Analysis overlay"
+                                        className="absolute inset-0 w-full h-full rounded-lg pointer-events-none"
+                                        style={{
+                                            opacity: analysisOpacity,
+                                            mixBlendMode: 'normal',
+                                        }}
+                                    />
+                                )}
+
+                                {imageLoaded && (
+                                    <SVGAnnotationLayer
+                                        width={imageSize.width}
+                                        height={imageSize.height}
+                                        onMouseDown={handleMouseDown}
+                                        onMouseMove={handleMouseMove}
+                                        onMouseUp={handleMouseUp}
+                                        onMouseLeave={handleMouseLeave}
+                                        onDoubleClick={handleDoubleClick}
+                                        onAnnotationMouseDown={handleAnnotationMouseDown}
+                                        onHandleMouseDown={handleHandleMouseDown}
+                                        onPolygonPointMouseDown={handlePolygonPointMouseDown}
+                                    />
+                                )}
+                            </div>
                         )}
                     </div>
                 </div>

@@ -11,42 +11,43 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   FiFlag,
-  FiAlertTriangle,
-  FiCheck,
-  FiRefreshCw,
+  FiFilter,
   FiSearch,
   FiChevronLeft,
   FiChevronRight,
+  FiCalendar,
   FiX,
-  FiLayers,
-  FiEye,
-  FiInfo,
+  FiAlertTriangle,
+  FiImage,
+  FiFileText,
+  FiCheck,
+  FiTrash2,
+  FiRefreshCw,
   FiEdit3,
-  FiActivity,
-  FiLink,
-  FiClock,
-  FiZap,
-  FiCopy,
-  FiTarget,
-  FiExternalLink,
+  FiLayers,
+  FiInfo,
+  FiMoreVertical,
   FiMaximize2,
   FiMinimize2,
-  FiPlay,
-  FiImage,
-  FiTrash2,
-  FiChevronDown,
-  FiBarChart2,
+  FiCopy,
+  FiZap,
   FiGitBranch,
-  FiFilter,
-  FiCalendar,
-  FiArrowLeft,
-  FiTag,
+  FiBarChart2,
+  FiChevronDown,
   FiGrid,
+  FiList,
+  FiActivity,
+  FiLink,
   FiPlus,
+  FiSun,
+  FiSliders,
+  FiTarget,
+  FiExternalLink
 } from 'react-icons/fi';
 import { useLanguage } from '../context/LanguageContext';
-import { useImages } from '../hooks/useImages';
-import api, { API_BASE_URL } from '../services/api';
+import { useImages } from '../hooks/useImages'; // Corrected import path
+import { api } from '../services/api';
+import { API_BASE_URL } from '../config/api';
 import SelectionToolbar from '../components/SelectionToolbar';
 import TagInput from '../components/TagInput';
 import AnnotationOverlay from '../components/AnnotationOverlay';
@@ -57,6 +58,14 @@ import BatchTagModal from '../components/BatchTagModal';
 import LightboxModal from '../components/common/LightboxModal';
 import ImageMetadataSidebar from '../components/common/ImageMetadataSidebar';
 import { usePanelExtraction } from '../hooks/usePanelExtraction';
+import {
+  loadImageToCanvas,
+  applyErrorLevelAnalysis,
+  applyNoiseAnalysis,
+  applyLuminanceGradient,
+  applyLevelSweep,
+  applyCloneDetection
+} from '../utils/imageAnalysis';
 import { showToast, showConfirm, showAlert } from '../utils/alert';
 import { AnalysisDetailsPanel, TypeBadge, StatusBadge } from '../components/analysis';
 import ProvenanceGraph from '../components/ProvenanceGraph';
@@ -67,11 +76,50 @@ import RemoveRelationshipModal from '../components/RemoveRelationshipModal';
 
 
 // --- Constants ---
-const IMAGES_PER_PAGE = 12;
+const IMAGES_PER_PAGE = 24;
 const TAB_DETAILS = 'details';
 const TAB_ANNOTATIONS = 'annotations';
 const TAB_ANALYSIS = 'analysis';
 const TAB_RELATED = 'related';
+
+// Analysis Tools Configuration (mirrors ImageAnalysisPage)
+const ANALYSIS_TOOLS_CONFIG = {
+  ela: {
+    id: 'ela',
+    name: 'Error Level Analysis',
+    description: 'Compares image to recompressed version',
+    icon: FiZap,
+    hasCanvas: true
+  },
+  noise: {
+    id: 'noise',
+    name: 'Noise Analysis',
+    description: 'Visualizes noise patterns',
+    icon: FiActivity,
+    hasCanvas: true
+  },
+  gradient: {
+    id: 'gradient',
+    name: 'Luminance Gradient',
+    description: 'Visualizes brightness changes',
+    icon: FiSun,
+    hasCanvas: true
+  },
+  levelSweep: {
+    id: 'levelSweep',
+    name: 'Level Sweep',
+    description: 'Highlights brightness levels',
+    icon: FiSliders,
+    hasCanvas: true
+  },
+  cloneDetection: {
+    id: 'cloneDetection',
+    name: 'Clone Detection',
+    description: 'Identifies copy-move regions',
+    icon: FiCopy,
+    hasCanvas: true
+  }
+};
 
 // Analysis type configurations for display
 const ANALYSIS_TYPE_CONFIG = {
@@ -554,6 +602,145 @@ const FlaggedImageDetailPanel = ({
   // State for inline analysis details view
   const [showAnalyzeMenu, setShowAnalyzeMenu] = useState(false);
   const analyzeMenuRef = useRef(null);
+
+  // --- Client-Side Analysis State ---
+  const [analysisToolParams, setAnalysisToolParams] = useState({
+    elaQuality: 75,
+    elaScale: 15,
+    elaOpacity: 100,
+    noiseAmplitude: 20,
+    noiseEqualize: false,
+    noiseOpacity: 100,
+    gradientIntensity: 5,
+    gradientOpacity: 100,
+    gradientNormalize: true,
+    gradientEqualize: false,
+    sweepPosition: 0.5,
+    sweepWidth: 32,
+    sweepOpacity: 100,
+    cloneMinSimilarity: 0.47,
+    cloneMinDetail: 0.01,
+    cloneMinClusterSize: 8,
+    cloneBlockSize: 4,
+    cloneMaxImageSize: 1024,
+    cloneShowQuantized: false
+  });
+  const [selectedAnalysisTool, setSelectedAnalysisTool] = useState(null); // Null initially
+  const [analysisOverlayCanvas, setAnalysisOverlayCanvas] = useState(null);
+  const [originalCanvas, setOriginalCanvas] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const analysisTimeoutRef = useRef(null);
+
+  // Load original canvas when modal opens or image changes
+  useEffect(() => {
+    if (!annotationModalOpen || !image?.imageId) {
+      setOriginalCanvas(null);
+      setAnalysisOverlayCanvas(null);
+      setSelectedAnalysisTool(null);
+      return;
+    }
+
+    let isMounted = true;
+    const loadCanvas = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        // Add cache bust to avoid cached CORS errors
+        const url = `${API_BASE_URL}/images/${image.imageId}/download${token ? `?token=${token}` : ''}&_t=${Date.now()}`;
+        const { canvas } = await loadImageToCanvas(url);
+        if (isMounted) setOriginalCanvas(canvas);
+      } catch (err) {
+        console.error("Failed to load canvas for analysis", err);
+      }
+    };
+    loadCanvas();
+    return () => { isMounted = false; };
+  }, [annotationModalOpen, image?.imageId]);
+
+
+  // Run Analysis Function
+  const handleRunAnalysis = useCallback(async () => {
+    if (!originalCanvas || !selectedAnalysisTool) return;
+
+    setIsAnalyzing(true);
+
+    // Use timeout to unblock UI
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    try {
+      let result = null;
+      const params = analysisToolParams;
+
+      switch (selectedAnalysisTool.id) {
+        case 'ela':
+          result = await applyErrorLevelAnalysis(
+            originalCanvas,
+            params.elaQuality,
+            params.elaScale,
+            100 // Always 100 opacity for overlay, controlled by AnnotationModal opacity slider
+          );
+          break;
+        case 'noise':
+          result = applyNoiseAnalysis(
+            originalCanvas,
+            params.noiseAmplitude,
+            params.noiseEqualize,
+            100
+          );
+          break;
+        case 'gradient':
+          result = applyLuminanceGradient(
+            originalCanvas,
+            params.gradientIntensity,
+            1,
+            params.gradientNormalize,
+            params.gradientEqualize
+          );
+          break;
+        case 'levelSweep':
+          result = applyLevelSweep(
+            originalCanvas,
+            params.sweepPosition,
+            params.sweepWidth,
+            100
+          );
+          break;
+        case 'cloneDetection':
+          result = applyCloneDetection(originalCanvas, {
+            minSimilarity: params.cloneMinSimilarity,
+            minDetail: params.cloneMinDetail,
+            minClusterSize: params.cloneMinClusterSize,
+            blockSize: params.cloneBlockSize,
+            maxImageSize: params.cloneMaxImageSize,
+            showQuantized: params.cloneShowQuantized
+          });
+          break;
+      }
+
+      if (result) {
+        setAnalysisOverlayCanvas(result);
+      }
+    } catch (err) {
+      console.error("Analysis failed", err);
+      showToast("Analysis failed", "error");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [originalCanvas, selectedAnalysisTool, analysisToolParams]);
+
+  // Trigger analysis when params or tool changes (debounced)
+  useEffect(() => {
+    if (!originalCanvas || !selectedAnalysisTool) return;
+
+    if (analysisTimeoutRef.current) clearTimeout(analysisTimeoutRef.current);
+
+    analysisTimeoutRef.current = setTimeout(() => {
+      handleRunAnalysis();
+    }, 300);
+
+    return () => {
+      if (analysisTimeoutRef.current) clearTimeout(analysisTimeoutRef.current);
+    };
+  }, [selectedAnalysisTool, analysisToolParams, originalCanvas, handleRunAnalysis]);
 
   // State for inline analysis details view
   const [selectedAnalysisForView, setSelectedAnalysisForView] = useState(null);
@@ -1476,6 +1663,27 @@ const FlaggedImageDetailPanel = ({
         existingAnnotations={annotations}
         onClose={() => setAnnotationModalOpen(false)}
         onSaveSuccess={handleAnnotationSaveSuccess}
+        // Analysis Tools Props
+        analysisCanvas={analysisOverlayCanvas}
+        analysisToolId={selectedAnalysisTool?.id}
+        analysisToolName={selectedAnalysisTool?.name}
+        analysisParams={analysisToolParams}
+        onAnalysisParamsChange={(newParams) => {
+          setAnalysisToolParams(prev => ({ ...prev, ...newParams }));
+          // Trigger re-run if tool is selected (debouncing handled in effect if we added one, but direct call is safer for now)
+          // Ideally we should use a debounced effect like ImageAnalysisPage, but for now specific run button or direct update
+          // We'll call runAnalysis with the new params immediately for responsiveness, relies on fast client-side processing
+          // But wait, state update is async.
+          // We'll use a useEffect to trigger runAnalysis when params change, similar to ImageAnalysisPage
+        }}
+        onRunAnalysis={(toolId) => {
+          if (toolId && ANALYSIS_TOOLS_CONFIG[toolId]) {
+            const tool = ANALYSIS_TOOLS_CONFIG[toolId];
+            setSelectedAnalysisTool(tool);
+            // The effect below will trigger the analysis
+          }
+        }}
+        availableAnalysisTools={Object.values(ANALYSIS_TOOLS_CONFIG)}
       />
 
       {/* Dual Image Comparison Modal */}
