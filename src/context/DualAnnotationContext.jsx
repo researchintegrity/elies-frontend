@@ -59,6 +59,10 @@ const initialState = {
     nextGroupId: 1,
     nextLinkColorIndex: 0,
 
+    // Pending deletions (to be processed on save)
+    deletedAnnotationIds: [],
+    deletedLinkIds: [],
+
     // UI state
     annotationsVisible: true,
     isModified: false,
@@ -120,6 +124,7 @@ const ActionTypes = {
     TOGGLE_TOOLBAR: 'TOGGLE_TOOLBAR',
     TOGGLE_ANNOTATIONS_VISIBILITY: 'TOGGLE_ANNOTATIONS_VISIBILITY',
     SET_MODIFIED: 'SET_MODIFIED',
+    CLEAR_DELETED_LISTS: 'CLEAR_DELETED_LISTS',
     RESET: 'RESET',
 };
 
@@ -217,44 +222,178 @@ const dualAnnotationReducer = (state, action) => {
 
         case ActionTypes.DELETE_ANNOTATION: {
             const { side, id } = action.payload;
-            const key = side === 'left' ? 'leftAnnotations' : 'rightAnnotations';
-            const newAnnotations = state[key].filter(ann => ann.id !== id);
 
-            // Also remove any linked pairs involving this annotation
-            const linkedPairs = state.linkedPairs.filter(lp =>
-                (side === 'left' ? lp.leftAnnotationId : lp.rightAnnotationId) !== id
+            // Identify links connected to the annotation
+            const linksToDelete = state.linkedPairs.filter(lp =>
+                (side === 'left' && lp.leftAnnotationId === id) ||
+                (side === 'right' && lp.rightAnnotationId === id)
             );
+
+            let newLeftAnnotations = state.leftAnnotations;
+            let newRightAnnotations = state.rightAnnotations;
+            let newLinkedPairs = state.linkedPairs;
+            let newDeletedAnnotationIds = state.deletedAnnotationIds;
+            let newDeletedLinkIds = state.deletedLinkIds;
+
+            if (linksToDelete.length > 0) {
+                // Case: Annotation is linked -> Delete the PAIR(s)
+
+                // 1. Remove the annotation
+                if (side === 'left') {
+                    newLeftAnnotations = newLeftAnnotations.filter(a => a.id !== id);
+                } else {
+                    newRightAnnotations = newRightAnnotations.filter(a => a.id !== id);
+                }
+
+                // 2. Process each link
+                linksToDelete.forEach(link => {
+                    // Add link ID to deletion list (ALWAYS if it exists, server links start with link_)
+                    if (link.linkId) {
+                        if (!newDeletedLinkIds.includes(link.linkId)) {
+                            newDeletedLinkIds = [...newDeletedLinkIds, link.linkId];
+                        }
+                    }
+
+                    // Remove partner annotation from view
+                    if (side === 'left') {
+                        if (link.rightAnnotationId) {
+                            newRightAnnotations = newRightAnnotations.filter(a => a.id !== link.rightAnnotationId);
+                        }
+                    } else {
+                        if (link.leftAnnotationId) {
+                            newLeftAnnotations = newLeftAnnotations.filter(a => a.id !== link.leftAnnotationId);
+                        }
+                    }
+                });
+
+                // 3. Remove the links from state
+                const linkIdsToRemove = linksToDelete.map(l => l.linkId);
+                newLinkedPairs = newLinkedPairs.filter(lp => !linkIdsToRemove.includes(lp.linkId));
+
+            } else {
+                // Case: Unlinked -> Just delete
+                if (side === 'left') {
+                    newLeftAnnotations = newLeftAnnotations.filter(a => a.id !== id);
+                } else {
+                    newRightAnnotations = newRightAnnotations.filter(a => a.id !== id);
+                }
+
+                // Track deleted ID
+                if (id && !String(id).startsWith('ann_')) {
+                    newDeletedAnnotationIds = [...newDeletedAnnotationIds, id];
+                }
+            }
 
             return {
                 ...state,
-                [key]: newAnnotations,
-                linkedPairs,
+                leftAnnotations: newLeftAnnotations,
+                rightAnnotations: newRightAnnotations,
+                linkedPairs: newLinkedPairs,
                 selectedId: state.selectedId === id ? null : state.selectedId,
                 selectedSide: state.selectedId === id ? null : state.selectedSide,
+                deletedAnnotationIds: newDeletedAnnotationIds,
+                deletedLinkIds: newDeletedLinkIds,
                 isModified: true,
-                ...pushToHistory({ ...state, [key]: newAnnotations, linkedPairs }),
+                ...pushToHistory({
+                    ...state,
+                    leftAnnotations: newLeftAnnotations,
+                    rightAnnotations: newRightAnnotations,
+                    linkedPairs: newLinkedPairs,
+                    deletedAnnotationIds: newDeletedAnnotationIds,
+                    deletedLinkIds: newDeletedLinkIds
+                }),
             };
         }
 
         case ActionTypes.DELETE_SELECTED: {
             if (!state.selectedId || !state.selectedSide) return state;
-            const key = state.selectedSide === 'left' ? 'leftAnnotations' : 'rightAnnotations';
-            const newAnnotations = state[key].filter(ann => ann.id !== state.selectedId);
 
-            const linkedPairs = state.linkedPairs.filter(lp =>
-                (state.selectedSide === 'left' ? lp.leftAnnotationId : lp.rightAnnotationId) !== state.selectedId
+            // Identify links connected to the selected annotation
+            const linksToDelete = state.linkedPairs.filter(lp =>
+                (state.selectedSide === 'left' && lp.leftAnnotationId === state.selectedId) ||
+                (state.selectedSide === 'right' && lp.rightAnnotationId === state.selectedId)
             );
+
+            let newLeftAnnotations = state.leftAnnotations;
+            let newRightAnnotations = state.rightAnnotations;
+            let newLinkedPairs = state.linkedPairs;
+            let newDeletedAnnotationIds = state.deletedAnnotationIds;
+            let newDeletedLinkIds = state.deletedLinkIds;
+
+            if (linksToDelete.length > 0) {
+                // Case: Annotation is linked -> Delete the PAIR(s)
+
+                // 1. Remove the selected annotation
+                if (state.selectedSide === 'left') {
+                    newLeftAnnotations = newLeftAnnotations.filter(a => a.id !== state.selectedId);
+                } else {
+                    newRightAnnotations = newRightAnnotations.filter(a => a.id !== state.selectedId);
+                }
+
+                // 2. Process each link
+                linksToDelete.forEach(link => {
+                    // Add link ID to deletion list (ALWAYS if it exists)
+                    if (link.linkId) {
+                        // Avoid duplicates
+                        if (!newDeletedLinkIds.includes(link.linkId)) {
+                            newDeletedLinkIds = [...newDeletedLinkIds, link.linkId];
+                        }
+                    }
+
+                    // Remove partner annotation from view
+                    // (The main selected one is already removed above)
+                    if (state.selectedSide === 'left') {
+                        // Selected was left, remove right partner
+                        if (link.rightAnnotationId) {
+                            newRightAnnotations = newRightAnnotations.filter(a => a.id !== link.rightAnnotationId);
+                        }
+                    } else {
+                        // Selected was right, remove left partner
+                        if (link.leftAnnotationId) {
+                            newLeftAnnotations = newLeftAnnotations.filter(a => a.id !== link.leftAnnotationId);
+                        }
+                    }
+                });
+
+                // 3. Remove the links from state
+                const linkIdsToRemove = linksToDelete.map(l => l.linkId);
+                newLinkedPairs = newLinkedPairs.filter(lp => !linkIdsToRemove.includes(lp.linkId));
+
+            } else {
+                // Case: Unlinked annotation -> Just delete it
+                if (state.selectedSide === 'left') {
+                    newLeftAnnotations = newLeftAnnotations.filter(a => a.id !== state.selectedId);
+                } else {
+                    newRightAnnotations = newRightAnnotations.filter(a => a.id !== state.selectedId);
+                }
+
+                // Track deleted ID if it's a server annotation
+                if (state.selectedId && !String(state.selectedId).startsWith('ann_')) {
+                    newDeletedAnnotationIds = [...newDeletedAnnotationIds, state.selectedId];
+                }
+            }
 
             return {
                 ...state,
-                [key]: newAnnotations,
-                linkedPairs,
+                leftAnnotations: newLeftAnnotations,
+                rightAnnotations: newRightAnnotations,
+                linkedPairs: newLinkedPairs,
                 selectedId: null,
                 selectedSide: null,
+                deletedAnnotationIds: newDeletedAnnotationIds,
+                deletedLinkIds: newDeletedLinkIds,
                 isModified: true,
-                ...pushToHistory({ ...state, [key]: newAnnotations, linkedPairs }),
+                ...pushToHistory({
+                    ...state,
+                    leftAnnotations: newLeftAnnotations,
+                    rightAnnotations: newRightAnnotations,
+                    linkedPairs: newLinkedPairs,
+                    deletedAnnotationIds: newDeletedAnnotationIds,
+                    deletedLinkIds: newDeletedLinkIds
+                }),
             };
         }
+
 
         // --- Selection ---
         case ActionTypes.SELECT_ANNOTATION:
@@ -453,14 +592,21 @@ const dualAnnotationReducer = (state, action) => {
 
         case ActionTypes.DELETE_LINK: {
             const linkedPairs = state.linkedPairs.filter(lp => lp.linkId !== action.payload);
+
+            // Track deleted link ID
+            let deletedLinkIds = state.deletedLinkIds;
+            if (action.payload) {
+                deletedLinkIds = [...state.deletedLinkIds, action.payload];
+            }
+
             return {
                 ...state,
                 linkedPairs,
+                deletedLinkIds,
                 isModified: true,
-                ...pushToHistory({ ...state, linkedPairs }),
+                ...pushToHistory({ ...state, linkedPairs, deletedLinkIds }),
             };
         }
-
         case ActionTypes.UPDATE_LINK: {
             const { linkId, updates } = action.payload;
             const linkedPairs = state.linkedPairs.map(lp =>
@@ -525,6 +671,13 @@ const dualAnnotationReducer = (state, action) => {
 
         case ActionTypes.SET_MODIFIED:
             return { ...state, isModified: action.payload };
+
+        case ActionTypes.CLEAR_DELETED_LISTS:
+            return {
+                ...state,
+                deletedAnnotationIds: [],
+                deletedLinkIds: [],
+            };
 
         case ActionTypes.RESET:
             return { ...initialState };
@@ -670,6 +823,10 @@ export const DualAnnotationProvider = ({ children }) => {
         dispatch({ type: ActionTypes.RESET });
     }, []);
 
+    const clearDeletedLists = useCallback(() => {
+        dispatch({ type: ActionTypes.CLEAR_DELETED_LISTS });
+    }, []);
+
     // Memoized actions object
     const actions = useMemo(() => ({
         setLeftImage,
@@ -703,6 +860,7 @@ export const DualAnnotationProvider = ({ children }) => {
         toggleToolbar,
         toggleAnnotationsVisibility,
         setModified,
+        clearDeletedLists,
         reset,
     }), [
         setLeftImage, setRightImage, clearRightImage, setAnnotations, addAnnotation,
@@ -710,7 +868,7 @@ export const DualAnnotationProvider = ({ children }) => {
         clearSelection, setActiveSide, setTool, setActiveLabel, startDrawing, updateDrawing,
         addPolygonPoint, finishDrawing, cancelDrawing, startLinking, completeLink, cancelLinking,
         deleteLink, updateLink, setLinkedPairs, undo, redo, toggleBottomPanel, toggleToolbar,
-        toggleAnnotationsVisibility, setModified, reset,
+        toggleAnnotationsVisibility, setModified, clearDeletedLists, reset,
     ]);
 
     // Computed values

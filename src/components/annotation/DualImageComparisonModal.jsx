@@ -1705,9 +1705,9 @@ const DualImageComparisonModalInner = ({
                         leftAnnotationId: ann.id,
                         targetImageId: ann.linkedImageId,
                         targetFilename: ann.linkedImageId === rightId ? rightFilename : existingPair?.targetFilename,
-                        // Preserve existing properties
-                        name: existingPair?.name,
-                        color: existingPair?.color,
+                        // Preserve existing properties or use from annotation
+                        name: existingPair?.name || (ann.label?.name !== 'Shared Region' ? ann.label?.name : null),
+                        color: existingPair?.color || ann.label?.color,
                         visible: existingPair?.visible,
                     });
                 } else {
@@ -1728,8 +1728,8 @@ const DualImageComparisonModalInner = ({
                         rightAnnotationId: ann.id,
                         targetImageId: rightId,
                         targetFilename: rightFilename,
-                        name: existingPair?.name,
-                        color: existingPair?.color,
+                        name: existingPair?.name || (ann.label?.name !== 'Shared Region' ? ann.label?.name : null),
+                        color: existingPair?.color || ann.label?.color,
                         visible: existingPair?.visible,
                     });
                 }
@@ -1817,6 +1817,37 @@ const DualImageComparisonModalInner = ({
 
         setIsSaving(true);
         try {
+            // Process pending deletions first
+            const deletePromises = [];
+
+            // Delete annotations
+            if (state.deletedAnnotationIds && state.deletedAnnotationIds.length > 0) {
+                for (const id of state.deletedAnnotationIds) {
+                    deletePromises.push(
+                        api.deleteDualAnnotation(id)
+                            .catch(err => console.error('Error deleting annotation:', id, err))
+                    );
+                }
+            }
+
+            // Delete links (and their annotations)
+            if (state.deletedLinkIds && state.deletedLinkIds.length > 0) {
+                for (const linkId of state.deletedLinkIds) {
+                    deletePromises.push(
+                        api.deleteDualAnnotationsByLink(linkId)
+                            .catch(err => console.error('Error deleting link:', linkId, err))
+                    );
+                }
+            }
+
+            if (deletePromises.length > 0) {
+                await Promise.all(deletePromises);
+                // Clear deletion lists in context
+                if (actions.clearDeletedLists) {
+                    actions.clearDeletedLists();
+                }
+            }
+
             // Prepare dual annotations for batch save (ONLY NEW ONES)
             const newDualAnnotations = [];
 
@@ -1878,12 +1909,133 @@ const DualImageComparisonModalInner = ({
                 await api.createDualAnnotationsBatch(newDualAnnotations);
             }
 
-            // Create relationship if both images present
-            if (state.rightImage && state.linkedPairs.length > 0) {
-                try {
-                    await api.createRelationship(state.leftImage.id, state.rightImage.id, 'manual');
-                } catch {
-                    // Ignore duplicate relationship error
+            // Update existing annotations (non-new ones) that have been modified
+            // These are annotations with IDs that don't start with 'ann_' (server IDs)
+            const updatePromises = [];
+
+            // Update coords for individual annotations (position/size changes)
+            // Update existing left annotations
+            for (const ann of state.leftAnnotations) {
+                // Only update existing server annotations (not starting with ann_)
+                if (!ann.id || String(ann.id).startsWith('ann_')) continue;
+
+                const link = computed.getLinkForAnnotation(ann.id, 'left');
+                if (!link) continue;
+
+                updatePromises.push(
+                    api.updateDualAnnotation(ann.id, {
+                        coords: {
+                            x: ann.x,
+                            y: ann.y,
+                            width: ann.width,
+                            height: ann.height,
+                            points: ann.points,
+                        },
+                        // Ensure we update link properties (critical if newly linked or renamed)
+                        link_id: link.linkId,
+                        pair_name: link.name,
+                        pair_color: link.color,
+                        text: ann.description || '',
+                    }).catch(err => console.error('Error updating left annotation:', err))
+                );
+            }
+
+            // Update existing right annotations
+            if (state.rightImage) {
+                for (const ann of state.rightAnnotations) {
+                    if (!ann.id || String(ann.id).startsWith('ann_')) continue;
+
+                    const link = computed.getLinkForAnnotation(ann.id, 'right');
+                    if (!link) continue;
+
+                    updatePromises.push(
+                        api.updateDualAnnotation(ann.id, {
+                            coords: {
+                                x: ann.x,
+                                y: ann.y,
+                                width: ann.width,
+                                height: ann.height,
+                                points: ann.points,
+                            },
+                            // Ensure we update link properties
+                            link_id: link.linkId,
+                            pair_name: link.name,
+                            pair_color: link.color,
+                            text: ann.description || '',
+                        }).catch(err => console.error('Error updating right annotation:', err))
+                    );
+                }
+            }
+
+            // Update name/color for ALL linked annotations (including those not displayed)
+            // This ensures changes propagate to annotations on images not currently shown
+            for (const link of state.linkedPairs) {
+                // Remove the check for 'link_' prefix because server IDs also use it
+                // Just check if we have a valid linkId
+                if (!link.linkId) continue;
+
+                updatePromises.push(
+                    api.updateDualAnnotationsByLink(link.linkId, {
+                        pair_name: link.name,
+                        pair_color: link.color,
+                    }).catch(err => {
+                        // Ignore 404s (means link doesn't exist in DB yet - it's being created now)
+                        if (!err.message || !err.message.includes('404')) {
+                            console.error('Error updating link:', link.linkId, err);
+                        }
+                    })
+                );
+            }
+
+            // Wait for all updates to complete
+            if (updatePromises.length > 0) {
+                await Promise.all(updatePromises);
+            }
+
+            // Manage relationship if both images present
+            if (state.rightImage) {
+                // Check if any links remain for the CURRENT left/right pair specifically
+                // (linkedPairs may contain links to OTHER targets due to triplicate detection)
+                const linksToCurrentTarget = state.linkedPairs.filter(lp =>
+                    lp.targetImageId === state.rightImage.id ||
+                    !lp.targetImageId // Links without targetImageId are current session links
+                );
+
+                if (linksToCurrentTarget.length > 0) {
+                    // Has links -> Ensure relationship exists
+                    try {
+                        await api.createRelationship(state.leftImage.id, state.rightImage.id, 'manual');
+                    } catch {
+                        // Ignore duplicate relationship error
+                    }
+                } else {
+                    // No links remain -> Delete existing manual relationship if it exists
+                    try {
+                        const leftId = state.leftImage?.id || state.leftImage?._id;
+                        const rightId = state.rightImage?.id || state.rightImage?._id;
+
+                        if (leftId && rightId) {
+                            const rels = await api.getRelationships(leftId);
+                            // Find relationship between these two images with type 'manual'
+                            const manualRel = rels.find(r =>
+                                r.source_type === 'manual' &&
+                                (
+                                    (String(r.image1_id) === String(leftId) && String(r.image2_id) === String(rightId)) ||
+                                    (String(r.image1_id) === String(rightId) && String(r.image2_id) === String(leftId))
+                                )
+                            );
+
+                            if (manualRel) {
+                                const relId = manualRel.id || manualRel._id;
+                                if (relId) {
+                                    await api.removeRelationship(relId);
+                                    console.log('Removed manual relationship due to empty annotations:', relId);
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Error removing relationship:', err);
+                    }
                 }
             }
 

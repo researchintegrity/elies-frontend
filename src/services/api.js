@@ -222,6 +222,27 @@ export const api = {
     },
 
     /**
+     * Update an existing dual-image annotation
+     * @param {string} annotationId - Annotation ID
+     * @param {Object} data - Update data (coords, pair_name, pair_color, text)
+     * @returns {Promise<Object>} Updated annotation
+     */
+    updateDualAnnotation: async (annotationId, data) => {
+        return api.put(`/annotations/dual/${annotationId}`, data);
+    },
+
+    /**
+     * Update all dual-image annotations with a specific link ID
+     * Used for propagating name/color changes to all linked annotations
+     * @param {string} linkId - Link ID
+     * @param {Object} data - Update data (pair_name, pair_color, text)
+     * @returns {Promise<Object>} Update result with count
+     */
+    updateDualAnnotationsByLink: async (linkId, data) => {
+        return api.put(`/annotations/dual/by-link/${linkId}`, data);
+    },
+
+    /**
      * Get IDs of images linked via dual annotations
      * @param {string} imageId - Image ID
      * @returns {Promise<string[]>} List of linked image IDs
