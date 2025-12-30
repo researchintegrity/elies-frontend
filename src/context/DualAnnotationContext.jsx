@@ -380,26 +380,67 @@ const dualAnnotationReducer = (state, action) => {
             // Must be from different sides
             if (firstSide === secondSide) return state;
 
+            // Determine source (left) and target (right) annotation IDs
+            let sourceAnnotationId = firstSide === 'left' ? firstId : secondId;
+            let targetAnnotationId = firstSide === 'right' ? firstId : secondId;
+            const sourceSide = firstSide === 'left' ? 'left' : 'right';
+            const targetSide = firstSide === 'right' ? 'left' : 'right';
+
+            // Get the source and target annotations
+            const sourceKey = sourceSide === 'left' ? 'leftAnnotations' : 'rightAnnotations';
+            const targetKey = targetSide === 'left' ? 'leftAnnotations' : 'rightAnnotations';
+            const sourceAnnotation = state[sourceKey].find(a => a.id === sourceAnnotationId);
+            const targetAnnotation = state[targetKey].find(a => a.id === targetAnnotationId);
+
+            if (!sourceAnnotation || !targetAnnotation) return state;
+
+            // Check if source annotation is already linked to a DIFFERENT target
+            // If so, clone the source annotation for the new link
+            let updatedSourceAnnotations = state[sourceKey];
+            const existingSourceLink = state.linkedPairs.find(lp =>
+                (sourceSide === 'left' && lp.leftAnnotationId === sourceAnnotationId) ||
+                (sourceSide === 'right' && lp.rightAnnotationId === sourceAnnotationId)
+            );
+
+            // Clone source annotation if it's already linked (to support multi-target)
+            if (existingSourceLink) {
+                const clonedAnnotation = {
+                    ...sourceAnnotation,
+                    id: generateId(), // New unique ID for the clone
+                    linkId: undefined, // Will be set via the link
+                    linkedImageId: undefined,
+                };
+                updatedSourceAnnotations = [...state[sourceKey], clonedAnnotation];
+                sourceAnnotationId = clonedAnnotation.id; // Use the clone for the new link
+            }
+
             const linkId = generateLinkId();
             const color = LINK_COLORS[state.nextLinkColorIndex % LINK_COLORS.length];
             const pairNumber = state.linkedPairs.length + 1;
 
             const newLink = {
                 linkId,
-                leftAnnotationId: firstSide === 'left' ? firstId : secondId,
-                rightAnnotationId: firstSide === 'right' ? firstId : secondId,
+                leftAnnotationId: sourceSide === 'left' ? sourceAnnotationId : targetAnnotationId,
+                rightAnnotationId: sourceSide === 'right' ? sourceAnnotationId : targetAnnotationId,
                 color,
                 name: `Pair ${pairNumber}`,
+                // Track target image for multi-target support
+                targetImageId: state.rightImage?.id,
             };
 
-            return {
+            const newState = {
                 ...state,
+                [sourceKey]: updatedSourceAnnotations,
                 linkedPairs: [...state.linkedPairs, newLink],
                 isLinkingMode: false,
                 pendingLinkAnnotation: null,
                 nextLinkColorIndex: state.nextLinkColorIndex + 1,
                 isModified: true,
-                ...pushToHistory({ ...state, linkedPairs: [...state.linkedPairs, newLink] }),
+            };
+
+            return {
+                ...newState,
+                ...pushToHistory(newState),
             };
         }
 
