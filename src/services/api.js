@@ -147,60 +147,87 @@ export const api = {
         return api.delete(`/images/${imageId}/types/${typeName}`);
     },
 
-    // --- Annotations ---
+    // --- Annotations (Legacy methods removed) ---
 
-    getAnnotations: async (imageId) => {
-        // Query param image_id style seems consistent with startProvenanceAnalysis etc.
-        return api.get('/annotations', { image_id: imageId });
-    },
 
-    createAnnotation: async (annotationData) => {
-        return api.post('/annotations', annotationData);
-    },
-
-    updateAnnotation: async (annotationId, annotationData) => {
-        return api.put(`/annotations/${annotationId}`, annotationData);
-    },
-
-    deleteAnnotation: async (annotationId) => {
-        return api.delete(`/annotations/${annotationId}`);
-    },
+    // =========================================================================
+    // Single-Image Annotations (new API)
+    // =========================================================================
 
     /**
-     * Bulk save/sync annotations for an image
+     * Get single-image annotations for an image
      * @param {string} imageId - Image ID
-     * @param {Array} annotations - Array of annotation objects
-     * @returns {Promise<{success: boolean, annotations: Array}>}
+     * @returns {Promise<Array>} Array of single annotations
      */
-    saveAnnotations: async (imageId, annotations) => {
-        return api.post(`/images/${imageId}/annotations/sync`, { annotations });
+    getSingleAnnotations: async (imageId) => {
+        return api.get(`/annotations/single`, { image_id: imageId });
     },
 
     /**
-     * Create multiple annotations at once (for linked cross-image pairs)
-     * @param {Array} annotations - Array of annotation objects
+     * Create a single-image annotation
+     * @param {Object} data - Annotation data
+     * @returns {Promise<Object>} Created annotation
+     */
+    createSingleAnnotation: async (data) => {
+        return api.post('/annotations/single', data);
+    },
+
+    /**
+     * Delete a single-image annotation
+     * @param {string} annotationId - Annotation ID
+     */
+    deleteSingleAnnotation: async (annotationId) => {
+        return api.delete(`/annotations/single/${annotationId}`);
+    },
+
+    // =========================================================================
+    // Dual-Image (Cross-Image) Annotations (new API)
+    // =========================================================================
+
+    /**
+     * Get dual-image annotations for a source image
+     * @param {string} sourceImageId - Source image ID
+     * @param {string} targetImageId - Optional target image ID to filter by
+     * @returns {Promise<Array>} Array of dual annotations
+     */
+    getDualAnnotations: async (sourceImageId, targetImageId = null) => {
+        const params = { source_image_id: sourceImageId };
+        if (targetImageId) params.target_image_id = targetImageId;
+        return api.get('/annotations/dual', params);
+    },
+
+    /**
+     * Batch create dual-image annotations
+     * @param {Array} annotations - Array of dual annotation objects
      * @returns {Promise<Array>} Array of created annotations
      */
-    createAnnotationsBatch: async (annotations) => {
-        return api.post('/annotations/batch', { annotations });
+    createDualAnnotationsBatch: async (annotations) => {
+        return api.post('/annotations/dual/batch', { annotations });
     },
 
     /**
-     * Get annotations by link ID (for cross-image annotation pairs)
-     * @param {string} linkId - Link ID to query
-     * @returns {Promise<Array>} Array of linked annotations
+     * Delete a dual-image annotation
+     * @param {string} annotationId - Annotation ID
      */
-    getAnnotationsByLinkId: async (linkId) => {
-        return api.get(`/annotations?link_id=${linkId}`);
+    deleteDualAnnotation: async (annotationId) => {
+        return api.delete(`/annotations/dual/${annotationId}`);
     },
 
     /**
-     * Get IDs of images linked to a specific image via annotations
+     * Delete all dual-image annotations with a specific link ID
+     * @param {string} linkId - Link ID
+     */
+    deleteDualAnnotationsByLink: async (linkId) => {
+        return api.delete(`/annotations/dual/by-link/${linkId}`);
+    },
+
+    /**
+     * Get IDs of images linked via dual annotations
      * @param {string} imageId - Image ID
      * @returns {Promise<string[]>} List of linked image IDs
      */
-    getLinkedImages: async (imageId) => {
-        return api.get(`/annotations/linked-images/${imageId}`);
+    getDualLinkedImages: async (imageId) => {
+        return api.get(`/annotations/dual/linked-images/${imageId}`);
     },
 
     /**
@@ -216,6 +243,7 @@ export const api = {
         if (params.page) queryParams.page = params.page;
         if (params.perPage) queryParams.per_page = params.perPage;
         if (params.flagged !== undefined) queryParams.flagged = params.flagged;
+        if (params.linkedTo) queryParams.linked_to_image_id = params.linkedTo;
         return api.get('/images', queryParams);
     },
 

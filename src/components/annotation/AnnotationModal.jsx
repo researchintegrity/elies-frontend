@@ -479,7 +479,7 @@ const AnnotationModalInner = ({
             // Delete existing annotations
             for (const existing of existingAnnotations) {
                 try {
-                    await api.deleteAnnotation(existing._id || existing.id);
+                    await api.deleteSingleAnnotation(existing._id || existing.id);
                 } catch (e) {
                     console.warn('Error deleting old annotation:', e);
                 }
@@ -513,7 +513,7 @@ const AnnotationModalInner = ({
                     shape_type: ann.type,
                 };
 
-                const saved = await api.createAnnotation(payload);
+                const saved = await api.createSingleAnnotation(payload);
                 savedAnnotations.push(saved);
             }
 

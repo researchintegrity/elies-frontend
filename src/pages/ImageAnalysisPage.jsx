@@ -715,7 +715,7 @@ const ImageAnalysisPage = () => {
 
         const fetchAnnotations = async () => {
             try {
-                const data = await api.getAnnotations(selectedImage.id);
+                const data = await api.getSingleAnnotations(selectedImage.id);
                 setAnnotations(data || []);
 
                 // Determine next group ID
@@ -1023,7 +1023,7 @@ const ImageAnalysisPage = () => {
                     };
 
                     try {
-                        const saved = await api.createAnnotation(payload);
+                        const saved = await api.createSingleAnnotation(payload);
                         const newAnno = { ...saved, ...payload, _id: saved._id || saved.id };
                         setAnnotations(prev => [...prev, newAnno]);
 
@@ -1266,8 +1266,19 @@ const ImageAnalysisPage = () => {
 
         // Re-run analysis with 100% opacity for the annotation canvas
         try {
-            const imageUrl = imageUrls[selectedImage.id];
-            const { canvas } = await loadImageToCanvas(imageUrl);
+            let canvas = originalCanvas;
+
+            // If original canvas is not available, try to download and load the full image
+            if (!canvas) {
+                const blob = await api.download(`/images/${selectedImage.id}/download`);
+                const url = URL.createObjectURL(blob);
+                const loaded = await loadImageToCanvas(url);
+                canvas = loaded.canvas;
+                URL.revokeObjectURL(url);
+            }
+
+            if (!canvas) throw new Error("Source image canvas not available");
+
 
             let result = null;
 
@@ -1865,12 +1876,11 @@ const ImageAnalysisPage = () => {
                 onSaveSuccess={() => {
                     // Refresh annotations from API
                     if (selectedImage) {
-                        api.getAnnotations(selectedImage.id)
+                        api.getSingleAnnotations(selectedImage.id)
                             .then(data => setAnnotations(data || []))
                             .catch(err => console.error('Error refreshing annotations:', err));
                     }
-                    setShowAnnotationModal(false);
-                    setAnnotationCanvas(null); // Clear the annotation canvas
+                    // Keep modal open after save
                 }}
                 // Analysis overlay props - use annotationCanvas (100% opacity) or fallback to resultCanvas
                 analysisCanvas={annotationCanvas || resultCanvas}

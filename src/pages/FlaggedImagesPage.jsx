@@ -543,6 +543,7 @@ const FlaggedImageDetailPanel = ({
   const [loadingAnalyses, setLoadingAnalyses] = useState(false);
   const [loadingAnnotations, setLoadingAnnotations] = useState(false);
   const [loadingRelationshipGraph, setLoadingRelationshipGraph] = useState(false);
+  const [dualAnnotationCount, setDualAnnotationCount] = useState(0);
   const [selectedRelatedNode, setSelectedRelatedNode] = useState(null);
   const [showRemoveConfirmModal, setShowRemoveConfirmModal] = useState(false);
   const [relationshipGraph, setRelationshipGraph] = useState(null);
@@ -658,8 +659,12 @@ const FlaggedImageDetailPanel = ({
       if (!image?.imageId) return;
       setLoadingAnnotations(true);
       try {
-        const data = await api.getAnnotations(image.imageId);
-        setAnnotations(data || []);
+        const [singleData, dualData] = await Promise.all([
+          api.getSingleAnnotations(image.imageId),
+          api.getDualAnnotations(image.imageId)
+        ]);
+        setAnnotations(singleData || []);
+        setDualAnnotationCount(dualData?.length || 0);
       } catch (err) {
         console.error('Error fetching annotations:', err);
       } finally {
@@ -761,7 +766,7 @@ const FlaggedImageDetailPanel = ({
   const handleAnnotationSaveSuccess = async () => {
     // Refresh annotations after save
     try {
-      const data = await api.getAnnotations(image.imageId);
+      const data = await api.getSingleAnnotations(image.imageId);
       setAnnotations(data || []);
     } catch (err) {
       console.error('Error refreshing annotations:', err);
@@ -954,8 +959,7 @@ const FlaggedImageDetailPanel = ({
           <div className="h-full flex flex-col">
             {/* Filter dual/cross-image annotations */}
             {(() => {
-              const displayAnnotations = annotations.filter(a => !a.link_id && !a.linked_image_id && !a.linkId && !a.linkedImageId);
-              const dualAnnotationCount = annotations.length - displayAnnotations.length;
+              const displayAnnotations = annotations; // Single annotations separated via API
 
               return (
                 <>
@@ -979,7 +983,7 @@ const FlaggedImageDetailPanel = ({
                       <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-300">
                         <FiLayers size={14} />
                         <span className="text-xs font-medium">
-                          {t('flagged.hasDualAnnotations').replace('{count}', dualAnnotationCount) || `This image has ${dualAnnotationCount} dual-screen annotation${dualAnnotationCount > 1 ? 's' : ''}`}
+                          {t('flagged.hasDualAnnotations').replace('{count}', dualAnnotationCount) || `This image has ${dualAnnotationCount} linked annotation${dualAnnotationCount > 1 ? 's' : ''} related to other image${dualAnnotationCount > 1 ? 's' : ''}`}
                         </span>
                       </div>
                       <button
@@ -1435,14 +1439,18 @@ const FlaggedImageDetailPanel = ({
           isOpen={showComparisonModal}
           onClose={() => setShowComparisonModal(false)}
           selectedImage={image}
-          existingAnnotations={annotations}
+
           onSaveSuccess={() => {
             // Refresh annotations
             const fetchAnnotations = async () => {
               if (!image?.imageId) return;
               try {
-                const data = await api.getAnnotations(image.imageId);
-                setAnnotations(data || []);
+                const [singleData, dualData] = await Promise.all([
+                  api.getSingleAnnotations(image.imageId),
+                  api.getDualAnnotations(image.imageId)
+                ]);
+                setAnnotations(singleData || []);
+                setDualAnnotationCount(dualData?.length || 0);
               } catch (err) {
                 console.error('Error fetching annotations:', err);
               }

@@ -1105,7 +1105,7 @@ const translations = {
         'flagged.compareImages': 'Comparar Imagens',
         'flagged.annotationsSaved': 'Anotações salvas com sucesso',
         'flagged.addRelated': 'Adicionar Relacionada',
-        'flagged.hasDualAnnotations': 'Esta imagem possui {count} anotações de tela dupla',
+        'flagged.hasDualAnnotations': 'Esta imagem possui {count} anotação(ões) vinculada(s) a outra(s) imagem(ns)',
         'flagged.flag': 'Sinalizar',
         'flagged.flagged': 'Sinalizada',
 
@@ -2215,7 +2215,7 @@ const translations = {
         'flagged.compareImages': 'Compare Images',
         'flagged.annotationsSaved': 'Annotations saved successfully',
         'flagged.addRelated': 'Add Related',
-        'flagged.hasDualAnnotations': 'This image has {count} dual-screen annotations',
+        'flagged.hasDualAnnotations': 'This image has {count} linked annotation(s) related to other image(s)',
         'flagged.flag': 'Flag',
         'flagged.flagged': 'Flagged',
 
