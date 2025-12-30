@@ -519,38 +519,35 @@ const dualAnnotationReducer = (state, action) => {
             // Must be from different sides
             if (firstSide === secondSide) return state;
 
-            // Determine source (left) and target (right) annotation IDs
-            let sourceAnnotationId = firstSide === 'left' ? firstId : secondId;
-            let targetAnnotationId = firstSide === 'right' ? firstId : secondId;
-            const sourceSide = firstSide === 'left' ? 'left' : 'right';
-            const targetSide = firstSide === 'right' ? 'left' : 'right';
+            // Determine which annotation is from left and which from right
+            // Links always store leftAnnotationId and rightAnnotationId regardless of click order
+            const leftAnnotationId = firstSide === 'left' ? firstId : secondId;
+            const rightAnnotationId = firstSide === 'right' ? firstId : secondId;
 
-            // Get the source and target annotations
-            const sourceKey = sourceSide === 'left' ? 'leftAnnotations' : 'rightAnnotations';
-            const targetKey = targetSide === 'left' ? 'leftAnnotations' : 'rightAnnotations';
-            const sourceAnnotation = state[sourceKey].find(a => a.id === sourceAnnotationId);
-            const targetAnnotation = state[targetKey].find(a => a.id === targetAnnotationId);
+            // Get the annotations from their respective arrays
+            const leftAnnotation = state.leftAnnotations.find(a => a.id === leftAnnotationId);
+            const rightAnnotation = state.rightAnnotations.find(a => a.id === rightAnnotationId);
 
-            if (!sourceAnnotation || !targetAnnotation) return state;
+            if (!leftAnnotation || !rightAnnotation) return state;
 
-            // Check if source annotation is already linked to a DIFFERENT target
-            // If so, clone the source annotation for the new link
-            let updatedSourceAnnotations = state[sourceKey];
-            const existingSourceLink = state.linkedPairs.find(lp =>
-                (sourceSide === 'left' && lp.leftAnnotationId === sourceAnnotationId) ||
-                (sourceSide === 'right' && lp.rightAnnotationId === sourceAnnotationId)
+            // Check if left annotation is already linked to a DIFFERENT right image
+            // If so, clone the left annotation for the new link
+            let updatedLeftAnnotations = state.leftAnnotations;
+            let finalLeftAnnotationId = leftAnnotationId;
+            const existingLeftLink = state.linkedPairs.find(lp =>
+                lp.leftAnnotationId === leftAnnotationId
             );
 
-            // Clone source annotation if it's already linked (to support multi-target)
-            if (existingSourceLink) {
+            // Clone left annotation if it's already linked (to support multi-target)
+            if (existingLeftLink) {
                 const clonedAnnotation = {
-                    ...sourceAnnotation,
+                    ...leftAnnotation,
                     id: generateId(), // New unique ID for the clone
                     linkId: undefined, // Will be set via the link
                     linkedImageId: undefined,
                 };
-                updatedSourceAnnotations = [...state[sourceKey], clonedAnnotation];
-                sourceAnnotationId = clonedAnnotation.id; // Use the clone for the new link
+                updatedLeftAnnotations = [...state.leftAnnotations, clonedAnnotation];
+                finalLeftAnnotationId = clonedAnnotation.id; // Use the clone for the new link
             }
 
             const linkId = generateLinkId();
@@ -559,8 +556,8 @@ const dualAnnotationReducer = (state, action) => {
 
             const newLink = {
                 linkId,
-                leftAnnotationId: sourceSide === 'left' ? sourceAnnotationId : targetAnnotationId,
-                rightAnnotationId: sourceSide === 'right' ? sourceAnnotationId : targetAnnotationId,
+                leftAnnotationId: finalLeftAnnotationId,
+                rightAnnotationId: rightAnnotationId,
                 color,
                 name: `Pair ${pairNumber}`,
                 // Track target image for multi-target support
@@ -569,7 +566,7 @@ const dualAnnotationReducer = (state, action) => {
 
             const newState = {
                 ...state,
-                [sourceKey]: updatedSourceAnnotations,
+                leftAnnotations: updatedLeftAnnotations,
                 linkedPairs: [...state.linkedPairs, newLink],
                 isLinkingMode: false,
                 pendingLinkAnnotation: null,

@@ -557,6 +557,7 @@ const FlaggedImageDetailPanel = ({
 
   // State for inline analysis details view
   const [selectedAnalysisForView, setSelectedAnalysisForView] = useState(null);
+  const [linkedAnnotationCount, setLinkedAnnotationCount] = useState(0);
 
   // Reset selected analysis and active tab when image changes
   useEffect(() => {
@@ -1262,7 +1263,25 @@ const FlaggedImageDetailPanel = ({
                     <button
                       onClick={() => {
                         if (!directEdge) return;
-                        setShowRemoveConfirmModal(true);
+
+                        // Fetch linked annotations count before showing modal
+                        setLoadingRelationshipGraph(true);
+                        const fetchCount = async () => {
+                          try {
+                            const [sourceAnns, targetAnns] = await Promise.all([
+                              api.getDualAnnotations(image.imageId, selectedRelatedNode.id),
+                              api.getDualAnnotations(selectedRelatedNode.id, image.imageId)
+                            ]);
+                            setLinkedAnnotationCount(sourceAnns.length + targetAnns.length);
+                          } catch (err) {
+                            console.error("Error fetching linked annotations count:", err);
+                            setLinkedAnnotationCount(0);
+                          } finally {
+                            setLoadingRelationshipGraph(false);
+                            setShowRemoveConfirmModal(true);
+                          }
+                        };
+                        fetchCount();
                       }}
                       disabled={!directEdge}
                       title={directEdge ? (t('relationship.removeRelationship') || 'Remove relationship') : (t('relationship.indirectRelationship') || 'Cannot remove indirect relationship')}
@@ -1301,7 +1320,7 @@ const FlaggedImageDetailPanel = ({
               currentImageId={image.imageId}
               currentImageFilename={image.filename}
               onRelationshipsCreated={(count) => {
-                showToast.success(`Linked ${count} image${count !== 1 ? 's' : ''} as related`);
+                showToast(`Linked ${count} image${count !== 1 ? 's' : ''} as related`, 'success');
                 // Refresh the relationship graph
                 setLoadingRelationshipGraph(true);
                 api.getRelationshipGraph(image.imageId, graphDepth) // Use current depth
@@ -1333,6 +1352,7 @@ const FlaggedImageDetailPanel = ({
               onClose={() => setShowRemoveConfirmModal(false)}
               sourceImage={image}
               targetNode={selectedRelatedNode}
+              linkedAnnotationCount={linkedAnnotationCount}
               isRemoving={loadingRelationshipGraph}
               onConfirm={async () => {
                 if (!selectedRelatedNode || !image) return;
@@ -1344,15 +1364,40 @@ const FlaggedImageDetailPanel = ({
                 );
 
                 if (!edge || !edge.id) {
-                  showToast.error("Cannot remove: Relationship ID missing");
+                  showToast("Cannot remove: Relationship ID missing", 'error');
                   setShowRemoveConfirmModal(false);
                   return;
                 }
 
                 try {
                   setLoadingRelationshipGraph(true);
+
+                  // 1. Check for annotations again to be safe and get their IDs
+                  let annotationsToDelete = [];
+                  try {
+                    // Check both directions
+                    const [sourceAnns, targetAnns] = await Promise.all([
+                      api.getDualAnnotations(image.imageId, selectedRelatedNode.id),
+                      api.getDualAnnotations(selectedRelatedNode.id, image.imageId)
+                    ]);
+                    annotationsToDelete = [...sourceAnns, ...targetAnns];
+                  } catch (err) {
+                    console.error("Error checking for annotations to delete:", err);
+                    // Continue to try relationship removal even if annotation check fails
+                  }
+
+                  // 2. Delete annotations if any found
+                  if (annotationsToDelete.length > 0) {
+                    const deletePromises = annotationsToDelete.map(ann =>
+                      api.deleteDualAnnotation(ann.id || ann._id)
+                        .catch(e => console.error(`Failed to delete annotation ${ann.id}`, e))
+                    );
+                    await Promise.all(deletePromises);
+                  }
+
+                  // 3. Remove the relationship
                   await api.removeRelationship(edge.id);
-                  showToast.success(t('flagged.relationshipRemoved') || "Relationship removed");
+                  showToast(t('flagged.relationshipRemoved') || "Relationship removed", 'success');
 
                   // Refresh graph
                   const data = await api.getRelationshipGraph(image.imageId, graphDepth);
@@ -1361,7 +1406,7 @@ const FlaggedImageDetailPanel = ({
                   setShowRemoveConfirmModal(false);
                 } catch (error) {
                   console.error("Failed to remove relationship", error);
-                  showToast.error(t('flagged.removeRelationshipError') || "Failed to remove relationship");
+                  showToast(t('flagged.removeRelationshipError') || "Failed to remove relationship", 'error');
                 } finally {
                   setLoadingRelationshipGraph(false);
                 }
@@ -1456,6 +1501,13 @@ const FlaggedImageDetailPanel = ({
               }
             };
             fetchAnnotations();
+
+            // Refresh the relationship graph
+            setLoadingRelationshipGraph(true);
+            api.getRelationshipGraph(image.imageId, graphDepth)
+              .then(data => setRelationshipGraph(data))
+              .catch(console.error)
+              .finally(() => setLoadingRelationshipGraph(false));
           }}
         />
       )}

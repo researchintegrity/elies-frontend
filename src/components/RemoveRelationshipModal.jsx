@@ -15,6 +15,7 @@ const RemoveRelationshipModal = ({
     onConfirm,
     sourceImage, // { id, filename }
     targetNode,  // { id, label/filename }
+    linkedAnnotationCount = 0, // Number of annotations that will be deleted
     isRemoving = false
 }) => {
     const { t } = useLanguage();
@@ -110,6 +111,12 @@ const RemoveRelationshipModal = ({
                             <p className="text-xs text-red-600 dark:text-red-400 mt-1 leading-relaxed">
                                 {t('relationship.confirmUnlinkMessage') || 'Are you sure you want to remove the relationship between these images? This action cannot be undone.'}
                             </p>
+                            {linkedAnnotationCount > 0 && (
+                                <p className="text-xs font-bold text-red-700 dark:text-red-300 mt-2">
+                                    {t('relationship.willDeleteAnnotations', { count: linkedAnnotationCount }) ||
+                                        `Warning: This will also permanently delete ${linkedAnnotationCount} linked annotation${linkedAnnotationCount !== 1 ? 's' : ''} between these images.`}
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>

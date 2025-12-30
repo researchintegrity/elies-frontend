@@ -50,6 +50,8 @@ const AnnotationShape = ({
     annotation,
     isSelected,
     isHovered,
+    isPendingLink,
+    isRecentlyLinked,
     onMouseDown,
     onHandleMouseDown,
     onPolygonPointMouseDown,
@@ -142,10 +144,63 @@ const AnnotationShape = ({
         ));
     };
 
+    // Calculate center for badge positioning
+    const getAnnotationCenter = () => {
+        if (annotation.type === ShapeTypes.POLYGON && annotation.points?.length > 0) {
+            const sumX = annotation.points.reduce((sum, p) => sum + p.x, 0);
+            const sumY = annotation.points.reduce((sum, p) => sum + p.y, 0);
+            return { x: sumX / annotation.points.length, y: sumY / annotation.points.length };
+        }
+        const { x, y, width, height } = normalizeRect(annotation);
+        return { x: x + width / 2, y: y + height / 2 };
+    };
+
+    const renderLinkBadge = () => {
+        if (!isPendingLink && !isRecentlyLinked) return null;
+        const center = getAnnotationCenter();
+        const badgeNumber = isPendingLink ? '1' : '2';
+        const badgeColor = isPendingLink ? '#F59E0B' : '#10B981'; // Amber for pending, green for linked
+        return (
+            <g>
+                {/* Pulsing glow effect */}
+                <circle
+                    cx={center.x}
+                    cy={center.y}
+                    r={20}
+                    fill={badgeColor}
+                    opacity={0.3}
+                    className={isPendingLink ? 'animate-ping' : 'animate-pulse'}
+                />
+                {/* Badge background */}
+                <circle
+                    cx={center.x}
+                    cy={center.y}
+                    r={14}
+                    fill={badgeColor}
+                    stroke="white"
+                    strokeWidth={2}
+                />
+                {/* Badge number */}
+                <text
+                    x={center.x}
+                    y={center.y + 5}
+                    textAnchor="middle"
+                    fill="white"
+                    fontSize={14}
+                    fontWeight="bold"
+                    style={{ pointerEvents: 'none' }}
+                >
+                    {badgeNumber}
+                </text>
+            </g>
+        );
+    };
+
     return (
         <g>
             {renderShape()}
             {renderResizeHandles()}
+            {renderLinkBadge()}
         </g>
     );
 };
@@ -273,6 +328,8 @@ const DualSVGAnnotationLayer = ({
     isDrawing,
     activeLabel,
     activeTool,
+    pendingLinkAnnotationId, // ID of annotation pending for linking (shows "1" badge)
+    recentlyLinkedAnnotationId, // ID of annotation just linked (shows brief "2" badge)
     getAnnotationColor, // Optional: function to get link color for annotation
     onMouseDown,
     onMouseMove,
@@ -323,6 +380,8 @@ const DualSVGAnnotationLayer = ({
                     annotation={annotation}
                     isSelected={selectedId === annotation.id}
                     isHovered={hoveredId === annotation.id}
+                    isPendingLink={pendingLinkAnnotationId === annotation.id}
+                    isRecentlyLinked={recentlyLinkedAnnotationId === annotation.id}
                     linkColor={getAnnotationColor ? getAnnotationColor(annotation.id) : null}
                     onMouseDown={(e) => onAnnotationMouseDown?.(e, annotation)}
                     onHandleMouseDown={(e, handle) => onHandleMouseDown?.(e, annotation, handle)}

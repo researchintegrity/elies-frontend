@@ -71,6 +71,7 @@ const ImageViewerPanel = ({
     image,
     annotations,
     onImageClick,
+    onLinkComplete,
     placeholder,
 }) => {
     const { state, actions, computed } = useDualAnnotation();
@@ -94,6 +95,9 @@ const ImageViewerPanel = ({
     // Rotation mode state (Alt key or 'O' key toggles it)
     const [isRotationMode, setIsRotationMode] = useState(false);
     const [rotationDragStart, setRotationDragStart] = useState(null);
+
+    // Recently linked annotation (for brief "2" badge)
+    const [recentlyLinkedId, setRecentlyLinkedId] = useState(null);
 
     const isActive = state.activeSide === side;
     const { activeTool, isDrawing, currentShape, selectedId, selectedSide, isLinkingMode, pendingLinkAnnotation } = state;
@@ -161,12 +165,38 @@ const ImageViewerPanel = ({
         const pos = getMousePosition(e);
         setDragStart(pos);
 
-        // Handle linking mode
+        // Handle Shift+Click for annotation linking (works with SELECT tool or linking mode)
+        if (e.shiftKey && (activeTool === ToolTypes.SELECT || isLinkingMode)) {
+            const clickedAnnotation = findAnnotationAtPoint(pos, annotations);
+            if (clickedAnnotation) {
+                if (pendingLinkAnnotation) {
+                    if (pendingLinkAnnotation.side !== side) {
+                        // Complete the link - annotations are from different sides
+                        setRecentlyLinkedId(clickedAnnotation.id);
+                        setTimeout(() => setRecentlyLinkedId(null), 300);
+                        actions.completeLink(clickedAnnotation.id, side);
+                        showToast('Annotations linked!', 'success');
+                    } else {
+                        // Same side - replace the pending selection
+                        actions.startLinking(clickedAnnotation.id, side);
+                    }
+                } else {
+                    // No pending annotation - start linking
+                    actions.startLinking(clickedAnnotation.id, side);
+                }
+                return;
+            }
+        }
+
+        // Handle linking mode (button-based)
         if (isLinkingMode) {
             const clickedAnnotation = findAnnotationAtPoint(pos, annotations);
             if (clickedAnnotation) {
                 if (pendingLinkAnnotation && pendingLinkAnnotation.side !== side) {
+                    setRecentlyLinkedId(clickedAnnotation.id);
+                    setTimeout(() => setRecentlyLinkedId(null), 300);
                     actions.completeLink(clickedAnnotation.id, side);
+                    showToast('Annotations linked!', 'success');
                 } else {
                     actions.startLinking(clickedAnnotation.id, side);
                 }
@@ -492,6 +522,8 @@ const ImageViewerPanel = ({
                             isDrawing={isDrawing && state.activeSide === side}
                             activeLabel={state.activeLabel}
                             activeTool={state.activeTool}
+                            pendingLinkAnnotationId={pendingLinkAnnotation?.side === side ? pendingLinkAnnotation.id : null}
+                            recentlyLinkedAnnotationId={recentlyLinkedId}
                             getAnnotationColor={getAnnotationLinkColor}
                             onMouseDown={handleMouseDown}
                             onMouseMove={handleMouseMove}
@@ -814,9 +846,13 @@ const ToolbarPanel = ({ onTriggerDetection, showUnlinked, onToggleShowUnlinked }
                     <FiLink2 size={14} />
                     {isLinkingMode ? 'Click target annotation...' : 'Link Selected'}
                 </button>
-                {isLinkingMode && (
+                {isLinkingMode ? (
                     <p className="mt-2 text-xs text-amber-400">
                         Click an annotation on the other image to create a link
+                    </p>
+                ) : (
+                    <p className="mt-2 text-xs text-gray-500">
+                        💡 Tip: Hold <kbd className="px-1 py-0.5 bg-gray-700 rounded text-gray-300">Shift</kbd> and click annotations on both images to link them quickly
                     </p>
                 )}
             </div>
@@ -940,12 +976,14 @@ const BottomPanel = ({
     isLoadingAnalyses = false,
     onSelectAnalysis,
     showLinkedOnly,
-    onToggleLinkedOnly
+    onToggleLinkedOnly,
+    showFlaggedOnly,
+    onToggleFlaggedOnly
 }) => {
     const { state, actions } = useDualAnnotation();
     const [activeTab, setActiveTab] = useState('gallery');
     const [searchQuery, setSearchQuery] = useState('');
-    const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
+    // showFlaggedOnly is now a prop
     // showLinkedOnly is now a prop
     const [expandedImage, setExpandedImage] = useState(null);
     const [panelHeight, setPanelHeight] = useState(256); // Default height in pixels (h-64 = 16rem = 256px)
@@ -997,7 +1035,7 @@ const BottomPanel = ({
     const getImageId = (img) => img.id || img._id;
 
     const filteredImages = images?.filter(img => {
-        if (showFlaggedOnly && !img.is_flagged) return false;
+
 
 
         const imgId = getImageId(img);
@@ -1098,7 +1136,7 @@ const BottomPanel = ({
                             <input
                                 type="checkbox"
                                 checked={showFlaggedOnly}
-                                onChange={(e) => setShowFlaggedOnly(e.target.checked)}
+                                onChange={(e) => onToggleFlaggedOnly(e.target.checked)}
                                 className="rounded bg-gray-700 border-gray-600 text-red-500 focus:ring-0"
                             />
                             Flagged Only
@@ -1347,14 +1385,17 @@ const DualImageComparisonModalInner = ({
     const [isRunningDetection, setIsRunningDetection] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [showLinkedOnly, setShowLinkedOnly] = useState(false);
+    const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
     const [showUnlinkedAnnotations, setShowUnlinkedAnnotations] = useState(true);
     const [totalImages, setTotalImages] = useState(0);
     const [linkedImageIds, setLinkedImageIds] = useState([]);
     const [analysisHistory, setAnalysisHistory] = useState([]);
     const [isLoadingAnalyses, setIsLoadingAnalyses] = useState(false);
+    const [pendingAutoSave, setPendingAutoSave] = useState(false);
 
     const initializedRef = useRef(null);
     const pollIntervalRef = useRef(null);
+    const prevLinkedPairsLengthRef = useRef(state.linkedPairs.length);
 
     // Cleanup polling on unmount
     useEffect(() => {
@@ -1559,6 +1600,9 @@ const DualImageComparisonModalInner = ({
             if (showLinkedOnly && state.leftImage?.id) {
                 params.linkedTo = state.leftImage.id;
             }
+            if (showFlaggedOnly) {
+                params.flagged = true;
+            }
             const response = await api.getImages(params);
             // Handle different response formats
             const items = response.items || response.data || response || [];
@@ -1571,11 +1615,11 @@ const DualImageComparisonModalInner = ({
         } finally {
             setIsLoadingImages(false);
         }
-    }, [showLinkedOnly, state.leftImage?.id]);
+    }, [showLinkedOnly, showFlaggedOnly, state.leftImage?.id]);
 
     useEffect(() => {
         loadImages(1);
-    }, [loadImages, showLinkedOnly, state.leftImage?.id]);
+    }, [loadImages, showLinkedOnly, showFlaggedOnly, state.leftImage?.id]);
 
     // Helper to refresh annotations from backend
     const refreshAnnotations = useCallback(async () => {
@@ -1597,10 +1641,14 @@ const DualImageComparisonModalInner = ({
             description: ann.text,
         });
 
+        let leftAnnotationsList = [];
+        let rightAnnotationsList = [];
+
         // Load Left Annotations
         try {
             const annotations = await api.getDualAnnotations(state.leftImage.id);
-            actions.setAnnotations('left', annotations.map(mapToInternal));
+            leftAnnotationsList = annotations.map(mapToInternal);
+            actions.setAnnotations('left', leftAnnotationsList);
         } catch (error) {
             console.error('Error reloading left annotations:', error);
         }
@@ -1613,12 +1661,76 @@ const DualImageComparisonModalInner = ({
                     const linkedId = ann.linked_image_id || ann.linkedImageId;
                     return !linkedId || (state.leftImage && linkedId === state.leftImage.id);
                 });
-                actions.setAnnotations('right', filtered.map(mapToInternal));
+                rightAnnotationsList = filtered.map(mapToInternal);
+                actions.setAnnotations('right', rightAnnotationsList);
             } catch (error) {
                 console.error('Error reloading right annotations:', error);
             }
         }
-    }, [state.leftImage, state.rightImage, actions]);
+
+        // Rebuild linkedPairs from reloaded annotations to ensure IDs match
+        const existingPairsMap = new Map(state.linkedPairs.map(p => [p.linkId, p]));
+        const linkMap = new Map();
+
+        leftAnnotationsList.forEach(ann => {
+            if (ann.linkId && ann.linkedImageId) {
+                const existingPair = existingPairsMap.get(ann.linkId);
+                if (!linkMap.has(ann.linkId)) {
+                    linkMap.set(ann.linkId, {
+                        linkId: ann.linkId,
+                        leftAnnotationId: ann.id,
+                        targetImageId: ann.linkedImageId,
+                        targetFilename: existingPair?.targetFilename,
+                        name: existingPair?.name || (ann.label?.name !== 'Shared Region' ? ann.label?.name : null),
+                        color: existingPair?.color || ann.label?.color,
+                        visible: existingPair?.visible,
+                    });
+                } else {
+                    linkMap.get(ann.linkId).leftAnnotationId = ann.id;
+                }
+            }
+        });
+
+        rightAnnotationsList.forEach(ann => {
+            if (ann.linkId) {
+                if (linkMap.has(ann.linkId)) {
+                    linkMap.get(ann.linkId).rightAnnotationId = ann.id;
+                } else {
+                    const existingPair = existingPairsMap.get(ann.linkId);
+                    linkMap.set(ann.linkId, {
+                        linkId: ann.linkId,
+                        rightAnnotationId: ann.id,
+                        targetImageId: state.rightImage?.id,
+                        targetFilename: state.rightImage?.filename,
+                        name: existingPair?.name || (ann.label?.name !== 'Shared Region' ? ann.label?.name : null),
+                        color: existingPair?.color || ann.label?.color,
+                        visible: existingPair?.visible,
+                    });
+                }
+            }
+        });
+
+        // Convert to array and assign names/colors
+        let nextPairNumber = 1;
+        const linkColors = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'];
+        const allPairs = Array.from(linkMap.values())
+            .filter(pair => pair.leftAnnotationId)
+            .map((pair) => {
+                let name = pair.name;
+                if (!name) {
+                    name = `Pair ${nextPairNumber}`;
+                    nextPairNumber++;
+                }
+                return {
+                    ...pair,
+                    name,
+                    color: pair.color || linkColors[(nextPairNumber - 1) % linkColors.length],
+                    visible: pair.visible !== false,
+                };
+            });
+
+        actions.setLinkedPairs(allPairs);
+    }, [state.leftImage, state.rightImage, state.linkedPairs, actions]);
 
     // Handle page change
     const handlePageChange = useCallback((newPage) => {
@@ -1851,12 +1963,20 @@ const DualImageComparisonModalInner = ({
             // Prepare dual annotations for batch save (ONLY NEW ONES)
             const newDualAnnotations = [];
 
+            console.log('[Save Debug] Left annotations:', state.leftAnnotations.map(a => ({ id: a.id, type: a.type })));
+            console.log('[Save Debug] Right annotations:', state.rightAnnotations.map(a => ({ id: a.id, type: a.type })));
+            console.log('[Save Debug] Linked pairs:', state.linkedPairs);
+
             // Left annotations (source = left, target = right)
             for (const ann of state.leftAnnotations) {
                 // Skip if it's an existing server annotation (doesn't start with ann_)
-                if (ann.id && !String(ann.id).startsWith('ann_')) continue;
+                if (ann.id && !String(ann.id).startsWith('ann_')) {
+                    console.log('[Save Debug] Skipping left ann (server ID):', ann.id);
+                    continue;
+                }
 
                 const link = computed.getLinkForAnnotation(ann.id, 'left');
+                console.log('[Save Debug] Left ann', ann.id, 'link:', link);
                 if (!link || !state.rightImage) continue; // Only save linked annotations in dual mode
 
                 newDualAnnotations.push({
@@ -1880,9 +2000,13 @@ const DualImageComparisonModalInner = ({
             // Right annotations (source = right, target = left)
             if (state.rightImage) {
                 for (const ann of state.rightAnnotations) {
-                    if (ann.id && !String(ann.id).startsWith('ann_')) continue;
+                    if (ann.id && !String(ann.id).startsWith('ann_')) {
+                        console.log('[Save Debug] Skipping right ann (server ID):', ann.id);
+                        continue;
+                    }
 
                     const link = computed.getLinkForAnnotation(ann.id, 'right');
+                    console.log('[Save Debug] Right ann', ann.id, 'link:', link);
                     if (!link) continue;
 
                     newDualAnnotations.push({
@@ -1905,8 +2029,12 @@ const DualImageComparisonModalInner = ({
             }
 
             // Batch save dual annotations using new API
+            console.log('[Save Debug] New dual annotations to save:', newDualAnnotations.length, newDualAnnotations);
             if (newDualAnnotations.length > 0) {
                 await api.createDualAnnotationsBatch(newDualAnnotations);
+                console.log('[Save Debug] Batch create completed');
+            } else {
+                console.log('[Save Debug] No new annotations to save!');
             }
 
             // Update existing annotations (non-new ones) that have been modified
@@ -1970,8 +2098,7 @@ const DualImageComparisonModalInner = ({
             // Update name/color for ALL linked annotations (including those not displayed)
             // This ensures changes propagate to annotations on images not currently shown
             for (const link of state.linkedPairs) {
-                // Remove the check for 'link_' prefix because server IDs also use it
-                // Just check if we have a valid linkId
+                // Skip if no linkId
                 if (!link.linkId) continue;
 
                 updatePromises.push(
@@ -1979,8 +2106,13 @@ const DualImageComparisonModalInner = ({
                         pair_name: link.name,
                         pair_color: link.color,
                     }).catch(err => {
-                        // Ignore 404s (means link doesn't exist in DB yet - it's being created now)
-                        if (!err.message || !err.message.includes('404')) {
+                        // Silently ignore 404s - means link is new and doesn't exist in DB yet
+                        // (it's being created via createDualAnnotationsBatch above)
+                        const is404 = err.message?.includes('404') ||
+                            err.message?.includes('Not Found') ||
+                            err.message?.includes('not found') ||
+                            err.response?.status === 404;
+                        if (!is404) {
                             console.error('Error updating link:', link.linkId, err);
                         }
                     })
@@ -2065,6 +2197,25 @@ const DualImageComparisonModalInner = ({
             setIsSaving(false);
         }
     }, [state, computed, actions, onSaveSuccess]);
+
+    // Auto-save when a new link is created (linkedPairs length increases)
+    useEffect(() => {
+        const currentLength = state.linkedPairs.length;
+        const prevLength = prevLinkedPairsLengthRef.current;
+
+        if (currentLength > prevLength && currentLength > 0) {
+            console.log('[Auto-save] New link detected, triggering save...');
+            // Use a small timeout to ensure state is fully updated
+            const timer = setTimeout(() => {
+                handleSave();
+            }, 50);
+
+            prevLinkedPairsLengthRef.current = currentLength;
+            return () => clearTimeout(timer);
+        }
+
+        prevLinkedPairsLengthRef.current = currentLength;
+    }, [state.linkedPairs.length, handleSave]);
 
     // Keyboard shortcuts
     useEffect(() => {
@@ -2170,6 +2321,7 @@ const DualImageComparisonModalInner = ({
                             side="left"
                             image={state.leftImage}
                             annotations={getDisplayAnnotations(state.leftAnnotations, 'left')}
+                            onLinkComplete={handleSave}
                             placeholder="Selected image"
                         />
                         <ImageViewerPanel
@@ -2177,6 +2329,7 @@ const DualImageComparisonModalInner = ({
                             image={state.rightImage}
                             annotations={getDisplayAnnotations(state.rightAnnotations, 'right')}
                             onImageClick={() => actions.toggleBottomPanel()}
+                            onLinkComplete={handleSave}
                             placeholder="Click to select candidate"
                         />
                     </div>
@@ -2204,6 +2357,8 @@ const DualImageComparisonModalInner = ({
                         })}
                         showLinkedOnly={showLinkedOnly}
                         onToggleLinkedOnly={setShowLinkedOnly}
+                        showFlaggedOnly={showFlaggedOnly}
+                        onToggleFlaggedOnly={setShowFlaggedOnly}
                     />
                 </div>
 
