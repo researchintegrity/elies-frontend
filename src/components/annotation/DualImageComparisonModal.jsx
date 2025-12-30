@@ -14,7 +14,7 @@ import {
     FiChevronDown, FiChevronUp, FiChevronRight, FiChevronLeft,
     FiRotateCw, FiZoomIn, FiZoomOut, FiMaximize2, FiCrop,
     FiSquare, FiCircle, FiEdit3, FiMousePointer, FiTrash2,
-    FiRefreshCw, FiGrid, FiLayers, FiPlay, FiSearch,
+    FiRefreshCw, FiGrid, FiLayers, FiPlay, FiSearch, FiEye, FiEyeOff,
 } from 'react-icons/fi';
 import { DualAnnotationProvider, useDualAnnotation, ShapeTypes, ToolTypes, DefaultLabels } from '../../context/DualAnnotationContext';
 import DualSVGAnnotationLayer from './DualSVGAnnotationLayer';
@@ -481,7 +481,7 @@ const ImageViewerPanel = ({
                     )}
 
                     {/* Annotation Layer */}
-                    {imageLoaded && (
+                    {imageLoaded && state.annotationsVisible && (
                         <DualSVGAnnotationLayer
                             width={imageSize.width}
                             height={imageSize.height}
@@ -511,12 +511,222 @@ const ImageViewerPanel = ({
     );
 };
 
+// Predefined colors for linked pairs
+const PAIR_COLORS = [
+    '#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6',
+    '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1',
+];
+
+// Linked Pair Item with editable name and color
+const LinkedPairItem = ({ pair, index, onUpdate, onDelete, rightImage }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editName, setEditName] = useState(pair.name || `Pair ${index + 1}`);
+    const [showColorPicker, setShowColorPicker] = useState(false);
+    const [pickerPos, setPickerPos] = useState({ top: 0, left: 0 });
+
+    const inputRef = useRef(null);
+    const buttonRef = useRef(null);
+    const pickerRef = useRef(null);
+
+    useEffect(() => {
+        if (isEditing && inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.select();
+        }
+    }, [isEditing]);
+
+    // Close color picker when clicking outside or scrolling
+    useEffect(() => {
+        const handleInteraction = (e) => {
+            // Check if click is inside the picker or the toggle button
+            if (showColorPicker &&
+                pickerRef.current &&
+                !pickerRef.current.contains(e.target) &&
+                buttonRef.current &&
+                !buttonRef.current.contains(e.target)) {
+                setShowColorPicker(false);
+            }
+        };
+
+        const handleScroll = () => {
+            if (showColorPicker) setShowColorPicker(false);
+        };
+
+        if (showColorPicker) {
+            document.addEventListener('mousedown', handleInteraction);
+            // Capture scroll events on the window (including sub-scrollers) to close picker
+            document.addEventListener('scroll', handleScroll, true);
+            window.addEventListener('resize', handleScroll);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleInteraction);
+            document.removeEventListener('scroll', handleScroll, true);
+            window.removeEventListener('resize', handleScroll);
+        };
+    }, [showColorPicker]);
+
+    const handleNameSubmit = () => {
+        if (editName.trim() && editName !== pair.name) {
+            onUpdate(pair.linkId, { name: editName.trim() });
+        }
+        setIsEditing(false);
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter') handleNameSubmit();
+        if (e.key === 'Escape') {
+            setEditName(pair.name || `Pair ${index + 1}`);
+            setIsEditing(false);
+        }
+    };
+
+    const togglePicker = () => {
+        if (!showColorPicker) {
+            // Calculate position
+            const rect = buttonRef.current.getBoundingClientRect();
+            // Default: Position to the left of the button
+            let top = rect.top;
+            let left = rect.left - 200; // 200px (w-48 + padding)
+
+            // Boundary checks
+            const pickerHeight = 150;
+            if (top + pickerHeight > window.innerHeight) {
+                top = rect.bottom - pickerHeight; // Align bottom edges
+            }
+            if (left < 10) {
+                left = rect.right + 10; // Flip to right if not enough space on left
+            }
+
+            setPickerPos({ top, left });
+            setShowColorPicker(true);
+        } else {
+            setShowColorPicker(false);
+        }
+    };
+
+    const handleColorSelect = (color) => {
+        onUpdate(pair.linkId, { color });
+        setShowColorPicker(false);
+    };
+
+    // Helper to get short display name for image
+    const getImageDisplayName = (img) => {
+        if (!img) return 'Unknown';
+        if (img.filename) {
+            const name = img.filename;
+            return name.length > 15 ? name.substring(0, 12) + '...' : name;
+        }
+        return img.id?.substring(0, 8) || 'Unknown';
+    };
+
+    return (
+        <div className="bg-gray-700/50 rounded-lg p-2">
+            <div className="flex items-center gap-2">
+                {/* Color Swatch */}
+                <button
+                    ref={buttonRef}
+                    onClick={togglePicker}
+                    className="w-5 h-5 rounded-full border-2 border-gray-500 hover:border-white transition-colors flex-shrink-0"
+                    style={{ backgroundColor: pair.color }}
+                    title="Change color"
+                />
+
+                {/* Name */}
+                <div className="flex-1 min-w-0">
+                    {isEditing ? (
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            onBlur={handleNameSubmit}
+                            onKeyDown={handleKeyDown}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded outline-none focus:ring-1 focus:ring-indigo-500"
+                            maxLength={30}
+                        />
+                    ) : (
+                        <>
+                            <span
+                                onClick={() => setIsEditing(true)}
+                                className="block text-xs text-gray-200 cursor-pointer hover:text-white truncate"
+                                title="Click to edit name"
+                            >
+                                {pair.name || `Pair ${index + 1}`}
+                            </span>
+                            {/* Show linked target image */}
+                            <span
+                                className={`block text-[10px] truncate ${pair.targetImageId === rightImage?.id ? 'text-green-500' : 'text-gray-500'}`}
+                                title={`Target: ${pair.targetFilename || pair.targetImageId || rightImage?.filename || 'Unknown'}`}
+                            >
+                                → {getImageDisplayName({ filename: pair.targetFilename, id: pair.targetImageId }) || getImageDisplayName(rightImage)}
+                                {pair.targetImageId !== rightImage?.id && <span className="ml-1 text-amber-500">(other)</span>}
+                            </span>
+                        </>
+                    )}
+                </div>
+
+                {/* Visibility Toggle */}
+                <button
+                    onClick={() => onUpdate(pair.linkId, { visible: pair.visible === false ? true : false })}
+                    className={`p-1 rounded hover:bg-gray-600 flex-shrink-0 ${pair.visible === false ? 'text-gray-600' : 'text-green-400'}`}
+                    title={pair.visible === false ? 'Show this pair' : 'Hide this pair'}
+                >
+                    {pair.visible === false ? <FiEyeOff size={14} /> : <FiEye size={14} />}
+                </button>
+
+                {/* Delete Button */}
+                <button
+                    onClick={() => onDelete(pair.linkId)}
+                    className="p-1 rounded hover:bg-gray-600 text-gray-400 hover:text-red-400 flex-shrink-0"
+                    title="Remove link"
+                >
+                    <FiXCircle size={14} />
+                </button>
+            </div>
+
+            {/* Fixed Position Color Picker Dropdown */}
+            {showColorPicker && (
+                <div
+                    ref={pickerRef}
+                    className="fixed p-2 bg-gray-800 rounded-lg border border-gray-600 shadow-xl w-48 z-[9999]"
+                    style={{ top: pickerPos.top, left: pickerPos.left }}
+                >
+                    <div className="grid grid-cols-5 gap-1 mb-2">
+                        {PAIR_COLORS.map((color) => (
+                            <button
+                                key={color}
+                                onClick={() => handleColorSelect(color)}
+                                className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${pair.color === color ? 'ring-2 ring-white ring-offset-1 ring-offset-gray-800' : ''}`}
+                                style={{ backgroundColor: color }}
+                            />
+                        ))}
+                    </div>
+                    {/* Custom Color Native Picker */}
+                    <div className="pt-2 border-t border-gray-700 flex items-center justify-between">
+                        <span className="text-[10px] text-gray-400">Custom Color:</span>
+                        <div className="relative overflow-hidden w-8 h-6 rounded border border-gray-600 cursor-pointer hover:border-gray-400">
+                            <input
+                                type="color"
+                                value={pair.color}
+                                onChange={(e) => handleColorSelect(e.target.value)}
+                                className="absolute -top-2 -left-2 w-12 h-12 cursor-pointer p-0 border-0 opacity-0"
+                            />
+                            {/* Visual indicator of current custom color */}
+                            <div className="w-full h-full" style={{ backgroundColor: pair.color }} />
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 // Right Toolbar Panel
 const ToolbarPanel = ({ onTriggerDetection }) => {
     const { state, actions, computed } = useDualAnnotation();
     // const { t } = useLanguage(); // Removed unused var
 
-    const { activeTool, activeLabel, availableLabels, linkedPairs, toolbarExpanded, isLinkingMode } = state;
+    const { activeTool, linkedPairs, toolbarExpanded, isLinkingMode, annotationsVisible } = state;
 
     if (!toolbarExpanded) {
         return (
@@ -533,7 +743,7 @@ const ToolbarPanel = ({ onTriggerDetection }) => {
     }
 
     return (
-        <div className="w-64 flex flex-col bg-gray-800 border-l border-gray-700 overflow-hidden">
+        <div className="w-72 flex flex-col bg-gray-800 border-l border-gray-700 overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
                 <h3 className="text-sm font-semibold text-white">Tools</h3>
@@ -581,28 +791,6 @@ const ToolbarPanel = ({ onTriggerDetection }) => {
                 </div>
             </div>
 
-            {/* Labels */}
-            <div className="p-3 border-b border-gray-700">
-                <div className="text-xs font-medium text-gray-400 uppercase mb-2">Label</div>
-                <div className="space-y-1">
-                    {availableLabels.slice(0, 4).map(label => (
-                        <button
-                            key={label.id}
-                            onClick={() => actions.setActiveLabel(label)}
-                            className={`
-                                w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm
-                                ${activeLabel?.id === label.id
-                                    ? 'bg-gray-700 text-white'
-                                    : 'text-gray-300 hover:bg-gray-700/50'}
-                            `}
-                        >
-                            <span className="w-3 h-3 rounded" style={{ backgroundColor: label.color }} />
-                            {label.name}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
             {/* Link Annotations */}
             <div className="p-3 border-b border-gray-700">
                 <div className="text-xs font-medium text-gray-400 uppercase mb-2">Link Annotations</div>
@@ -635,30 +823,32 @@ const ToolbarPanel = ({ onTriggerDetection }) => {
 
             {/* Linked Pairs List */}
             <div className="flex-1 overflow-auto p-3">
-                <div className="text-xs font-medium text-gray-400 uppercase mb-2">
-                    Linked Pairs ({linkedPairs.length})
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-gray-400 uppercase">
+                        Linked Pairs ({linkedPairs.length})
+                    </span>
+                    <button
+                        onClick={actions.toggleAnnotationsVisibility}
+                        className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${annotationsVisible ? 'text-green-400 hover:bg-gray-700' : 'text-gray-500 hover:bg-gray-700'}`}
+                        title={annotationsVisible ? 'Hide all annotations' : 'Show all annotations'}
+                    >
+                        {annotationsVisible ? <FiEye size={12} /> : <FiEyeOff size={12} />}
+                        <span>{annotationsVisible ? 'Hide All' : 'Show All'}</span>
+                    </button>
                 </div>
                 {linkedPairs.length === 0 ? (
                     <p className="text-xs text-gray-500">No linked pairs yet</p>
                 ) : (
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                         {linkedPairs.map((pair, idx) => (
-                            <div
+                            <LinkedPairItem
                                 key={pair.linkId}
-                                className="flex items-center justify-between px-2 py-1.5 bg-gray-700/50 rounded"
-                            >
-                                <div className="flex items-center gap-2">
-                                    <span className="w-3 h-3 rounded" style={{ backgroundColor: pair.color }} />
-                                    <span className="text-xs text-gray-300">Pair {idx + 1}</span>
-                                </div>
-                                <button
-                                    onClick={() => actions.deleteLink(pair.linkId)}
-                                    className="p-1 rounded hover:bg-gray-600 text-gray-400 hover:text-red-400"
-                                    title="Remove link"
-                                >
-                                    <FiXCircle size={12} />
-                                </button>
-                            </div>
+                                pair={pair}
+                                index={idx}
+                                onUpdate={actions.updateLink}
+                                onDelete={actions.deleteLink}
+                                rightImage={state.rightImage}
+                            />
                         ))}
                     </div>
                 )}
@@ -707,7 +897,7 @@ const ToolbarPanel = ({ onTriggerDetection }) => {
                     <FiTrash2 size={14} className="mx-auto" />
                 </button>
             </div>
-        </div>
+        </div >
     );
 };
 
@@ -1208,6 +1398,60 @@ const DualImageComparisonModalInner = ({
         fetchAnalyses();
     }, [state.leftImage?.id, state.rightImage?.id]);
 
+    // Helper to dynamic update labels based on links
+    const getDisplayAnnotations = useCallback((annotations, side) => {
+        if (!annotations) return [];
+        const currentRightId = state.rightImage?.id;
+
+        return annotations
+            .map((ann) => {
+                // First check if this annotation is in our linkedPairs
+                const link = state.linkedPairs.find(lp =>
+                    (side === 'left' && lp.leftAnnotationId === ann.id) ||
+                    (side === 'right' && lp.rightAnnotationId === ann.id)
+                );
+
+                if (link) {
+                    // Skip if this link is hidden
+                    if (link.visible === false) return null;
+
+                    // Check if this is from a different target (for triplicate detection)
+                    const isFromOtherTarget = link.targetImageId && link.targetImageId !== currentRightId;
+
+                    // Use dynamic name and color from the link
+                    return {
+                        ...ann,
+                        linkId: link.linkId,
+                        isFromOtherTarget, // Mark for visual distinction
+                        label: {
+                            id: 'shared',
+                            name: link.name || `Pair ${state.linkedPairs.indexOf(link) + 1}`,
+                            color: link.color || '#8B5CF6'
+                        }
+                    };
+                } else if (ann.linkId || ann.link_id || ann.linkedImageId || ann.linked_image_id) {
+                    // Existing linked annotation without active link in state (from server)
+                    // This can happen for annotations linked to images not currently being compared
+                    const linkedImgId = ann.linkedImageId || ann.linked_image_id;
+                    const isFromOtherTarget = linkedImgId && linkedImgId !== currentRightId;
+
+                    const pairIndex = annotations.filter(a => a.linkId || a.link_id).indexOf(ann);
+                    return {
+                        ...ann,
+                        linkId: ann.linkId || ann.link_id,
+                        isFromOtherTarget,
+                        label: {
+                            id: 'shared',
+                            name: `Pair ${pairIndex + 1}`,
+                            color: isFromOtherTarget ? '#9CA3AF' : '#8B5CF6' // Gray for other targets
+                        }
+                    };
+                }
+                return ann;
+            })
+            .filter(Boolean); // Remove hidden annotations (null values)
+    }, [state.linkedPairs, state.rightImage?.id]);
+
     // Initialize with selected image
     useEffect(() => {
         if (selectedImage) {
@@ -1232,23 +1476,44 @@ const DualImageComparisonModalInner = ({
                 const mapToInternal = (ann) => ({
                     id: ann._id || ann.id,
                     type: ann.shape_type || ShapeTypes.RECTANGLE,
-                    label: DefaultLabels.find(l => l.id === ann.type) || DefaultLabels[0],
+                    label: (ann.link_id || ann.linked_image_id || ann.linkId || ann.linkedImageId)
+                        ? { id: 'shared', name: 'Shared Region', color: '#8B5CF6' }
+                        : (DefaultLabels.find(l => l.id === ann.type) || DefaultLabels[0]),
                     x: ann.coords?.x || 0,
                     y: ann.coords?.y || 0,
                     width: ann.coords?.width || 0,
                     height: ann.coords?.height || 0,
                     points: ann.coords?.points,
-                    linkId: ann.link_id,
-                    linkedImageId: ann.linked_image_id,
+                    linkId: ann.link_id || ann.linkId,
+                    linkedImageId: ann.linked_image_id || ann.linkedImageId,
                     description: ann.text,
                 });
 
                 // Filter annotations: Show generic ones OR ones linked to current right image
                 const filtered = existingAnnotations
-                    .filter(ann => !ann.linked_image_id || (state.rightImage && ann.linked_image_id === state.rightImage.id))
+                    .filter(ann => {
+                        const linkedId = ann.linked_image_id || ann.linkedImageId;
+                        return !linkedId || (state.rightImage && linkedId === state.rightImage.id);
+                    })
                     .map(mapToInternal);
 
                 actions.setAnnotations('left', filtered);
+
+                // Reconstruct linkedPairs from annotations that have link_id
+                // This ensures the sidebar shows existing pairs
+                const linkMap = new Map();
+                filtered.forEach(ann => {
+                    if (ann.linkId) {
+                        if (!linkMap.has(ann.linkId)) {
+                            linkMap.set(ann.linkId, { leftAnnotationId: ann.id });
+                        } else {
+                            linkMap.get(ann.linkId).leftAnnotationId = ann.id;
+                        }
+                    }
+                });
+
+                // We'll need to also check right annotations when they're loaded
+                // For now, just mark that we've initialized
                 initializedRef.current = state.leftImage.id;
             }
         }
@@ -1286,54 +1551,133 @@ const DualImageComparisonModalInner = ({
     // Handle candidate image selection
     const handleSelectCandidateImage = useCallback(async (img) => {
         const rightId = img.id || img._id;
+        const rightFilename = img.filename;
+
         actions.setRightImage({
             id: rightId,
             url: getImageUrl(rightId),
-            filename: img.filename,
+            filename: rightFilename,
         });
 
         const mapToInternal = (ann) => ({
             id: ann._id || ann.id,
             type: ann.shape_type || ShapeTypes.RECTANGLE,
-            label: DefaultLabels.find(l => l.id === ann.type) || DefaultLabels[0],
+            label: (ann.link_id || ann.linked_image_id || ann.linkId || ann.linkedImageId)
+                ? { id: 'shared', name: 'Shared Region', color: '#8B5CF6' }
+                : (DefaultLabels.find(l => l.id === ann.type) || DefaultLabels[0]),
             x: ann.coords?.x || 0,
             y: ann.coords?.y || 0,
             width: ann.coords?.width || 0,
             height: ann.coords?.height || 0,
             points: ann.coords?.points,
-            linkId: ann.link_id,
-            linkedImageId: ann.linked_image_id,
+            linkId: ann.link_id || ann.linkId,
+            linkedImageId: ann.linked_image_id || ann.linkedImageId,
             description: ann.text,
         });
+
+        let leftAnnotationsList = [];
+        let rightAnnotationsList = [];
 
         // Load annotations for Right image (Filter: Generic or Linked to Left)
         try {
             const annotations = await api.getAnnotations(rightId);
-            const filteredRight = annotations.filter(ann =>
-                !ann.linked_image_id ||
-                (state.leftImage && ann.linked_image_id === state.leftImage.id)
-            );
-            actions.setAnnotations('right', filteredRight.map(mapToInternal));
+            const filteredRight = annotations.filter(ann => {
+                const linkedId = ann.linked_image_id || ann.linkedImageId;
+                return !linkedId || (state.leftImage && linkedId === state.leftImage.id);
+            });
+            rightAnnotationsList = filteredRight.map(mapToInternal);
+            actions.setAnnotations('right', rightAnnotationsList);
         } catch (error) {
             console.error('Error loading right annotations:', error);
         }
 
-        // Re-load/Re-filter annotations for Left image (Filter: Generic or Linked to NEW Right)
+        // Load ALL annotations for Left image (include annotations linked to ANY target)
+        // This allows seeing previous annotations from other targets for triplicate detection
         if (state.leftImage) {
             try {
                 const annotations = await api.getAnnotations(state.leftImage.id);
-                const filteredLeft = annotations.filter(ann =>
-                    !ann.linked_image_id ||
-                    ann.linked_image_id === rightId
-                );
-                actions.setAnnotations('left', filteredLeft.map(mapToInternal));
+                // Load ALL linked annotations, not filtered by current right image
+                leftAnnotationsList = annotations.map(mapToInternal);
+                actions.setAnnotations('left', leftAnnotationsList);
                 // Update init ref so existingAnnotations effect doesn't overwrite
                 if (initializedRef.current) initializedRef.current = state.leftImage.id;
             } catch (error) {
                 console.error('Error reloading left annotations:', error);
             }
         }
-    }, [actions, state.leftImage]);
+
+        // Reconstruct linkedPairs from annotations - preserve existing names/colors
+        const linkColors = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'];
+
+        // Create a map of existing pairs by linkId to preserve their properties
+        const existingPairsMap = new Map(state.linkedPairs.map(p => [p.linkId, p]));
+
+        // Build pairs from ALL left annotations that have links
+        const linkMap = new Map();
+
+        // Collect ALL left annotations with links (to any target)
+        leftAnnotationsList.forEach(ann => {
+            if (ann.linkId && ann.linkedImageId) {
+                const existingPair = existingPairsMap.get(ann.linkId);
+                if (!linkMap.has(ann.linkId)) {
+                    linkMap.set(ann.linkId, {
+                        linkId: ann.linkId,
+                        leftAnnotationId: ann.id,
+                        targetImageId: ann.linkedImageId,
+                        targetFilename: ann.linkedImageId === rightId ? rightFilename : existingPair?.targetFilename,
+                        // Preserve existing properties
+                        name: existingPair?.name,
+                        color: existingPair?.color,
+                        visible: existingPair?.visible,
+                    });
+                } else {
+                    linkMap.get(ann.linkId).leftAnnotationId = ann.id;
+                }
+            }
+        });
+
+        // Collect right annotations with links (for current pair only)
+        rightAnnotationsList.forEach(ann => {
+            if (ann.linkId) {
+                if (linkMap.has(ann.linkId)) {
+                    linkMap.get(ann.linkId).rightAnnotationId = ann.id;
+                } else {
+                    const existingPair = existingPairsMap.get(ann.linkId);
+                    linkMap.set(ann.linkId, {
+                        linkId: ann.linkId,
+                        rightAnnotationId: ann.id,
+                        targetImageId: rightId,
+                        targetFilename: rightFilename,
+                        name: existingPair?.name,
+                        color: existingPair?.color,
+                        visible: existingPair?.visible,
+                    });
+                }
+            }
+        });
+
+        // Convert to array and assign names/colors to pairs that don't have them
+        let nextPairNumber = 1;
+        const allPairs = Array.from(linkMap.values())
+            .filter(pair => pair.leftAnnotationId) // Must have left annotation at minimum
+            .map((pair) => {
+                // Determine the display name - use existing or generate new
+                let name = pair.name;
+                if (!name) {
+                    name = `Pair ${nextPairNumber}`;
+                    nextPairNumber++;
+                }
+
+                return {
+                    ...pair,
+                    name,
+                    color: pair.color || linkColors[(nextPairNumber - 1) % linkColors.length],
+                    visible: pair.visible !== false,
+                };
+            });
+
+        actions.setLinkedPairs(allPairs);
+    }, [actions, state.leftImage, state.linkedPairs]);
 
     // Run cross-copy-move detection
     const handleRunDetection = useCallback(async () => {
@@ -1476,21 +1820,67 @@ const DualImageComparisonModalInner = ({
 
                     if (state.leftImage) {
                         const anns = await api.getAnnotations(state.leftImage.id);
-                        // Filter: Generic OR linked to Right
-                        const filtered = anns.filter(ann =>
-                            !ann.linked_image_id ||
-                            (state.rightImage && ann.linked_image_id === state.rightImage.id)
-                        );
-                        actions.setAnnotations('left', mapToInternal(filtered));
+                        // Load ALL annotations (including those linked to other targets for triplicate detection)
+                        actions.setAnnotations('left', mapToInternal(anns));
                     }
                     if (state.rightImage) {
                         const anns = await api.getAnnotations(state.rightImage.id);
-                        // Filter: Generic OR linked to Left
+                        // Filter: Generic OR linked to Left (only current pair for right side)
                         const filtered = anns.filter(ann =>
                             !ann.linked_image_id ||
                             (state.leftImage && ann.linked_image_id === state.leftImage.id)
                         );
                         actions.setAnnotations('right', mapToInternal(filtered));
+                    }
+
+                    // Rebuild linkedPairs from all annotations to maintain consistency
+                    if (state.leftImage) {
+                        const allLeftAnns = await api.getAnnotations(state.leftImage.id);
+                        const linkColors = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'];
+                        const existingPairsMap = new Map(state.linkedPairs.map(p => [p.linkId, p]));
+                        const newLinkMap = new Map();
+
+                        // Group annotations by linkId
+                        for (const ann of allLeftAnns) {
+                            const linkId = ann.link_id || ann.linkId;
+                            const linkedImageId = ann.linked_image_id || ann.linkedImageId;
+                            if (linkId && linkedImageId) {
+                                if (!newLinkMap.has(linkId)) {
+                                    // Preserve existing pair properties (name, color, visible) if they exist
+                                    const existingPair = existingPairsMap.get(linkId);
+                                    newLinkMap.set(linkId, {
+                                        linkId,
+                                        leftAnnotationId: ann._id || ann.id,
+                                        targetImageId: linkedImageId,
+                                        name: existingPair?.name,
+                                        color: existingPair?.color,
+                                        visible: existingPair?.visible,
+                                    });
+                                }
+                            }
+                        }
+
+                        // For current right image, also check right annotations
+                        if (state.rightImage) {
+                            const rightAnns = await api.getAnnotations(state.rightImage.id);
+                            for (const ann of rightAnns) {
+                                const linkId = ann.link_id || ann.linkId;
+                                if (linkId && newLinkMap.has(linkId)) {
+                                    newLinkMap.get(linkId).rightAnnotationId = ann._id || ann.id;
+                                }
+                            }
+                        }
+
+                        // Convert to array and assign names/colors to new pairs
+                        let pairIndex = 0;
+                        const rebuiltPairs = Array.from(newLinkMap.values()).map(pair => ({
+                            ...pair,
+                            name: pair.name || `Pair ${++pairIndex}`,
+                            color: pair.color || linkColors[(pairIndex - 1) % linkColors.length],
+                            visible: pair.visible !== false,
+                        }));
+
+                        actions.setLinkedPairs(rebuiltPairs);
                     }
                 } catch (e) {
                     console.error('Error refreshing annotations:', e);
@@ -1625,13 +2015,13 @@ const DualImageComparisonModalInner = ({
                         <ImageViewerPanel
                             side="left"
                             image={state.leftImage}
-                            annotations={state.leftAnnotations}
+                            annotations={getDisplayAnnotations(state.leftAnnotations, 'left')}
                             placeholder="Selected image"
                         />
                         <ImageViewerPanel
                             side="right"
                             image={state.rightImage}
-                            annotations={state.rightAnnotations}
+                            annotations={getDisplayAnnotations(state.rightAnnotations, 'right')}
                             onImageClick={() => actions.toggleBottomPanel()}
                             placeholder="Click to select candidate"
                         />

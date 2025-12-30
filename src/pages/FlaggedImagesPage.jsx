@@ -52,6 +52,7 @@ import TagInput from '../components/TagInput';
 import AnnotationOverlay from '../components/AnnotationOverlay';
 import { SkeletonCard, EmptyState } from '../components/common';
 import AnnotationModal from '../components/annotation/AnnotationModal';
+import DualImageComparisonModal from '../components/annotation/DualImageComparisonModal';
 import BatchTagModal from '../components/BatchTagModal';
 import LightboxModal from '../components/common/LightboxModal';
 import ImageMetadataSidebar from '../components/common/ImageMetadataSidebar';
@@ -63,7 +64,7 @@ import RelationshipGraph from '../components/RelationshipGraph';
 
 import AddRelatedImageModal from '../components/AddRelatedImageModal';
 import RemoveRelationshipModal from '../components/RemoveRelationshipModal';
-import DualImageComparisonModal from '../components/annotation/DualImageComparisonModal';
+
 
 // --- Constants ---
 const IMAGES_PER_PAGE = 12;
@@ -951,118 +952,146 @@ const FlaggedImageDetailPanel = ({
         {/* Annotations Tab */}
         {activeTab === TAB_ANNOTATIONS && (
           <div className="h-full flex flex-col">
-            {/* Header */}
-            <div className="flex-none flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-                {t('flagged.annotations') || 'Annotations'} ({annotations.length})
-              </h4>
-              <button
-                onClick={handleOpenAnnotation}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-              >
-                <FiEdit3 size={12} />
-                {t('flagged.editAnnotations') || 'Edit'}
-              </button>
-            </div>
+            {/* Filter dual/cross-image annotations */}
+            {(() => {
+              const displayAnnotations = annotations.filter(a => !a.link_id && !a.linked_image_id && !a.linkId && !a.linkedImageId);
+              const dualAnnotationCount = annotations.length - displayAnnotations.length;
 
-            {/* Image with Annotation Overlays */}
-            <div className="flex-1 flex items-center justify-center bg-gray-100 dark:bg-gray-800 p-4 overflow-hidden">
-              <div className="relative max-h-[50vh] max-w-full flex items-center justify-center">
-                <AnnotationOverlay
-                  isActive={false}
-                  annotations={annotations.map(a => {
-                    // Normalize annotations to ensure 'coords' exists
-                    if (a.coords) return a;
-                    // Fallback for regions (convert 0-1 to %)
-                    if (a.regions && a.regions.length > 0) {
-                      const r = a.regions[0];
-                      if (r.type === 'rect' || r.type === 'rectangle') {
-                        return {
-                          ...a,
-                          type: 'rectangle', // Ensure type matches what Overlay expects
-                          coords: {
-                            x: (r.x || 0) * 100,
-                            y: (r.y || 0) * 100,
-                            width: (r.width || 0) * 100,
-                            height: (r.height || 0) * 100
-                          }
-                        };
-                      }
-                    }
-                    return a;
-                  })}
-                  onAnnotationClick={() => handleOpenAnnotation()}
-                >
-                  <img
-                    src={getFullImageUrl(image.imageId)}
-                    alt={image.filename}
-                    className="max-h-[50vh] max-w-full object-contain rounded shadow-sm"
-                    draggable={false}
-                  />
-                </AnnotationOverlay>
-
-                {/* Empty state overlay */}
-                {annotations.length === 0 && !loadingAnnotations && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="bg-black/60 backdrop-blur-sm p-4 rounded-xl text-center text-white pointer-events-auto">
-                      <FiEdit3 size={24} className="mx-auto mb-2 opacity-80" />
-                      <p className="text-sm font-medium mb-2">{t('flagged.noAnnotations') || 'No annotations'}</p>
-                      <button
-                        onClick={handleOpenAnnotation}
-                        className="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                      >
-                        {t('flagged.addAnnotation') || 'Add Annotation'}
-                      </button>
-                    </div>
+              return (
+                <>
+                  {/* Header */}
+                  <div className="flex-none flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {t('flagged.annotations') || 'Annotations'} ({displayAnnotations.length})
+                    </h4>
+                    <button
+                      onClick={handleOpenAnnotation}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                    >
+                      <FiEdit3 size={12} />
+                      {t('flagged.editAnnotations') || 'Edit'}
+                    </button>
                   </div>
-                )}
 
-                {/* Loading overlay */}
-                {loadingAnnotations && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-black/50 backdrop-blur-sm rounded">
-                    <FiRefreshCw className="animate-spin text-indigo-600 dark:text-indigo-400" size={32} />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Annotation List - Compact list below image */}
-            {annotations.length > 0 && (
-              <div className="flex-none max-h-28 overflow-y-auto p-3 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-                <div className="flex flex-wrap gap-2">
-                  {annotations.map((anno, index) => {
-                    // Match color logic from AnnotationOverlay
-                    const getGroupColor = (type, id) => {
-                      if (type !== 'copy-move') return '#EF4444'; // Red for general manipulation
-                      const colors = [
-                        '#3B82F6', // Blue
-                        '#10B981', // Green
-                        '#F59E0B', // Amber
-                        '#8B5CF6', // Purple
-                        '#EC4899', // Pink
-                        '#06B6D4', // Cyan
-                      ];
-                      return colors[((id || 1) - 1) % colors.length] || '#3B82F6';
-                    };
-                    const color = getGroupColor(anno.type, anno.group_id);
-                    return (
-                      <div
-                        key={anno._id}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full text-xs"
-                      >
-                        <span
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: color }}
-                        />
-                        <span className="text-gray-700 dark:text-gray-300 truncate max-w-[150px]">
-                          {anno.text || anno.type || `Annotation ${index + 1}`}
+                  {/* Dual Annotation Banner */}
+                  {dualAnnotationCount > 0 && (
+                    <div className="flex-none px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 border-b border-indigo-100 dark:border-indigo-800 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-300">
+                        <FiLayers size={14} />
+                        <span className="text-xs font-medium">
+                          {t('flagged.hasDualAnnotations').replace('{count}', dualAnnotationCount) || `This image has ${dualAnnotationCount} dual-screen annotation${dualAnnotationCount > 1 ? 's' : ''}`}
                         </span>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+                      <button
+                        onClick={() => setShowComparisonModal(true)}
+                        className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 underline"
+                      >
+                        {t('flagged.compareImages') || 'Compare Images'}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Image with Annotation Overlays */}
+                  <div className="flex-1 flex items-center justify-center bg-gray-100 dark:bg-gray-800 p-4 overflow-hidden">
+                    <div className="relative max-h-[50vh] max-w-full flex items-center justify-center">
+                      <AnnotationOverlay
+                        isActive={false}
+                        annotations={displayAnnotations.map(a => {
+                          // Normalize annotations to ensure 'coords' exists
+                          if (a.coords) return a;
+                          // Fallback for regions (convert 0-1 to %)
+                          if (a.regions && a.regions.length > 0) {
+                            const r = a.regions[0];
+                            if (r.type === 'rect' || r.type === 'rectangle') {
+                              return {
+                                ...a,
+                                type: 'rectangle', // Ensure type matches what Overlay expects
+                                coords: {
+                                  x: (r.x || 0) * 100,
+                                  y: (r.y || 0) * 100,
+                                  width: (r.width || 0) * 100,
+                                  height: (r.height || 0) * 100
+                                }
+                              };
+                            }
+                          }
+                          return a;
+                        })}
+                        onAnnotationClick={() => handleOpenAnnotation()}
+                      >
+                        <img
+                          src={getFullImageUrl(image.imageId)}
+                          alt={image.filename}
+                          className="max-h-[50vh] max-w-full object-contain rounded shadow-sm"
+                          draggable={false}
+                        />
+                      </AnnotationOverlay>
+
+                      {/* Empty state overlay */}
+                      {displayAnnotations.length === 0 && !loadingAnnotations && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="bg-black/60 backdrop-blur-sm p-4 rounded-xl text-center text-white pointer-events-auto">
+                            <FiEdit3 size={24} className="mx-auto mb-2 opacity-80" />
+                            <p className="text-sm font-medium mb-2">{t('flagged.noAnnotations') || 'No annotations'}</p>
+                            <button
+                              onClick={handleOpenAnnotation}
+                              className="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                            >
+                              {t('flagged.addAnnotation') || 'Add Annotation'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Loading overlay */}
+                      {loadingAnnotations && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-black/50 backdrop-blur-sm rounded">
+                          <FiRefreshCw className="animate-spin text-indigo-600 dark:text-indigo-400" size={32} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Annotation List - Compact list below image */}
+                  {displayAnnotations.length > 0 && (
+                    <div className="flex-none max-h-28 overflow-y-auto p-3 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+                      <div className="flex flex-wrap gap-2">
+                        {displayAnnotations.map((anno, index) => {
+                          // Match color logic from AnnotationOverlay
+                          const getGroupColor = (type, id) => {
+                            if (type !== 'copy-move') return '#EF4444'; // Red for general manipulation
+                            const colors = [
+                              '#3B82F6', // Blue
+                              '#10B981', // Green
+                              '#F59E0B', // Amber
+                              '#8B5CF6', // Purple
+                              '#EC4899', // Pink
+                              '#06B6D4', // Cyan
+                            ];
+                            return colors[((id || 1) - 1) % colors.length] || '#3B82F6';
+                          };
+                          const color = getGroupColor(anno.type, anno.group_id);
+                          return (
+                            <div
+                              key={anno._id}
+                              className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full text-xs"
+                            >
+                              <span
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: color }}
+                              />
+                              <span className="text-gray-700 dark:text-gray-300 truncate max-w-[150px]">
+                                {anno.text || anno.type || `Annotation ${index + 1}`}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
 
@@ -1399,6 +1428,29 @@ const FlaggedImageDetailPanel = ({
         onClose={() => setAnnotationModalOpen(false)}
         onSaveSuccess={handleAnnotationSaveSuccess}
       />
+
+      {/* Dual Image Comparison Modal */}
+      {showComparisonModal && (
+        <DualImageComparisonModal
+          isOpen={showComparisonModal}
+          onClose={() => setShowComparisonModal(false)}
+          selectedImage={image}
+          existingAnnotations={annotations}
+          onSaveSuccess={() => {
+            // Refresh annotations
+            const fetchAnnotations = async () => {
+              if (!image?.imageId) return;
+              try {
+                const data = await api.getAnnotations(image.imageId);
+                setAnnotations(data || []);
+              } catch (err) {
+                console.error('Error fetching annotations:', err);
+              }
+            };
+            fetchAnnotations();
+          }}
+        />
+      )}
     </div >
   );
 };

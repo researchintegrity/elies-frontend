@@ -60,6 +60,7 @@ const initialState = {
     nextLinkColorIndex: 0,
 
     // UI state
+    annotationsVisible: true,
     isModified: false,
     bottomPanelExpanded: true,
     toolbarExpanded: true,
@@ -107,6 +108,8 @@ const ActionTypes = {
     COMPLETE_LINKING: 'COMPLETE_LINKING',
     CANCEL_LINKING: 'CANCEL_LINKING',
     DELETE_LINK: 'DELETE_LINK',
+    UPDATE_LINK: 'UPDATE_LINK',
+    SET_LINKED_PAIRS: 'SET_LINKED_PAIRS',
 
     // History
     UNDO: 'UNDO',
@@ -115,6 +118,7 @@ const ActionTypes = {
     // UI
     TOGGLE_BOTTOM_PANEL: 'TOGGLE_BOTTOM_PANEL',
     TOGGLE_TOOLBAR: 'TOGGLE_TOOLBAR',
+    TOGGLE_ANNOTATIONS_VISIBILITY: 'TOGGLE_ANNOTATIONS_VISIBILITY',
     SET_MODIFIED: 'SET_MODIFIED',
     RESET: 'RESET',
 };
@@ -378,12 +382,14 @@ const dualAnnotationReducer = (state, action) => {
 
             const linkId = generateLinkId();
             const color = LINK_COLORS[state.nextLinkColorIndex % LINK_COLORS.length];
+            const pairNumber = state.linkedPairs.length + 1;
 
             const newLink = {
                 linkId,
                 leftAnnotationId: firstSide === 'left' ? firstId : secondId,
                 rightAnnotationId: firstSide === 'right' ? firstId : secondId,
                 color,
+                name: `Pair ${pairNumber}`,
             };
 
             return {
@@ -413,6 +419,25 @@ const dualAnnotationReducer = (state, action) => {
                 ...pushToHistory({ ...state, linkedPairs }),
             };
         }
+
+        case ActionTypes.UPDATE_LINK: {
+            const { linkId, updates } = action.payload;
+            const linkedPairs = state.linkedPairs.map(lp =>
+                lp.linkId === linkId ? { ...lp, ...updates } : lp
+            );
+            return {
+                ...state,
+                linkedPairs,
+                isModified: true,
+            };
+        }
+
+        case ActionTypes.SET_LINKED_PAIRS:
+            return {
+                ...state,
+                linkedPairs: action.payload,
+                nextLinkColorIndex: action.payload.length,
+            };
 
         // --- History ---
         case ActionTypes.UNDO: {
@@ -453,6 +478,9 @@ const dualAnnotationReducer = (state, action) => {
 
         case ActionTypes.TOGGLE_TOOLBAR:
             return { ...state, toolbarExpanded: !state.toolbarExpanded };
+
+        case ActionTypes.TOGGLE_ANNOTATIONS_VISIBILITY:
+            return { ...state, annotationsVisible: !state.annotationsVisible };
 
         case ActionTypes.SET_MODIFIED:
             return { ...state, isModified: action.payload };
@@ -565,6 +593,14 @@ export const DualAnnotationProvider = ({ children }) => {
         dispatch({ type: ActionTypes.DELETE_LINK, payload: linkId });
     }, []);
 
+    const updateLink = useCallback((linkId, updates) => {
+        dispatch({ type: ActionTypes.UPDATE_LINK, payload: { linkId, updates } });
+    }, []);
+
+    const setLinkedPairs = useCallback((pairs) => {
+        dispatch({ type: ActionTypes.SET_LINKED_PAIRS, payload: pairs });
+    }, []);
+
     const undo = useCallback(() => {
         dispatch({ type: ActionTypes.UNDO });
     }, []);
@@ -579,6 +615,10 @@ export const DualAnnotationProvider = ({ children }) => {
 
     const toggleToolbar = useCallback(() => {
         dispatch({ type: ActionTypes.TOGGLE_TOOLBAR });
+    }, []);
+
+    const toggleAnnotationsVisibility = useCallback(() => {
+        dispatch({ type: ActionTypes.TOGGLE_ANNOTATIONS_VISIBILITY });
     }, []);
 
     const setModified = useCallback((modified) => {
@@ -614,10 +654,13 @@ export const DualAnnotationProvider = ({ children }) => {
         completeLink,
         cancelLinking,
         deleteLink,
+        updateLink,
+        setLinkedPairs,
         undo,
         redo,
         toggleBottomPanel,
         toggleToolbar,
+        toggleAnnotationsVisibility,
         setModified,
         reset,
     }), [
@@ -625,7 +668,8 @@ export const DualAnnotationProvider = ({ children }) => {
         updateAnnotation, deleteAnnotation, deleteSelected, selectAnnotation, hoverAnnotation,
         clearSelection, setActiveSide, setTool, setActiveLabel, startDrawing, updateDrawing,
         addPolygonPoint, finishDrawing, cancelDrawing, startLinking, completeLink, cancelLinking,
-        deleteLink, undo, redo, toggleBottomPanel, toggleToolbar, setModified, reset,
+        deleteLink, updateLink, setLinkedPairs, undo, redo, toggleBottomPanel, toggleToolbar,
+        toggleAnnotationsVisibility, setModified, reset,
     ]);
 
     // Computed values
