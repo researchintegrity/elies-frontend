@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import * as d3 from 'd3';
-import { FiZoomIn, FiZoomOut, FiMaximize2, FiSliders } from 'react-icons/fi';
+import { FiZoomIn, FiZoomOut, FiMaximize2, FiSliders, FiEye, FiEyeOff } from 'react-icons/fi';
 import { useLanguage } from '../context/LanguageContext';
 
 /**
@@ -38,6 +38,7 @@ const RelationshipGraph = ({
     const [tightness, setTightness] = useState(50); // 0-100 slider value
     const [showControls, setShowControls] = useState(false);
     const [depthValue, setDepthValue] = useState(currentDepth === 0 ? 21 : currentDepth); // Local state for depth slider
+    const [showWeakRelations, setShowWeakRelations] = useState(true);
 
     // Create MST edge lookup for efficient checking
     const mstEdgeSet = useMemo(() => {
@@ -240,7 +241,7 @@ const RelationshipGraph = ({
         simulationRef.current = simulation;
 
         // Separate MST and non-MST edges for different rendering
-        const nonMstLinks = graphData.links.filter(l => !l.isMstEdge);
+        const nonMstLinks = graphData.links.filter(l => !l.isMstEdge && showWeakRelations);
         const mstLinks = graphData.links.filter(l => l.isMstEdge);
 
         // Create non-MST edges (lighter, dashed) - rendered first (behind)
@@ -404,7 +405,7 @@ const RelationshipGraph = ({
             simulation.stop();
             simulationRef.current = null;
         };
-    }, [graphData, dimensions, getImageUrl, onNodeClick, gravity]);
+    }, [graphData, dimensions, getImageUrl, onNodeClick, gravity, showWeakRelations]);
 
     // Zoom controls
     const handleZoomIn = () => {
@@ -571,9 +572,20 @@ const RelationshipGraph = ({
                     <div className="w-6 h-0.5 bg-gray-600" />
                     <span className="text-gray-600 dark:text-gray-300">{t('relationship.strongRelation') || 'Strong relation'}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div
+                    className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50 p-1 -m-1 rounded transition-colors"
+                    onClick={() => setShowWeakRelations(!showWeakRelations)}
+                    title={showWeakRelations ? "Hide Content Share Relations" : "Show Content Share Relations"}
+                >
                     <div className="w-6 h-0.5 bg-gray-300 border-dashed border-t border-gray-400" style={{ borderStyle: 'dashed' }} />
-                    <span className="text-gray-600 dark:text-gray-300">{t('relationship.weakRelation') || 'Weak relation'}</span>
+                    <span className={`text-gray-600 dark:text-gray-300 ${!showWeakRelations ? 'text-gray-400' : ''}`}>
+                        {t('relationship.weakRelation') || 'Content Share Relation'}
+                    </span>
+                    {showWeakRelations ? (
+                        <FiEye size={10} className="text-gray-400 ml-auto" />
+                    ) : (
+                        <FiEyeOff size={10} className="text-gray-400 ml-auto" />
+                    )}
                 </div>
             </div>
 
