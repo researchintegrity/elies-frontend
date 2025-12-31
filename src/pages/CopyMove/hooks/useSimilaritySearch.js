@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../../services/api';
 import { showToast } from '../../../utils/alert';
 
@@ -44,10 +44,10 @@ export const useSimilaritySearch = (sourceImage, filterMode, setFilterMode, t) =
         }
     };
 
-    const clearSimilarity = () => {
+    const clearSimilarity = useCallback(() => {
         setSimilarityResults([]);
         setSimilarityPage(1);
-    }
+    }, []);
 
     return {
         similarityResults,

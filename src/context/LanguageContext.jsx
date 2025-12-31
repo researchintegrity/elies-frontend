@@ -135,6 +135,7 @@ const translations = {
         'gallery.last': 'Última',
         'gallery.previousPage': 'Página anterior',
         'gallery.nextPage': 'Próxima página',
+        'gallery.noImagesFound': 'Nenhuma imagem encontrada',
 
         // Image Filters Panel
         'filters.title': 'Filtros',
@@ -895,7 +896,9 @@ const translations = {
         'manipulation.selectInstructions': 'Clique em uma imagem da galeria para selecioná-la para análise de manipulação',
         'manipulation.startOver': 'Recomeçar',
         'manipulation.newAnalysis': 'Nova Análise',
+        'manipulation.startAnalysis': 'Iniciar Análise',
         // Batch analysis
+        'manipulation.viewSidebar': 'Ver Selecionadas',
         'manipulation.selectedImages': 'Imagens Selecionadas',
         'manipulation.batchConfigureTitle': 'Configurar Análise em Lote',
         'manipulation.batchConfigureDesc': 'Estas configurações serão aplicadas a todas as imagens selecionadas',
@@ -904,6 +907,7 @@ const translations = {
         'manipulation.batchResults': 'Resultados da Análise em Lote',
         'manipulation.batchResultsDesc': 'Resultados para todas as imagens analisadas',
         'manipulation.batchCompleted': 'Análise em lote concluída',
+        'manipulation.batchStarted': 'Análise em lote iniciada',
         'manipulation.imagesAnalyzed': 'imagens analisadas',
         'manipulation.complete': 'Concluído',
         'manipulation.allImagesDeleted': 'Todas as imagens selecionadas não existem mais',
@@ -1271,6 +1275,7 @@ const translations = {
         'gallery.last': 'Last',
         'gallery.previousPage': 'Previous page',
         'gallery.nextPage': 'Next page',
+        'gallery.noImagesFound': 'No images found',
 
         // Image Filters Panel
         'filters.title': 'Filters',
@@ -2030,7 +2035,9 @@ const translations = {
         'manipulation.selectInstructions': 'Click an image from the gallery to select it for manipulation analysis',
         'manipulation.startOver': 'Start Over',
         'manipulation.newAnalysis': 'New Analysis',
+        'manipulation.startAnalysis': 'Start Analysis',
         // Batch analysis
+        'manipulation.viewSidebar': 'View Selected',
         'manipulation.selectedImages': 'Selected Images',
         'manipulation.batchConfigureTitle': 'Configure Batch Analysis',
         'manipulation.batchConfigureDesc': 'These settings will apply to all selected images',
@@ -2039,6 +2046,7 @@ const translations = {
         'manipulation.batchResults': 'Batch Analysis Results',
         'manipulation.batchResultsDesc': 'Results for all analyzed images',
         'manipulation.batchCompleted': 'Batch analysis completed',
+        'manipulation.batchStarted': 'Batch analysis started',
         'manipulation.imagesAnalyzed': 'images analyzed',
         'manipulation.complete': 'Complete',
         'manipulation.allImagesDeleted': 'All selected images no longer exist',
@@ -2338,6 +2346,7 @@ export const LanguageProvider = ({ children }) => {
     );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useLanguage = () => {
     const context = useContext(LanguageContext);
     if (!context) {
@@ -2353,6 +2362,7 @@ export const useLanguage = () => {
  * @param {string} key - The translation key
  * @returns {string} The translated string or the key if not found
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const translate = (key, params = {}) => {
     const language = (typeof window !== 'undefined' && localStorage.getItem('elis-language')) || 'pt';
     let text = translations[language]?.[key] || translations['pt']?.[key] || key;
