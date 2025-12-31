@@ -145,14 +145,6 @@ const CopyMovePage = ({ onNavigate }) => {
         t
     });
 
-    // Reset similarity results when source is deselected
-    useEffect(() => {
-        if (!sourceImage) {
-            clearSimilarity();
-            if (filterMode === 'similar') setFilterMode('all');
-        }
-    }, [sourceImage, filterMode, clearSimilarity, setFilterMode]);
-
     // ESC key to clear selection
     useEffect(() => {
         const handleKeyDown = (e) => {
