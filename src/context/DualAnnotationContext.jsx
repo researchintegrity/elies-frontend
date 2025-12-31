@@ -8,13 +8,13 @@
  */
 import React, { createContext, useContext, useReducer, useCallback, useMemo } from 'react';
 import { ShapeTypes, ToolTypes, DefaultLabels } from './AnnotationContext';
-
+import { v4 as uuidv4 } from 'uuid';
 // Re-export for convenience
 export { ShapeTypes, ToolTypes, DefaultLabels };
 
 // Generate unique IDs
-const generateId = () => `ann_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-const generateLinkId = () => `link_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+const generateId = () => `ann_${uuidv4()}_${Math.random().toString(36).substr(2, 9)}`;
+const generateLinkId = () => `link_${uuidv4()}_${Math.random().toString(36).substr(2, 9)}`;
 
 // --- Initial State ---
 const initialState = {

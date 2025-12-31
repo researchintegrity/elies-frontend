@@ -439,7 +439,7 @@ const ImageAnalysisPage = () => {
                                     setCrop={annotations.setCrop}
                                     showAnnotations={annotations.showAnnotations}
                                     annotations={annotations.annotations}
-                                    onAnnotationClick={annotations.handleAnnotationClick} // Fixed prop name
+                                    onAnnotationClick={annotations.handleAnnotationClick} // Prop name for annotation click handler
                                     selectedAnnotationId={annotations.selectedAnnotationId}
                                     t={t}
                                 />

@@ -49,16 +49,7 @@ export const useImageAnnotations = (selectedImage, t) => {
 
     // Keyboard shortcuts (Copy/Paste) for Annotations
     useEffect(() => {
-        // If we want to restrict copy/paste to a specific mode, we can check annotationMode here
-        // For now, I'll keep it as in the original code, but maybe check if annotations are visible?
-        // Original checked `if (!annotationMode) return;` but `annotationMode` was hardcoded to `false` in state initialization: `const [annotationMode] = useState(false);`
-        // Wait, if it was false, the effect would never run?
-        // Ah, looking at the code: `const [annotationMode] = useState(false);` ... `if (!annotationMode) return;`
-        // So the copy/paste logic was actually DISABLED in the original code unless I missed where it was set to true?
-        // Or maybe strictly speaking `state` usually implies `useState(initial)`.
-        // Let's assume we WANT it to work. or maybe it was intended to be enabled by a button.
-        // I will expose `annotationMode` and `setAnnotationMode` so it can be enabled.
-
+        
         if (!selectedImage) return;
 
         const handleKeyDown = async (e) => {

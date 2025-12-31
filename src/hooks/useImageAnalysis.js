@@ -163,13 +163,7 @@ export const useImageAnalysis = (selectedImage, t) => {
                     result = applyLuminanceGradient(
                         originalCanvas,
                         params.gradientIntensity,
-                        resolveOpacity(params.gradientOpacity) / 100, // Normalized 0-1 for gradient? Check original code.
-                        // Original: showAnnotationModal ? 1 : (params.gradientOpacity / 100)
-                        // It seems params.gradientOpacity is 0-100, but applyLuminanceGradient expects 0-1 ??
-                        // Let's check original code: params.gradientOpacity / 100.
-                        // wait, forcedOpacity is usually 100 (from modal).
-                        // If forcedOpacity is 100, result should be 1.0.
-                        // So logic: (forcedOpacity !== null ? forcedOpacity : params.gradientOpacity) / 100
+                        resolveOpacity(params.gradientOpacity) / 100,
                         params.gradientNormalize,
                         params.gradientEqualize
                     );
