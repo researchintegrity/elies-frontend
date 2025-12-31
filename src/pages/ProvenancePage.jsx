@@ -335,7 +335,7 @@ const ProvenancePage = () => {
     const [galleryPage, setGalleryPage] = useState(1);
     const [totalImages, setTotalImages] = useState(0);
     const [pairsPage, setPairsPage] = useState(1); // For matched pairs pagination
-    const [gravity, setGravity] = useState(0.02);
+    const [gravity, _setGravity] = useState(0.02); // eslint-disable-line no-unused-vars
 
     // Query Gallery Filter (for finding query image quickly) - now server-side
     const [galleryFilters, setGalleryFilters] = useState({
