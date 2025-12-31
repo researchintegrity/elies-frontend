@@ -446,6 +446,10 @@ const translations = {
         'cbir.origin': 'Origem',
         'cbir.selectSourceFirst': 'Selecione uma imagem de origem primeiro.',
         'cbir.noResultsWithCriteria': 'Nenhuma imagem similar encontrada com os critérios atuais.',
+        'cbir.markAsRelated': 'Marcar como Relacionada',
+        'cbir.linking': 'Vinculando...',
+        'cbir.linkedAsRelated': 'Imagem vinculada como relacionada',
+        'cbir.linkError': 'Falha ao vincular imagens',
 
         // Annotation Page
         'annotation.title': 'Anotar Imagens',
@@ -1585,6 +1589,10 @@ const translations = {
         'cbir.origin': 'Source',
         'cbir.selectSourceFirst': 'Select a source image first.',
         'cbir.noResultsWithCriteria': 'No similar images found with current criteria.',
+        'cbir.markAsRelated': 'Mark as Related',
+        'cbir.linking': 'Linking...',
+        'cbir.linkedAsRelated': 'Image linked as related',
+        'cbir.linkError': 'Failed to link images',
 
         // Annotation Page
         'annotation.title': 'Annotate Images',
