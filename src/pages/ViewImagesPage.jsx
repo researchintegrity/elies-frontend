@@ -4,16 +4,13 @@ import {
   FiSearch,
   FiFilter,
   FiRefreshCw,
-  FiImage,
   FiX,
   FiAlertTriangle,
-  FiCheck,
   FiTarget,
   FiZap,
   FiArrowLeft,
   FiChevronLeft,
-  FiChevronRight,
-  FiFlag
+  FiChevronRight
 } from 'react-icons/fi';
 import { useImages } from '../hooks/useImages';
 import { usePanelExtraction } from '../hooks/usePanelExtraction';
@@ -22,327 +19,18 @@ import { api } from '../services/api';
 import { showAlert, showToast, showConfirm } from '../utils/alert';
 import SelectionToolbar from '../components/SelectionToolbar';
 import ImageFilters from '../components/ImageFilters';
-import TagInput from '../components/TagInput';
 import BatchTagModal from '../components/BatchTagModal';
 import { SkeletonCard, EmptyState } from '../components/common';
 import { API_BASE_URL } from '../config/api';
+import LightboxModal from '../components/common/LightboxModal';
+import ImageMetadataSidebar from '../components/common/ImageMetadataSidebar';
+import ImageCard from '../components/ImageCard';
+import QueryImageThumbnail from '../components/QueryImageThumbnail';
 
-// --- Components ---
-
-const LightboxModal = ({ image, onClose, imageUrl, onTagAdd, onTagRemove, t, locale }) => {
-  // Hook must be called before any conditional returns (React rules of hooks)
-  useEffect(() => {
-    if (!image) return;
-    const handleEsc = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [image, onClose]);
-
-  if (!image) return null;
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/95 z-[1000] flex backdrop-blur-md animate-in fade-in duration-200"
-      onClick={onClose}
-      role="dialog"
-    >
-      <div className="flex-1 flex items-center justify-center p-8 relative" onClick={e => e.stopPropagation()}>
-        <button
-          className="absolute top-6 left-6 text-white/50 hover:text-white transition-colors"
-          onClick={onClose}
-        >
-          <FiX size={32} />
-        </button>
-
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={image.filename}
-            className="max-h-[90vh] max-w-full object-contain rounded-lg shadow-2xl"
-          />
-        ) : (
-          <div className="w-full h-full max-h-[80vh] aspect-video flex items-center justify-center">
-            <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
-          </div>
-        )}
-      </div>
-
-      {/* Metadata Sidebar */}
-      <div
-        className="w-[360px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 p-6 overflow-y-auto flex flex-col gap-6"
-        onClick={e => e.stopPropagation()}
-      >
-        <div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1 break-words">
-            {image.filename}
-          </h2>
-          <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
-            <span>{new Date(image.uploadedDate).toLocaleDateString(locale)}</span>
-            <span>•</span>
-            <span>{(image.fileSize / 1024).toFixed(1)} KB</span>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">{t('lightbox.tagsClassification')}</h3>
-          <TagInput
-            tags={image.imageType || []}
-            onAdd={(tag) => onTagAdd(image, tag)}
-            onRemove={(tag) => onTagRemove(image, tag)}
-          />
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">{t('lightbox.metadata')}</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-              <span className="block text-gray-500 text-xs mb-1">{t('lightbox.origin')}</span>
-              <span className="font-medium dark:text-gray-200 capitalize">{image.sourceType}</span>
-            </div>
-            <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-              <span className="block text-gray-500 text-xs mb-1">{t('lightbox.format')}</span>
-              <span className="font-medium dark:text-gray-200 uppercase">{image.filename.split('.').pop()}</span>
-            </div>
-          </div>
-
-          {/* Exif Metadata Placeholder */}
-          {image.exifMetadata && Object.keys(image.exifMetadata).length > 0 && (
-            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
-              {Object.entries(image.exifMetadata).slice(0, 5).map(([key, value]) => (
-                <div key={key} className="flex justify-between text-xs">
-                  <span className="text-gray-500">{key}</span>
-                  <span className="text-gray-900 dark:text-gray-300 truncate max-w-[120px]" title={String(value)}>{String(value)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Query Image Thumbnail for Similarity Mode (with selection support)
-const QueryImageThumbnail = ({ image, isSelected, onSelect, isSelectionMode }) => {
-  const token = localStorage.getItem('authToken');
-  const imageUrl = useMemo(() => {
-    if (!image) return null;
-    return `${API_BASE_URL}/images/${image.imageId || image.id}/thumbnail${token ? `?token=${token}` : ''}`;
-  }, [image, token]);
-
-  if (!image) return null;
-
-  if (!image) return null;
-
-  const handleClick = (e) => {
-    if (onSelect) onSelect(image.id, e);
-  };
-
-  return (
-    <div
-      onClick={handleClick}
-      className={`group relative flex items-center gap-3 p-2 pr-4 rounded-xl shadow-md cursor-pointer transition-all duration-200 ${isSelected
-        ? 'bg-indigo-50 dark:bg-indigo-900/30 border-2 border-indigo-500 ring-2 ring-indigo-500/30'
-        : 'bg-white dark:bg-gray-800 border-2 border-amber-400 dark:border-amber-500 hover:border-amber-500 dark:hover:border-amber-400'
-        }`}
-    >
-      <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0">
-        {/* Selection Checkbox - inside the thumbnail */}
-        <div
-          className={`absolute top-1 left-1 z-10 transition-opacity duration-200 ${isSelected || isSelectionMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-          onClick={(e) => { e.stopPropagation(); handleClick(e); }}
-        >
-          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors shadow-sm ${isSelected
-            ? 'bg-indigo-600 border-indigo-600 text-white'
-            : 'bg-white/90 dark:bg-gray-800/90 border-white dark:border-gray-400 hover:border-indigo-500'
-            }`}>
-            {isSelected && <FiCheck size={12} strokeWidth={3} />}
-          </div>
-        </div>
-
-        {imageUrl ? (
-          <img src={imageUrl} alt={image.filename} className="w-full h-full object-cover" loading="lazy" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-400">
-            <FiImage size={20} />
-          </div>
-        )}
-      </div>
-      <div className="min-w-0">
-        <span className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-bold">Query</span>
-        <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[120px]" title={image.filename}>
-          {image.filename}
-        </p>
-      </div>
-    </div>
-  );
-};
-const ImageCard = ({ image, onSelect, isSelected, isSelectionMode, similarityScore, rank, onToggleFlag }) => {
-  const { t } = useLanguage();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  // Helper function for score color
-  const getScoreColor = (score) => {
-    if (score >= 0.9) return 'text-green-600 dark:text-green-400';
-    if (score >= 0.7) return 'text-emerald-600 dark:text-emerald-400';
-    if (score >= 0.5) return 'text-amber-600 dark:text-amber-400';
-    return 'text-red-600 dark:text-red-400';
-  };
-
-  const getScoreBgColor = (score) => {
-    if (score >= 0.9) return 'bg-green-500';
-    if (score >= 0.7) return 'bg-emerald-500';
-    if (score >= 0.5) return 'bg-amber-500';
-    return 'bg-red-500';
-  };
-
-  const token = localStorage.getItem('authToken');
-  // Use memoized URL construction for performance
-  const displayUrl = useMemo(() => {
-    if (!image?.imageId) return null;
-    // Add cache busting timestamp if needed, but browser caching is desired here
-    return `${API_BASE_URL}/images/${image.imageId}/thumbnail${token ? `?token=${token}` : ''}`;
-  }, [image?.imageId, token]);
-
-  const handleImageLoad = () => setLoading(false);
-  const handleImageError = () => {
-    setLoading(false);
-    setError(true);
-  };
-
-  const handleFlagClick = (e) => {
-    e.stopPropagation();
-    if (onToggleFlag) {
-      onToggleFlag(image);
-    }
-  };
-
-  return (
-    <div
-      className={`group relative bg-white dark:bg-gray-800 rounded-xl overflow-hidden border transition-all duration-200 cursor-pointer
-        ${isSelected
-          ? 'ring-2 ring-indigo-500 border-indigo-500 shadow-lg scale-[1.02] z-10'
-          : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-md'
-        }`}
-      onClick={(e) => {
-        // Always toggle selection when clicking anywhere on the card
-        onSelect(image.id, e);
-      }}
-    >
-      {/* Checkbox Overlay (Visible on Hover or Selected) */}
-      <div
-        className={`absolute top-3 left-3 z-20 transition-opacity duration-200 ${isSelected || isSelectionMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-        onClick={(e) => { e.stopPropagation(); onSelect(image.id, e); }}
-      >
-        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected
-          ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
-          : 'bg-white/80 dark:bg-black/50 border-white/50 dark:border-gray-400 hover:border-indigo-500'
-          }`}>
-          {isSelected && <FiCheck size={14} strokeWidth={3} />}
-        </div>
-      </div>
-
-      {/* Flag Button (top-right) - Always visible when flagged */}
-      <div
-        className={`absolute top-3 right-3 z-20 transition-all duration-200 ${image.isFlagged ? 'opacity-100 scale-100' : 'opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100'}`}
-        onClick={handleFlagClick}
-        title={image.isFlagged ? (t('image.unflag') || 'Remove flag') : (t('image.flag') || 'Flag as suspicious')}
-      >
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-md ${image.isFlagged
-          ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse'
-          : 'bg-white/90 dark:bg-black/60 text-gray-400 hover:text-red-500 hover:bg-white dark:hover:bg-black/80'
-          }`}>
-          <FiFlag size={16} className={image.isFlagged ? 'fill-current' : ''} />
-        </div>
-      </div>
-
-      <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-900">
-        {/* Loading Skeleton - Overlay */}
-        {loading && !error && (
-          <div className="absolute inset-0 z-10 w-full h-full bg-gray-200 dark:bg-gray-800 animate-pulse"></div>
-        )}
-
-        {/* Error State */}
-        {error ? (
-          <div className="flex flex-col items-center justify-center w-full h-full text-gray-400 bg-gray-50 dark:bg-gray-800">
-            <FiAlertTriangle size={24} className="mb-2 text-amber-500" />
-            <span className="text-xs">{t('image.error')}</span>
-          </div>
-        ) : (
-          /* Main Image - Hidden until loaded */
-          <img
-            src={displayUrl}
-            alt={image.filename}
-            className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${loading ? 'opacity-0' : 'opacity-100'}`}
-            loading="lazy"
-            onLoad={handleImageLoad}
-            onError={handleImageError}
-          />
-        )}
-
-        {/* Gradient Overlay for Text Readability */}
-        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 to-transparent opacity-60"></div>
-      </div>
-
-      <div className="p-3">
-        <div className="flex justify-between items-start mb-1 h-6">
-          <h4 className="font-medium text-gray-900 dark:text-gray-100 truncate text-sm flex-1 pr-2" title={image.filename}>
-            {image.filename}
-          </h4>
-        </div>
-
-        {/* Similarity Score Bar - Only show when in similarity mode */}
-        {similarityScore !== null && (
-          <div className="flex items-center gap-2 mt-2 px-2 py-1.5 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800/50">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300">#{rank}</span>
-              <div className={`w-1.5 h-1.5 rounded-full ${getScoreBgColor(similarityScore)}`}></div>
-            </div>
-            <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${getScoreBgColor(similarityScore)}`}
-                style={{ width: `${similarityScore * 100}%` }}
-              ></div>
-            </div>
-            <span className={`text-[10px] font-bold ${getScoreColor(similarityScore)}`}>
-              {(similarityScore * 100).toFixed(0)}%
-            </span>
-          </div>
-        )}
-
-        {/* Tags - Only show when NOT in similarity mode */}
-        {similarityScore === null && (
-          <div className="flex items-center gap-2 mt-2 overflow-hidden h-6">
-            {image.imageType && image.imageType.length > 0 ? (
-              image.imageType.slice(0, 2).map(tag => (
-                <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 font-medium truncate max-w-[80px]">
-                  #{tag}
-                </span>
-              ))
-            ) : (
-              <span className="text-[10px] text-gray-400 italic">{t('image.noTags')}</span>
-            )}
-            {image.imageType && image.imageType.length > 2 && (
-              <span className="text-[10px] text-gray-400">+{image.imageType.length - 2}</span>
-            )}
-          </div>
-        )}
-
-        <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-          <span className="text-[10px] text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded capitalize">
-            {image.sourceType === 'uploaded' ? t('image.uploaded') : t('image.extracted')}
-          </span>
-          <span className="text-[10px] text-gray-400">
-            {new Date(image.uploadedDate).toLocaleDateString()}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-};
+// Components moved to separate files
+// LightboxModal -> ../components/common/LightboxModal
+// QueryImageThumbnail -> ../components/QueryImageThumbnail
+// ImageCard -> ../components/ImageCard
 
 // Map analysis types to page keys (matches PAGES in AppLayout)
 const analysisTypeToPageKey = {
@@ -1318,10 +1006,6 @@ const ViewImagesPage = () => {
                 <ImageCard
                   key={image.id}
                   image={image}
-                  onClick={(img, url) => {
-                    setLightboxImage(img);
-                    setLightboxUrl(url);
-                  }}
                   onSelect={handleSelect}
                   isSelected={selectedIds.has(image.id)}
                   isSelectionMode={selectedIds.size > 0}
@@ -1538,17 +1222,23 @@ const ViewImagesPage = () => {
       {
         lightboxImage && (
           <LightboxModal
-            image={images.find(i => i.id === lightboxImage.id) || lightboxImage}
-            imageUrl={lightboxUrl}
+            isOpen={!!lightboxImage}
             onClose={() => {
               setLightboxImage(null);
               setLightboxUrl(null);
             }}
-            onTagAdd={addImageTypes}
-            onTagRemove={removeImageType}
-            t={t}
-            locale={locale}
-          />
+            imageUrl={lightboxUrl}
+            title={lightboxImage?.filename}
+            showSidebar={true}
+          >
+            <ImageMetadataSidebar
+              image={images.find(i => i.id === lightboxImage.id) || lightboxImage}
+              t={t}
+              locale={locale}
+              onTagAdd={addImageTypes}
+              onTagRemove={removeImageType}
+            />
+          </LightboxModal>
         )
       }
     </div >
