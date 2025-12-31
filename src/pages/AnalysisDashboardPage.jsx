@@ -44,7 +44,6 @@ import {
     FiGrid,
     FiList,
     FiColumns,
-    FiBarChart2,
     FiTrash2,
     FiFileText,
     FiAlertTriangle,
@@ -74,6 +73,19 @@ const getFullImageUrl = (imageId) => {
 const AUTO_REFRESH_INTERVAL = 5000; // 5 seconds for processing analyses
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
+
+// View mode constants
+const VIEW_MODE = {
+    LIST: 'list',
+    GRID: 'grid'
+};
+
+const TAB_MODE = {
+    SOURCE: 'source',
+    TARGET: 'target',
+    COMPARISON: 'comparison',
+    RESULT: 'result'
+};
 
 // Analysis type configurations
 const ANALYSIS_TYPE_CONFIG = {
@@ -288,8 +300,7 @@ const ParametersDisplay = ({ parameters, sourceImageId, targetImageId, t, defaul
 
 // Filter Panel
 const FilterPanel = ({ filters, onFilterChange, onReset, t }) => {
-    // Date range state available for future implementation
-    const [_showDateRange, _setShowDateRange] = useState(false);
+    // TODO: Date range presets can be implemented here in the future
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-4">
@@ -380,7 +391,6 @@ const FilterPanel = ({ filters, onFilterChange, onReset, t }) => {
 const AnalysisRow = ({ analysis, onViewDetails, onReproduce, onViewResults, onFilterByImage, isFilterActive, t, locale, batchMode, isSelected, onToggleSelect }) => {
     // Use thumbnail URL directly - browser handles caching
     const imageUrl = analysis.source_image_id ? getThumbnailUrl(analysis.source_image_id) : null;
-    const loadingImage = false; // No loading state needed with direct URLs
     const [imageError, setImageError] = useState(false);
 
     const createdDate = new Date(analysis.created_at);
@@ -408,9 +418,7 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, onViewResults, onFi
                 )}
                 {/* Thumbnail */}
                 <div className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 bg-gray-100 dark:bg-gray-900 overflow-hidden">
-                    {loadingImage ? (
-                        <div className="w-full h-full animate-pulse bg-gray-200 dark:bg-gray-700" />
-                    ) : imageError ? (
+                    {imageError ? (
                         <div className="w-full h-full flex flex-col items-center justify-center text-amber-500 bg-amber-50 dark:bg-amber-900/20 gap-1">
                             <FiAlertTriangle size={20} />
                             <span className="text-xs font-medium">{t('analysisDashboard.deleted')}</span>
@@ -520,7 +528,6 @@ const AnalysisRow = ({ analysis, onViewDetails, onReproduce, onViewResults, onFi
 const AnalysisCard = ({ analysis, onViewDetails, onReproduce, onViewResults, isActive, onFilterByImage, isFilterActive, t, locale, batchMode, isSelected, onToggleSelect }) => {
     // Use thumbnail URL directly - browser handles caching
     const imageUrl = analysis.source_image_id ? getThumbnailUrl(analysis.source_image_id) : null;
-    const loadingImage = false; // No loading state needed with direct URLs
     const [imageError, setImageError] = useState(false);
 
     const createdDate = new Date(analysis.created_at);
@@ -537,9 +544,7 @@ const AnalysisCard = ({ analysis, onViewDetails, onReproduce, onViewResults, isA
         >
             {/* Thumbnail */}
             <div className="relative w-full pt-[65%] bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 rounded-t-xl overflow-hidden">
-                {loadingImage ? (
-                    <div className="absolute inset-0 animate-pulse bg-gray-200 dark:bg-gray-700" />
-                ) : imageError ? (
+                {imageError ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-amber-500 bg-amber-50 dark:bg-amber-900/20 gap-1">
                         <FiAlertTriangle size={32} />
                         <span className="text-xs font-medium">{t('analysisDashboard.deleted')}</span>
@@ -649,7 +654,6 @@ const AnalysisListRowCompact = ({ analysis, isActive, onClick, onFilterByImage, 
 
     // Use thumbnail URL directly - browser handles caching
     const imageUrl = analysis.source_image_id ? getThumbnailUrl(analysis.source_image_id) : null;
-    const loadingImage = false; // No loading state needed with direct URLs
     const [imageError, setImageError] = useState(false);
 
     return (
@@ -679,9 +683,7 @@ const AnalysisListRowCompact = ({ analysis, isActive, onClick, onFilterByImage, 
 
             {/* Thumbnail replacing Type Icon box */}
             <div className="flex-shrink-0 w-12 h-12 bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                {loadingImage ? (
-                    <div className="w-full h-full animate-pulse bg-gray-200 dark:bg-gray-700" />
-                ) : imageError ? (
+                {imageError ? (
                     <div className="w-full h-full flex flex-col items-center justify-center text-amber-500 bg-amber-50 dark:bg-amber-900/20 gap-0.5">
                         <FiAlertTriangle size={16} />
                         <span className="text-[8px] font-medium">{t('analysisDashboard.deleted')}</span>
@@ -807,6 +809,8 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
     const isProvenanceGraph = analysis.type === 'provenance' && activeTab === 'result' && analysis.results?.graph;
 
     // Load Provenance Graph Images - use thumbnail URLs
+    // Note: imageUrls is intentionally omitted from deps to avoid infinite loop
+    // (this effect updates imageUrls, so including it would cause re-render cycles)
     useEffect(() => {
         if (analysis.type === 'provenance' && analysis.results?.graph?.nodes) {
             const newUrls = {};
@@ -819,6 +823,7 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
                 setImageUrls(prev => ({ ...prev, ...newUrls }));
             }
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [analysis]);
 
     // Load Source Image - use full resolution for detail panel
@@ -838,7 +843,6 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
         setLoadingTarget(false);
     }, [analysis.parameters?.target_image_id, analysis.target_image_id]);
 
-    // Load Result Image
     // Load Result Image
     // Result Navigation State
     const [availableResults, setAvailableResults] = useState([]);
@@ -872,10 +876,7 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
             }
         });
 
-        // Special handling for copy-move cross: prioritize clusters
-        if (analysis.type === 'cross_image_copy_move') {
-            // If we have clusters, make it first or default? logic is fine usually.
-        }
+        // Note: For cross_image_copy_move, clusters are already correctly prioritized by availableResults order
 
         setAvailableResults(results);
         setCurrentResultIndex(0);
@@ -941,14 +942,13 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
         }
     }, [activeTab, analysis, resultUrl, availableResults, currentResultIndex]);
 
-    // Cleanup URLs
+    // Cleanup blob URLs only - sourceUrl and targetUrl are direct API URLs, not blob URLs
     useEffect(() => {
         return () => {
-            if (sourceUrl) URL.revokeObjectURL(sourceUrl);
-            if (targetUrl) URL.revokeObjectURL(targetUrl);
+            // Only resultUrl is created with URL.createObjectURL and needs revocation
             if (resultUrl) URL.revokeObjectURL(resultUrl);
         };
-    }, [sourceUrl, targetUrl, resultUrl]);
+    }, [resultUrl]);
 
     return (
         <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-lg flex flex-col h-full">
@@ -1442,6 +1442,8 @@ const Pagination = ({ currentPage, totalPages, totalItems, pageSize, onPageChang
 const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale }) => {
     const [resultImages, setResultImages] = useState({});
     const [loadingResults, setLoadingResults] = useState(true);
+    // Track created blob URLs for proper cleanup
+    const createdUrlsRef = React.useRef([]);
 
     useEffect(() => {
         if (!analysis) return;
@@ -1459,8 +1461,13 @@ const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale })
             return;
         }
 
+        // Clear previous URLs
+        createdUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+        createdUrlsRef.current = [];
+
         const loadResults = async () => {
             const images = {};
+            const newUrls = [];
             // Map of result keys to API endpoint types
             // Backend expects: matches, clusters, pred_map, conf_map, noiseprint, result_image
             const resultTypeMapping = {
@@ -1476,13 +1483,16 @@ const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale })
                 if (analysis.results[resultKey]) {
                     try {
                         const blob = await api.download(`/analyses/${analysis._id}/results/${apiType}/download`);
-                        images[resultKey] = URL.createObjectURL(blob);
+                        const url = URL.createObjectURL(blob);
+                        images[resultKey] = url;
+                        newUrls.push(url);
                     } catch (err) {
                         console.error(`Failed to load ${resultKey}:`, err);
                     }
                 }
             }
 
+            createdUrlsRef.current = newUrls;
             setResultImages(images);
             setLoadingResults(false);
         };
@@ -1490,9 +1500,11 @@ const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale })
         loadResults();
 
         return () => {
-            Object.values(resultImages).forEach(url => URL.revokeObjectURL(url));
+            // Cleanup: revoke all blob URLs created in this effect
+            createdUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+            createdUrlsRef.current = [];
         };
-    }, [analysis?._id]);
+    }, [analysis?._id, analysis?.results]);
 
     if (!analysis) return null;
 
@@ -2034,6 +2046,20 @@ const AnalysisDashboardPage = () => {
     // Check if any filters are active
     const hasActiveFilters = Object.values(filters).some(v => v !== null);
 
+    // Memoized navigation handlers for split view to avoid creating new functions on every render
+    const navigationHandlers = useMemo(() => {
+        if (!selectedAnalysis) {
+            return { onNext: null, onPrev: null, hasNext: false, hasPrev: false };
+        }
+        const idx = analyses.findIndex(a => a._id === selectedAnalysis._id);
+        return {
+            onNext: idx !== -1 && idx < analyses.length - 1 ? () => setSelectedAnalysis(analyses[idx + 1]) : null,
+            onPrev: idx > 0 ? () => setSelectedAnalysis(analyses[idx - 1]) : null,
+            hasNext: idx !== -1 && idx < analyses.length - 1,
+            hasPrev: idx > 0
+        };
+    }, [selectedAnalysis, analyses]);
+
     return (
         <div className="w-full h-full flex flex-col p-6 md:p-8 overflow-hidden relative text-gray-900 dark:text-gray-100 transition-colors duration-300">
             {/* Header & Toolbar */}
@@ -2438,16 +2464,10 @@ const AnalysisDashboardPage = () => {
                                 onFilterByImage={handleFilterByImage}
                                 activeTab={detailsActiveTab}
                                 onTabChange={setDetailsActiveTab}
-                                onNext={(() => {
-                                    const idx = analyses.findIndex(a => a._id === selectedAnalysis._id);
-                                    return idx !== -1 && idx < analyses.length - 1 ? () => setSelectedAnalysis(analyses[idx + 1]) : null;
-                                })()}
-                                onPrev={(() => {
-                                    const idx = analyses.findIndex(a => a._id === selectedAnalysis._id);
-                                    return idx > 0 ? () => setSelectedAnalysis(analyses[idx - 1]) : null;
-                                })()}
-                                hasNext={analyses.findIndex(a => a._id === selectedAnalysis._id) < analyses.length - 1}
-                                hasPrev={analyses.findIndex(a => a._id === selectedAnalysis._id) > 0}
+                                onNext={navigationHandlers.onNext}
+                                onPrev={navigationHandlers.onPrev}
+                                hasNext={navigationHandlers.hasNext}
+                                hasPrev={navigationHandlers.hasPrev}
                                 t={t}
                                 locale={locale}
                             />
