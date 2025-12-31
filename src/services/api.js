@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../config/api';
+import { translate } from '../context/LanguageContext';
 
 /**
  * Centralized API Client
@@ -26,15 +27,18 @@ const getHeaders = (isMultipart = false) => {
 };
 
 const handleResponse = async (response) => {
-    // Handle 401 Unauthorized globally
+    // Handle 401 Unauthorized globally - clear auth and redirect to login
     if (response.status === 401) {
-        // Optional: Clear token and redirect to login
-        // localStorage.removeItem('authToken');
-        // localStorage.removeItem('user');
-        // window.location.href = '/login'; 
-        // Note: For now, we'll just throw the error and let the context/component handle the redirect if needed,
-        // or we can dispatch a custom event.
-        throw new Error('Sessão expirada ou inválida. Por favor, faça login novamente.');
+        // Clear authentication data from localStorage
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+
+        // Force page reload which will redirect to login screen
+        // (App.jsx renders AuthPage when isAuthenticated is false)
+        window.location.reload();
+
+        // Throw error to prevent further processing
+        throw new Error(translate('api.sessionExpired'));
     }
 
     // Handle 204 No Content (Success with no body)
@@ -54,7 +58,10 @@ const handleResponse = async (response) => {
     }
 
     if (!response.ok) {
-        const errorMessage = data?.detail || data?.message || 'Ocorreu um erro na requisição.';
+        let errorMessage = data?.detail || data?.message || translate('api.requestError');
+        if (typeof errorMessage === 'object') {
+            errorMessage = JSON.stringify(errorMessage);
+        }
         throw new Error(errorMessage);
     }
 
@@ -94,6 +101,16 @@ export const api = {
         return handleResponse(response);
     },
 
+    patch: async (endpoint, body) => {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+            method: 'PATCH',
+            headers: getHeaders(),
+            body: JSON.stringify(body),
+        });
+
+        return handleResponse(response);
+    },
+
     delete: async (endpoint) => {
         const response = await fetch(`${API_BASE_URL}${endpoint}`, {
             method: 'DELETE',
@@ -112,7 +129,7 @@ export const api = {
 
         if (!response.ok) {
             // Try to parse error message if possible, otherwise generic
-            throw new Error('Falha no download do arquivo.');
+            throw new Error(translate('api.downloadError'));
         }
 
         return response.blob();
@@ -121,11 +138,134 @@ export const api = {
     // --- Image Type Management ---
 
     addImageTypes: async (imageId, types) => {
-        return api.post(`/images/${imageId}/types`, { types });
+        // Ensure types is an array
+        const typesArray = Array.isArray(types) ? types : [types];
+        return api.post(`/images/${imageId}/types`, { types: typesArray });
     },
 
     removeImageType: async (imageId, typeName) => {
         return api.delete(`/images/${imageId}/types/${typeName}`);
+    },
+
+    // --- Annotations (Legacy methods removed) ---
+
+
+    // =========================================================================
+    // Single-Image Annotations (new API)
+    // =========================================================================
+
+    /**
+     * Get single-image annotations for an image
+     * @param {string} imageId - Image ID
+     * @returns {Promise<Array>} Array of single annotations
+     */
+    getSingleAnnotations: async (imageId) => {
+        return api.get(`/annotations/single`, { image_id: imageId });
+    },
+
+    /**
+     * Create a single-image annotation
+     * @param {Object} data - Annotation data
+     * @returns {Promise<Object>} Created annotation
+     */
+    createSingleAnnotation: async (data) => {
+        return api.post('/annotations/single', data);
+    },
+
+    /**
+     * Delete a single-image annotation
+     * @param {string} annotationId - Annotation ID
+     */
+    deleteSingleAnnotation: async (annotationId) => {
+        return api.delete(`/annotations/single/${annotationId}`);
+    },
+
+    // =========================================================================
+    // Dual-Image (Cross-Image) Annotations (new API)
+    // =========================================================================
+
+    /**
+     * Get dual-image annotations for a source image
+     * @param {string} sourceImageId - Source image ID
+     * @param {string} targetImageId - Optional target image ID to filter by
+     * @returns {Promise<Array>} Array of dual annotations
+     */
+    getDualAnnotations: async (sourceImageId, targetImageId = null) => {
+        const params = { source_image_id: sourceImageId };
+        if (targetImageId) params.target_image_id = targetImageId;
+        return api.get('/annotations/dual', params);
+    },
+
+    /**
+     * Batch create dual-image annotations
+     * @param {Array} annotations - Array of dual annotation objects
+     * @returns {Promise<Array>} Array of created annotations
+     */
+    createDualAnnotationsBatch: async (annotations) => {
+        return api.post('/annotations/dual/batch', { annotations });
+    },
+
+    /**
+     * Delete a dual-image annotation
+     * @param {string} annotationId - Annotation ID
+     */
+    deleteDualAnnotation: async (annotationId) => {
+        return api.delete(`/annotations/dual/${annotationId}`);
+    },
+
+    /**
+     * Delete all dual-image annotations with a specific link ID
+     * @param {string} linkId - Link ID
+     */
+    deleteDualAnnotationsByLink: async (linkId) => {
+        return api.delete(`/annotations/dual/by-link/${linkId}`);
+    },
+
+    /**
+     * Update an existing dual-image annotation
+     * @param {string} annotationId - Annotation ID
+     * @param {Object} data - Update data (coords, pair_name, pair_color, text)
+     * @returns {Promise<Object>} Updated annotation
+     */
+    updateDualAnnotation: async (annotationId, data) => {
+        return api.put(`/annotations/dual/${annotationId}`, data);
+    },
+
+    /**
+     * Update all dual-image annotations with a specific link ID
+     * Used for propagating name/color changes to all linked annotations
+     * @param {string} linkId - Link ID
+     * @param {Object} data - Update data (pair_name, pair_color, text)
+     * @returns {Promise<Object>} Update result with count
+     */
+    updateDualAnnotationsByLink: async (linkId, data) => {
+        return api.put(`/annotations/dual/by-link/${linkId}`, data);
+    },
+
+    /**
+     * Get IDs of images linked via dual annotations
+     * @param {string} imageId - Image ID
+     * @returns {Promise<string[]>} List of linked image IDs
+     */
+    getDualLinkedImages: async (imageId) => {
+        return api.get(`/annotations/dual/linked-images/${imageId}`);
+    },
+
+    /**
+     * Get paginated list of user's images
+     * @param {Object} params - Query parameters
+     * @param {number} params.page - Page number (default: 1)
+     * @param {number} params.perPage - Items per page (default: 24)
+     * @param {boolean} params.flagged - Filter by flagged status
+     * @returns {Promise<Object>} Paginated image response
+     */
+    getImages: async (params = {}) => {
+        const queryParams = {};
+        if (params.page) queryParams.page = params.page;
+        if (params.perPage) queryParams.per_page = params.perPage;
+        if (params.flagged !== undefined) queryParams.flagged = params.flagged;
+        if (params.linkedTo) queryParams.linked_to_image_id = params.linkedTo;
+        return api.get('/images', queryParams);
     },
 
     // --- Documents ---
@@ -165,5 +305,303 @@ export const api = {
      */
     getPanelsFromImage: async (imageId) => {
         return api.get(`/images/${imageId}/panels`);
-    }
+    },
+
+    // --- Provenance Analysis ---
+
+    /**
+     * Check provenance service health status
+     * @returns {Promise<{service: string, healthy: boolean, message: string}>}
+     */
+    checkProvenanceHealth: async () => {
+        return api.get('/provenance/health');
+    },
+
+    /**
+     * Start provenance analysis for a query image
+     * @param {string} imageId - Query image ID
+     * @param {Object} params - Analysis parameters
+     * @param {number} params.k - Top-K candidates from CBIR (default: 10)
+     * @param {number} params.q - Top-Q for expansion (default: 5)
+     * @param {number} params.max_depth - Max expansion depth (default: 3)
+     * @param {string} params.descriptor_type - Descriptor type (default: 'cv_rsift')
+     * @returns {Promise<{message: string, analysis_id: string, query_image_id: string}>}
+     */
+    startProvenanceAnalysis: async (imageId, params = {}) => {
+        return api.post('/provenance/analyze', {
+            image_id: imageId,
+            search_image_ids: params.search_image_ids || null,
+            k: params.k || 10,
+            q: params.q || 5,
+            max_depth: params.max_depth || 3,
+            descriptor_type: params.descriptor_type || 'cv_rsift'
+        });
+    },
+
+    /**
+     * Get analysis details by ID (works for all analysis types including provenance)
+     * @param {string} analysisId - Analysis ID
+     * @returns {Promise<Object>} Analysis details including status and results
+     */
+    getAnalysisById: async (analysisId) => {
+        return api.get(`/analyses/${analysisId}`);
+    },
+
+    // --- Copy-Move Detection ---
+
+    /**
+     * Start single-image copy-move detection analysis
+     * Note: Single-image detection only supports 'dense' method
+     * @param {string} imageId - Image ID to analyze
+     * @param {string} method - Detection method (only 'dense' supported for single-image)
+     * @param {number} denseMethod - Dense method variant (1-5)
+     * @returns {Promise<{message: string, analysis_id: string}>}
+     */
+    startCopyMoveAnalysis: async (imageId, denseMethod = 2) => {
+        return api.post('/analyses/copy-move/single', {
+            image_id: imageId,
+            method: 'dense',  // Single-image only supports dense
+            dense_method: denseMethod
+        });
+    },
+
+    /**
+     * Start cross-image copy-move detection analysis
+     * @param {string} sourceImageId - Source image ID
+     * @param {string} targetImageId - Target image ID
+     * @param {string} method - Detection method ('keypoint' or 'dense', default: 'keypoint')
+     * @param {number} denseMethod - Dense method variant (1-5), only used when method='dense'
+     * @param {string} descriptor - Keypoint descriptor type, only used when method='keypoint'
+     * @returns {Promise<{message: string, analysis_id: string}>}
+     */
+    startCrossImageCopyMoveAnalysis: async (sourceImageId, targetImageId, method = 'keypoint', denseMethod = 2, descriptor = 'cv_rsift') => {
+        return api.post('/analyses/copy-move/cross', {
+            source_image_id: sourceImageId,
+            target_image_id: targetImageId,
+            method: method,
+            dense_method: denseMethod,
+            descriptor: descriptor
+        });
+    },
+
+    // --- Manipulation Detection (TruFor) ---
+
+    /**
+     * Start manipulation detection analysis using TruFor
+     * @param {string} imageId - Image ID to analyze
+     * @param {Object} options - Analysis options
+     * @param {boolean} options.save_noiseprint - Whether to save Noiseprint++ output (default: false)
+     * @returns {Promise<{message: string, analysis_id: string}>}
+     */
+    startManipulationAnalysis: async (imageId, options = {}) => {
+        return api.post('/analyses/trufor', {
+            image_id: imageId,
+            save_noiseprint: options.save_noiseprint || false
+        });
+    },
+
+    // --- Analysis Dashboard ---
+
+    /**
+     * List all analyses with pagination and filtering
+     * @param {Object} params - Query parameters
+     * @param {number} params.page - Page number (default: 1)
+     * @param {number} params.per_page - Items per page (default: 10)
+     * @param {string} params.type - Filter by analysis type
+     * @param {string} params.status - Filter by status (pending, processing, completed, failed)
+     * @param {string} params.source_image_id - Filter by source image ID
+     * @param {string} params.date_from - Filter by start date (ISO string)
+     * @param {string} params.date_to - Filter by end date (ISO string)
+     * @returns {Promise<{success: boolean, data: Array, pagination: Object}>}
+     */
+    listAnalyses: async (params = {}) => {
+        return api.get('/analyses', params);
+    },
+
+    /**
+     * Get all analyses associated with a specific image
+     * Returns analyses where the image is either source or target
+     * @param {string} imageId - Image ID to get analyses for
+     * @param {number} limit - Maximum number of analyses to return (default: 50)
+     * @returns {Promise<Array>} Array of analysis objects
+     */
+    getAnalysesByImage: async (imageId, limit = 50) => {
+        return api.get(`/analyses/by-image/${imageId}`, { limit });
+    },
+
+    /**
+     * Save a screening tool analysis result
+     * Allows storing results from screening tools with optional file upload
+     * @param {Object} data - Analysis data
+     * @param{string} data.source_image_id - Source image ID (required)
+     * @param {string} data.tool_name - Name of the screening tool (required)
+     * @param {string} data.tool_version - Version of the screening tool
+     * @param {string} data.description - Description of the analysis
+     * @param {Object} data.parameters - Parameters used for the analysis
+     * @param {Object} data.metrics - Analysis metrics/results
+     * @param {File} data.result_file - Optional result file to upload
+     * @returns {Promise<{success: boolean, message: string, analysis_id: string}>}
+     */
+    saveScreeningToolAnalysis: async (data) => {
+        const formData = new FormData();
+        formData.append('source_image_id', data.source_image_id);
+        formData.append('tool_name', data.tool_name);
+
+        if (data.tool_version) {
+            formData.append('tool_version', data.tool_version);
+        }
+        if (data.description) {
+            formData.append('description', data.description);
+        }
+        if (data.parameters) {
+            formData.append('parameters', JSON.stringify(data.parameters));
+        }
+        if (data.metrics) {
+            formData.append('metrics', JSON.stringify(data.metrics));
+        }
+        if (data.result_file) {
+            formData.append('result_file', data.result_file);
+        }
+
+        // Use getHeaders(true) for multipart form data (no Content-Type header)
+        const headers = getHeaders(true);
+
+        const response = await fetch(`${API_BASE_URL}/analyses/screening-tool`, {
+            method: 'POST',
+            headers,
+            body: formData
+        });
+
+        return response.json();
+    },
+
+    /**
+     * Save an image analysis result (from ImageAnalysisPage client-side tools)
+     * @param {Object} data - Analysis data
+     * @param {string} data.image_id - Image ID that was analyzed
+     * @param {string} data.analysis_subtype - Subtype/tool name (e.g., 'ela', 'noise', 'gradient')
+     * @param {Object} data.parameters - Parameters used for the analysis
+     * @param {string} data.notes - Optional notes about the analysis
+     * @param {Blob|File} data.result_image - Optional result image blob to upload
+     * @returns {Promise<Object>} The created analysis document
+     */
+    saveImageAnalysis: async (data) => {
+        const formData = new FormData();
+        formData.append('image_id', data.image_id);
+        formData.append('analysis_subtype', data.analysis_subtype);
+        formData.append('parameters', JSON.stringify(data.parameters || {}));
+
+        if (data.notes) {
+            formData.append('notes', data.notes);
+        }
+        if (data.result_image) {
+            // Convert blob to file if needed
+            const filename = `${data.analysis_subtype}_result.png`;
+            const file = data.result_image instanceof File
+                ? data.result_image
+                : new File([data.result_image], filename, { type: 'image/png' });
+            formData.append('result_image', file);
+        }
+
+        // Use getHeaders(true) for multipart form data (no Content-Type header)
+        const headers = getHeaders(true);
+
+        const response = await fetch(`${API_BASE_URL}/analyses/screening-tool`, {
+            method: 'POST',
+            headers,
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Failed to save analysis' }));
+            throw new Error(error.detail || 'Failed to save analysis');
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Download analysis result image
+     * @param {string} analysisId - Analysis ID
+     * @param {string} resultType - Result type (pred_map, conf_map, noiseprint, matches, clusters, result)
+     * @returns {Promise<Blob>} Result image blob
+     */
+    downloadAnalysisResult: async (analysisId, resultType) => {
+        return api.download(`/analyses/${analysisId}/results/${resultType}/download`);
+    },
+
+    // --- Flagged Images ---
+
+    /**
+     * Toggle the flagged status of an image
+     * @param {string} imageId - Image ID to toggle flag status
+     * @returns {Promise<Object>} Updated image object
+     */
+    toggleImageFlag: async (imageId) => {
+        return api.patch(`/images/${imageId}/flag`, {});
+    },
+
+    /**
+     * Get flagged images only
+     * @param {Object} params - Query params (page, per_page, etc.)
+     * @returns {Promise<Object>} Paginated response with flagged images
+     */
+    getFlaggedImages: async (params = {}) => {
+        return api.get('/images', { ...params, flagged: true });
+    },
+
+    // --- Image Relationships ---
+
+    /**
+     * Create a relationship between two images
+     * @param {string} image1Id - First image ID
+     * @param {string} image2Id - Second image ID
+     * @param {string} sourceType - Relationship source ('manual', 'provenance', 'cross_copy_move', 'similarity')
+     * @param {number} weight - Relationship strength (0-1, default: 1.0)
+     * @param {Object} metadata - Optional additional context
+     * @returns {Promise<Object>} Created relationship object
+     */
+    createRelationship: async (image1Id, image2Id, sourceType = 'manual', weight = 1.0, metadata = null) => {
+        return api.post('/relationships', {
+            image1_id: image1Id,
+            image2_id: image2Id,
+            source_type: sourceType,
+            weight,
+            metadata
+        });
+    },
+
+    /**
+     * Remove a relationship by ID
+     * @param {string} relationshipId - Relationship ID to remove
+     * @returns {Promise<Object>} Success message
+     */
+    removeRelationship: async (relationshipId) => {
+        return api.delete(`/relationships/${relationshipId}`);
+    },
+
+    /**
+     * Get all relationships for an image
+     * @param {string} imageId - Image ID to get relationships for
+     * @param {boolean} includeDetails - Include related image details (default: true)
+     * @returns {Promise<Array>} List of relationship objects
+     */
+    getRelationships: async (imageId, includeDetails = true) => {
+        return api.get(`/relationships/image/${imageId}`, { include_details: includeDetails });
+    },
+
+    /**
+     * Get relationship graph for visualization
+     * Uses BFS to build a graph from the starting image up to max_depth
+     * @param {string} imageId - Starting image ID
+     * @param {number} maxDepth - Maximum BFS depth (1-5, default: 3)
+     * @returns {Promise<{query_image_id: string, nodes: Array, edges: Array, mst_edges: Array}>}
+     */
+    getRelationshipGraph: async (imageId, maxDepth = 5) => {
+        return api.get(`/relationships/image/${imageId}/graph`, { max_depth: maxDepth });
+    },
 };
+
+export { API_BASE_URL };
+export default api;
+

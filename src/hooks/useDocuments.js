@@ -38,7 +38,7 @@ export const useDocuments = () => {
         } finally {
             setLoading(false);
         }
-    }, [t]);
+    }, []);
 
     const uploadDocument = useCallback(async (file) => {
         try {

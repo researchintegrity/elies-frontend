@@ -23,11 +23,9 @@ export const useProfile = () => {
 
         try {
             const response = await api.get('/users/me');
-            console.log('Profile API Response:', response); // Debug
 
             // A resposta pode vir direto ou em response.data
             const userData = response.data || response;
-            console.log('User Data:', userData); // Debug
 
             if (userData && (userData._id || userData.username)) {
                 setUser(userData);

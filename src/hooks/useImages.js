@@ -23,12 +23,29 @@ export const useImages = () => {
     });
 
     const fetchImages = useCallback(async (params = {}) => {
-        const { page = 1, per_page = DEFAULT_PER_PAGE, ...otherParams } = params;
+        const {
+            page = 1,
+            per_page = DEFAULT_PER_PAGE,
+            imageType = [],
+            dateFrom = null,
+            dateTo = null,
+            search = '',
+            sourceType = null,
+            ...otherParams
+        } = params;
+
+        // Build query params - only include non-empty values
+        const queryParams = { page, per_page, ...otherParams };
+        if (imageType && imageType.length > 0) queryParams.image_type = imageType.join(',');
+        if (dateFrom) queryParams.date_from = dateFrom;
+        if (dateTo) queryParams.date_to = dateTo;
+        if (search) queryParams.search = search;
+        if (sourceType && sourceType !== 'all') queryParams.source_type = sourceType;
 
         setLoading(true);
         setError(null);
         try {
-            const data = await api.get('/images', { page, per_page, ...otherParams });
+            const data = await api.get('/images', queryParams);
 
             // Handle both array response (legacy) and paginated response object
             let imageList = [];
@@ -66,7 +83,10 @@ export const useImages = () => {
                 uploadedDate: img.uploaded_date,
                 fileSize: img.file_size,
                 sourceType: img.source_type,
-                imageType: img.image_type || []
+                imageType: img.image_type || [],
+                isFlagged: img.is_flagged || false,
+                analysisStatus: img.analysis_status || {},
+                analysisResults: img.analysis_results || {}
             }));
 
             setImages(transformed);
@@ -159,6 +179,35 @@ export const useImages = () => {
         }
     }, [t]);
 
+    /**
+     * Toggle the flagged status of an image (optimistic update)
+     * @param {Object} image - Image object with id and is_flagged properties
+     * @returns {Promise<boolean>} Success status
+     */
+    const toggleFlag = useCallback(async (image) => {
+        // Optimistic update
+        const newFlagStatus = !image.isFlagged;
+        setImages(prev => prev.map(img =>
+            img.id === image.id ? { ...img, isFlagged: newFlagStatus } : img
+        ));
+
+        try {
+            const updatedImage = await api.toggleImageFlag(image.id);
+            // Update with server response to ensure consistency
+            setImages(prev => prev.map(img =>
+                img.id === image.id ? { ...img, isFlagged: updatedImage.is_flagged } : img
+            ));
+            return true;
+        } catch {
+            // Revert optimistic update on error
+            setImages(prev => prev.map(img =>
+                img.id === image.id ? { ...img, isFlagged: image.isFlagged } : img
+            ));
+            showToast(t('images.flagError') || 'Failed to update flag status', 'error');
+            return false;
+        }
+    }, [t]);
+
     return {
         images,
         loading,
@@ -168,6 +217,9 @@ export const useImages = () => {
         uploadImage,
         deleteImage,
         addImageTypes,
-        removeImageType
+        removeImageType,
+        toggleFlag,
     };
 };
+
+export default useImages;

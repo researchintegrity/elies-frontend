@@ -4,10 +4,8 @@ import {
   FiSearch,
   FiFilter,
   FiRefreshCw,
-  FiImage,
   FiX,
   FiAlertTriangle,
-  FiCheck,
   FiTarget,
   FiZap,
   FiArrowLeft,
@@ -21,326 +19,29 @@ import { api } from '../services/api';
 import { showAlert, showToast, showConfirm } from '../utils/alert';
 import SelectionToolbar from '../components/SelectionToolbar';
 import ImageFilters from '../components/ImageFilters';
-import TagInput from '../components/TagInput';
 import BatchTagModal from '../components/BatchTagModal';
 import { SkeletonCard, EmptyState } from '../components/common';
+import { API_BASE_URL } from '../config/api';
+import LightboxModal from '../components/common/LightboxModal';
+import ImageMetadataSidebar from '../components/common/ImageMetadataSidebar';
+import ImageCard from '../components/ImageCard';
+import QueryImageThumbnail from '../components/QueryImageThumbnail';
 
-// --- Components ---
+// Components moved to separate files
+// LightboxModal -> ../components/common/LightboxModal
+// QueryImageThumbnail -> ../components/QueryImageThumbnail
+// ImageCard -> ../components/ImageCard
 
-const LightboxModal = ({ image, onClose, imageUrl, onTagAdd, onTagRemove, t, locale }) => {
-  // Hook must be called before any conditional returns (React rules of hooks)
-  useEffect(() => {
-    if (!image) return;
-    const handleEsc = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [image, onClose]);
-
-  if (!image) return null;
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/95 z-[1000] flex backdrop-blur-md animate-in fade-in duration-200"
-      onClick={onClose}
-      role="dialog"
-    >
-      <div className="flex-1 flex items-center justify-center p-8 relative" onClick={e => e.stopPropagation()}>
-        <button
-          className="absolute top-6 left-6 text-white/50 hover:text-white transition-colors"
-          onClick={onClose}
-        >
-          <FiX size={32} />
-        </button>
-
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={image.filename}
-            className="max-h-[90vh] max-w-full object-contain rounded-lg shadow-2xl"
-          />
-        ) : (
-          <div className="w-full h-full max-h-[80vh] aspect-video flex items-center justify-center">
-            <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
-          </div>
-        )}
-      </div>
-
-      {/* Metadata Sidebar */}
-      <div
-        className="w-[360px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 p-6 overflow-y-auto flex flex-col gap-6"
-        onClick={e => e.stopPropagation()}
-      >
-        <div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1 break-words">
-            {image.filename}
-          </h2>
-          <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
-            <span>{new Date(image.uploadedDate).toLocaleDateString(locale)}</span>
-            <span>•</span>
-            <span>{(image.fileSize / 1024).toFixed(1)} KB</span>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">{t('lightbox.tagsClassification')}</h3>
-          <TagInput
-            tags={image.imageType || []}
-            onAdd={(tag) => onTagAdd(image, tag)}
-            onRemove={(tag) => onTagRemove(image, tag)}
-          />
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">{t('lightbox.metadata')}</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-              <span className="block text-gray-500 text-xs mb-1">{t('lightbox.origin')}</span>
-              <span className="font-medium dark:text-gray-200 capitalize">{image.sourceType}</span>
-            </div>
-            <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-              <span className="block text-gray-500 text-xs mb-1">{t('lightbox.format')}</span>
-              <span className="font-medium dark:text-gray-200 uppercase">{image.filename.split('.').pop()}</span>
-            </div>
-          </div>
-
-          {/* Exif Metadata Placeholder */}
-          {image.exifMetadata && Object.keys(image.exifMetadata).length > 0 && (
-            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
-              {Object.entries(image.exifMetadata).slice(0, 5).map(([key, value]) => (
-                <div key={key} className="flex justify-between text-xs">
-                  <span className="text-gray-500">{key}</span>
-                  <span className="text-gray-900 dark:text-gray-300 truncate max-w-[120px]" title={String(value)}>{String(value)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Query Image Thumbnail for Similarity Mode (with selection support)
-const QueryImageThumbnail = ({ image, isSelected, onSelect, isSelectionMode }) => {
-  const [imageUrl, setImageUrl] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let isMounted = true;
-    const loadImage = async () => {
-      try {
-        const blob = await api.download(`/images/${image.imageId || image.id}/download`);
-        const url = URL.createObjectURL(blob);
-        if (isMounted) {
-          setImageUrl(url);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (isMounted) setLoading(false);
-      }
-    };
-    if (image) loadImage();
-    return () => {
-      isMounted = false;
-      if (imageUrl) URL.revokeObjectURL(imageUrl);
-    };
-  }, [image?.id, image?.imageId]);
-
-  if (!image) return null;
-
-  const handleClick = () => {
-    if (onSelect) onSelect(image.id);
-  };
-
-  return (
-    <div
-      onClick={handleClick}
-      className={`group relative flex items-center gap-3 p-2 pr-4 rounded-xl shadow-md cursor-pointer transition-all duration-200 ${isSelected
-        ? 'bg-indigo-50 dark:bg-indigo-900/30 border-2 border-indigo-500 ring-2 ring-indigo-500/30'
-        : 'bg-white dark:bg-gray-800 border-2 border-amber-400 dark:border-amber-500 hover:border-amber-500 dark:hover:border-amber-400'
-        }`}
-    >
-      <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0">
-        {/* Selection Checkbox - inside the thumbnail */}
-        <div
-          className={`absolute top-1 left-1 z-10 transition-opacity duration-200 ${isSelected || isSelectionMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-          onClick={(e) => { e.stopPropagation(); handleClick(); }}
-        >
-          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors shadow-sm ${isSelected
-            ? 'bg-indigo-600 border-indigo-600 text-white'
-            : 'bg-white/90 dark:bg-gray-800/90 border-white dark:border-gray-400 hover:border-indigo-500'
-            }`}>
-            {isSelected && <FiCheck size={12} strokeWidth={3} />}
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="w-full h-full animate-pulse bg-gray-200 dark:bg-gray-600" />
-        ) : imageUrl ? (
-          <img src={imageUrl} alt={image.filename} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-400">
-            <FiImage size={20} />
-          </div>
-        )}
-      </div>
-      <div className="min-w-0">
-        <span className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-bold">Query</span>
-        <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[120px]" title={image.filename}>
-          {image.filename}
-        </p>
-      </div>
-    </div>
-  );
-};
-const ImageCard = ({ image, onClick, onSelect, isSelected, isSelectionMode, similarityScore, rank }) => {
-  const { t } = useLanguage();
-  const [imageUrl, setImageUrl] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  // Helper function for score color
-  const getScoreColor = (score) => {
-    if (score >= 0.9) return 'text-green-600 dark:text-green-400';
-    if (score >= 0.7) return 'text-emerald-600 dark:text-emerald-400';
-    if (score >= 0.5) return 'text-amber-600 dark:text-amber-400';
-    return 'text-red-600 dark:text-red-400';
-  };
-
-  const getScoreBgColor = (score) => {
-    if (score >= 0.9) return 'bg-green-500';
-    if (score >= 0.7) return 'bg-emerald-500';
-    if (score >= 0.5) return 'bg-amber-500';
-    return 'bg-red-500';
-  };
-
-  useEffect(() => {
-    let isMounted = true;
-    const loadImage = async () => {
-      try {
-        const blob = await api.download(`/images/${image.imageId}/download`);
-        const url = URL.createObjectURL(blob);
-        if (isMounted) {
-          setImageUrl(url);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(true);
-          setLoading(false);
-        }
-      }
-    };
-    if (image.imageId) loadImage();
-    return () => {
-      isMounted = false;
-      if (imageUrl) URL.revokeObjectURL(imageUrl);
-    };
-  }, [image.imageId]);
-
-  return (
-    <div
-      className={`group relative bg-white dark:bg-gray-800 rounded-xl overflow-hidden border transition-all duration-200 cursor-pointer
-        ${isSelected
-          ? 'ring-2 ring-indigo-500 border-indigo-500 shadow-lg scale-[1.02] z-10'
-          : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-md'
-        }`}
-      onClick={() => {
-        // Always toggle selection when clicking anywhere on the card
-        onSelect(image.id);
-      }}
-    >
-      {/* Checkbox Overlay (Visible on Hover or Selected) */}
-      <div
-        className={`absolute top-3 left-3 z-20 transition-opacity duration-200 ${isSelected || isSelectionMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-        onClick={(e) => { e.stopPropagation(); onSelect(image.id); }}
-      >
-        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected
-          ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
-          : 'bg-white/80 dark:bg-black/50 border-white/50 dark:border-gray-400 hover:border-indigo-500'
-          }`}>
-          {isSelected && <FiCheck size={14} strokeWidth={3} />}
-        </div>
-      </div>
-
-      <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-900">
-        {loading ? (
-          <div className="w-full h-full bg-gray-200 dark:bg-gray-800 animate-pulse"></div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center w-full h-full text-gray-400 bg-gray-50 dark:bg-gray-800">
-            <FiAlertTriangle size={24} className="mb-2 text-amber-500" />
-            <span className="text-xs">{t('image.error')}</span>
-          </div>
-        ) : (
-          <img
-            src={imageUrl}
-            alt={image.filename}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
-          />
-        )}
-
-        {/* Gradient Overlay for Text Readability */}
-        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 to-transparent opacity-60"></div>
-      </div>
-
-      <div className="p-3">
-        <div className="flex justify-between items-start mb-1 h-6">
-          <h4 className="font-medium text-gray-900 dark:text-gray-100 truncate text-sm flex-1 pr-2" title={image.filename}>
-            {image.filename}
-          </h4>
-        </div>
-
-        {/* Similarity Score Bar - Only show when in similarity mode */}
-        {similarityScore !== null && (
-          <div className="flex items-center gap-2 mt-2 px-2 py-1.5 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800/50">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300">#{rank}</span>
-              <div className={`w-1.5 h-1.5 rounded-full ${getScoreBgColor(similarityScore)}`}></div>
-            </div>
-            <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${getScoreBgColor(similarityScore)}`}
-                style={{ width: `${similarityScore * 100}%` }}
-              ></div>
-            </div>
-            <span className={`text-[10px] font-bold ${getScoreColor(similarityScore)}`}>
-              {(similarityScore * 100).toFixed(0)}%
-            </span>
-          </div>
-        )}
-
-        {/* Tags - Only show when NOT in similarity mode */}
-        {similarityScore === null && (
-          <div className="flex items-center gap-2 mt-2 overflow-hidden h-6">
-            {image.imageType && image.imageType.length > 0 ? (
-              image.imageType.slice(0, 2).map(tag => (
-                <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 font-medium truncate max-w-[80px]">
-                  #{tag}
-                </span>
-              ))
-            ) : (
-              <span className="text-[10px] text-gray-400 italic">{t('image.noTags')}</span>
-            )}
-            {image.imageType && image.imageType.length > 2 && (
-              <span className="text-[10px] text-gray-400">+{image.imageType.length - 2}</span>
-            )}
-          </div>
-        )}
-
-        <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-          <span className="text-[10px] text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded capitalize">
-            {image.sourceType === 'uploaded' ? t('image.uploaded') : t('image.extracted')}
-          </span>
-          <span className="text-[10px] text-gray-400">
-            {new Date(image.uploadedDate).toLocaleDateString()}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
+// Map analysis types to page keys (matches PAGES in AppLayout)
+const analysisTypeToPageKey = {
+  'imageAnalysis': 'imageAnalysis',
+  'manipulationDetection': 'manipulationDetection',
+  'copyMoveSingle': 'copyMove',
+  'copyMoveCross': 'copyMove',
+  'provenance': 'provenance',
+  // Batch analysis types route to the same pages
+  'batchManipulation': 'manipulationDetection',
+  'batchCopyMove': 'copyMove',
 };
 
 // --- Main Page Component ---
@@ -354,7 +55,8 @@ const ViewImagesPage = () => {
     fetchImages,
     deleteImage,
     addImageTypes,
-    removeImageType
+    removeImageType,
+    toggleFlag
   } = useImages();
 
   // Panel extraction
@@ -380,6 +82,8 @@ const ViewImagesPage = () => {
   const [selectedImages, setSelectedImages] = useState(new Map());
   const selectedIds = useMemo(() => new Set(selectedImages.keys()), [selectedImages]);
   const [isBatchTagModalOpen, setIsBatchTagModalOpen] = useState(false);
+  const [lastClickedId, setLastClickedId] = useState(null); // For shift-click range selection
+  const [lastActionWasSelect, setLastActionWasSelect] = useState(true); // Tracks if last action was select or deselect
 
   // Lightbox
   const [lightboxImage, setLightboxImage] = useState(null);
@@ -393,31 +97,81 @@ const ViewImagesPage = () => {
   const [similarityTopK, setSimilarityTopK] = useState(20);
   const [similarityThreshold, setSimilarityThreshold] = useState(0.5);
   const [similarityLabelFilter, setSimilarityLabelFilter] = useState('all');
+  const [similarityPage, setSimilarityPage] = useState(1);
+  const SIMILARITY_PER_PAGE = 12;
 
-  // Accumulated categories from all visited pages (persisted state)
-  const [allCategories, setAllCategories] = useState(new Set());
-
-  // Update available categories when images change (accumulate from all pages)
-  useEffect(() => {
-    if (images.length > 0) {
-      setAllCategories(prev => {
-        const newSet = new Set(prev);
-        images.forEach(img => {
-          (img.imageType || []).forEach(type => newSet.add(type));
-        });
-        return newSet;
-      });
-    }
-  }, [images]);
-
-  // Convert Set to sorted array for rendering
-  const availableCategoriesForSimilarity = useMemo(() => {
-    return Array.from(allCategories).sort();
-  }, [allCategories]);
+  // Fetch all available tags from backend (using dedicated endpoint for efficiency)
+  const [allCategories, setAllCategories] = useState([]);
 
   useEffect(() => {
-    fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE });
-  }, [fetchImages, currentPage]);
+    const fetchTags = async () => {
+      try {
+        const tags = await api.get('/images/tags');
+        setAllCategories(tags);
+      } catch (err) {
+        console.error('Error fetching tags:', err);
+      }
+    };
+    fetchTags();
+  }, []);
+
+  // Exit similarity mode
+  const handleExitSimilarityMode = useCallback(() => {
+    setSimilarityMode(false);
+    setSimilarityQueryImage(null);
+    setSimilarityResults([]);
+    setSelectedImages(new Map());
+    setSimilarityLabelFilter('all'); // Reset label filter
+  }, []);
+
+  // ESC key handler
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ignore if input is focused (but allow ranges/buttons to be escaped)
+      if (e.target.tagName === 'TEXTAREA' || (e.target.tagName === 'INPUT' && !['checkbox', 'radio', 'range', 'button', 'submit'].includes(e.target.type))) {
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        const modalOpen = isBatchTagModalOpen || lightboxImage;
+        if (modalOpen) {
+          // If modal is open, let it close first
+          if (lightboxImage) setLightboxImage(null);
+          // BatchTagModal handles its own close via callback usually, but if we control isOpen...
+          if (isBatchTagModalOpen) setIsBatchTagModalOpen(false);
+          return;
+        }
+
+        if (selectedIds.size > 0) {
+          setSelectedImages(new Map());
+        } else if (similarityMode) {
+          handleExitSimilarityMode();
+        } else if (filters.tags.length > 0 || filters.dateFrom || filters.dateTo || searchQuery || filters.sourceType !== 'all') {
+          // Clear filters
+          setFilters({ sourceType: 'all', dateFrom: '', dateTo: '', tags: [] });
+          setSearchQuery('');
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isBatchTagModalOpen, lightboxImage, selectedIds, similarityMode, filters, searchQuery, t, handleExitSimilarityMode]);
+
+  // Convert array for rendering (already sorted from backend)
+  const availableCategoriesForSimilarity = allCategories;
+
+  useEffect(() => {
+    // Pass all filters to the backend - server handles filtering and pagination
+    fetchImages({
+      page: currentPage,
+      per_page: IMAGES_PER_PAGE,
+      imageType: filters.tags,
+      dateFrom: filters.dateFrom,
+      dateTo: filters.dateTo,
+      search: searchQuery,
+      sourceType: filters.sourceType
+    });
+  }, [fetchImages, currentPage, filters, searchQuery]);
 
   // Handle page change
   const handlePageChange = useCallback((newPage) => {
@@ -463,6 +217,7 @@ const ViewImagesPage = () => {
         .slice(0, similarityTopK);
 
       setSimilarityResults(filteredMatches);
+      setSimilarityPage(1); // Reset to first page on new search
 
       if (filteredMatches.length === 0) {
         showToast(t('similarity.noResults'), 'info');
@@ -477,7 +232,7 @@ const ViewImagesPage = () => {
     } finally {
       setSimilarityLoading(false);
     }
-  }, [similarityTopK, similarityThreshold]);
+  }, [similarityTopK, similarityThreshold, t]);
 
   // Re-run search when parameters change (while in similarity mode)
   const handleUpdateSimilarityParams = useCallback(async () => {
@@ -486,65 +241,57 @@ const ViewImagesPage = () => {
     }
   }, [similarityMode, similarityQueryImage, handleSimilaritySearch, similarityLabelFilter]);
 
-  // Exit similarity mode
-  const handleExitSimilarityMode = useCallback(() => {
-    setSimilarityMode(false);
-    setSimilarityQueryImage(null);
-    setSimilarityResults([]);
-    setSelectedImages(new Map());
-    setSimilarityLabelFilter('all'); // Reset label filter
-  }, []);
+  // Track previous filter/search values to detect changes and reset pagination
+  const prevFiltersRef = React.useRef({ filters, searchQuery });
+  useEffect(() => {
+    const prev = prevFiltersRef.current;
+    // Check if filters or search changed (not just page)
+    const filtersChanged =
+      JSON.stringify(prev.filters) !== JSON.stringify(filters) ||
+      prev.searchQuery !== searchQuery;
+
+    if (filtersChanged && currentPage !== 1) {
+      setCurrentPage(1);
+    }
+    prevFiltersRef.current = { filters, searchQuery };
+  }, [filters, searchQuery, currentPage]);
 
   // Derived State: Filtered Images (or similarity results)
+  // Note: All filtering is now done server-side. This useMemo only handles:
+  // 1. Similarity mode - mapping results to expected format + pagination
+  // 2. Client-side sorting - for immediate UX feedback without API call
+
+  // All similarity images (for selection purposes)
+  const allSimilarityImages = useMemo(() => {
+    if (!similarityMode) return [];
+    return similarityResults.map(result => ({
+      id: result.image_id,
+      imageId: result.image_id,
+      filename: result.filename || t('image.noName'),
+      uploadedDate: result.uploaded_date || new Date().toISOString(),
+      fileSize: result.file_size || 0,
+      sourceType: result.source_type || 'unknown',
+      imageType: result.image_type || [],
+      similarityScore: result.similarity_score,
+      isFlagged: result.is_flagged || false
+    }));
+  }, [similarityMode, similarityResults, t]);
+
+  // Similarity pagination info
+  const similarityTotalPages = Math.ceil(allSimilarityImages.length / SIMILARITY_PER_PAGE);
+
   const filteredImages = useMemo(() => {
-    // In similarity mode, only show similarity results (or empty if none)
+    // In similarity mode, show paginated similarity results
     if (similarityMode) {
-      return similarityResults.map(result => ({
-        id: result.image_id,
-        imageId: result.image_id,
-        filename: result.filename || t('image.noName'),
-        uploadedDate: result.uploaded_date || new Date().toISOString(),
-        fileSize: result.file_size || 0,
-        sourceType: result.source_type || 'unknown',
-        imageType: result.image_type || [],
-        similarityScore: result.similarity_score
-      }));
+      const startIndex = (similarityPage - 1) * SIMILARITY_PER_PAGE;
+      const endIndex = startIndex + SIMILARITY_PER_PAGE;
+      return allSimilarityImages.slice(startIndex, endIndex);
     }
 
+    // Server handles all filtering now, just apply local sorting for UX
     let result = [...images];
 
-    // 1. Search Query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(img =>
-        img.filename.toLowerCase().includes(query)
-      );
-    }
-
-    // 2. Filters
-    if (filters.sourceType !== 'all') {
-      result = result.filter(img => img.sourceType === filters.sourceType);
-    }
-
-    if (filters.dateFrom) {
-      const fromDate = new Date(filters.dateFrom);
-      result = result.filter(img => new Date(img.uploadedDate) >= fromDate);
-    }
-
-    if (filters.dateTo) {
-      const toDate = new Date(filters.dateTo);
-      // Ajustar para fim do dia
-      toDate.setHours(23, 59, 59, 999);
-      result = result.filter(img => new Date(img.uploadedDate) <= toDate);
-    }
-
-    if (filters.tags && filters.tags.length > 0) {
-      result = result.filter(img =>
-        filters.tags.some(tag => (img.imageType || []).includes(tag))
-      );
-    }
-
-    // 3. Sorting
+    // Client-side sorting for immediate feedback
     result.sort((a, b) => {
       switch (sortBy) {
         case 'newest': return new Date(b.uploadedDate) - new Date(a.uploadedDate);
@@ -557,15 +304,51 @@ const ViewImagesPage = () => {
     });
 
     return result;
-  }, [images, searchQuery, sortBy, filters, similarityMode, similarityResults]);
+  }, [images, sortBy, similarityMode, allSimilarityImages, similarityPage, SIMILARITY_PER_PAGE]);
 
   // Handlers
 
-  const handleSelect = useCallback((id) => {
+  const handleSelect = useCallback((id, event) => {
+    // Determine the current image list for range selection
+    const currentImageList = similarityMode ? allSimilarityImages : filteredImages;
+
     // Find the image data from current page images or similarity results
     const imageData = images.find(img => img.id === id) ||
-      filteredImages.find(img => img.id === id);
+      currentImageList.find(img => img.id === id);
 
+    // Shift-click range selection/deselection
+    if (event?.shiftKey && lastClickedId && lastClickedId !== id) {
+      // Use the current page/view images for range selection
+      const visibleImages = similarityMode ? allSimilarityImages : filteredImages;
+      const lastIndex = visibleImages.findIndex(img => img.id === lastClickedId);
+      const currentIndex = visibleImages.findIndex(img => img.id === id);
+
+      if (lastIndex !== -1 && currentIndex !== -1) {
+        const startIndex = Math.min(lastIndex, currentIndex);
+        const endIndex = Math.max(lastIndex, currentIndex);
+        const rangeImages = visibleImages.slice(startIndex, endIndex + 1);
+
+        // Use the last action type to determine select or deselect
+        setSelectedImages(prev => {
+          const newMap = new Map(prev);
+          if (lastActionWasSelect) {
+            // Select the range
+            rangeImages.forEach(img => newMap.set(img.id, img));
+          } else {
+            // Deselect the range
+            rangeImages.forEach(img => newMap.delete(img.id));
+          }
+          return newMap;
+        });
+
+        // Toggle action for next shift-click (so it does the opposite)
+        setLastActionWasSelect(!lastActionWasSelect);
+        return;
+      }
+    }
+
+    // Regular click - toggle selection
+    const wasSelected = selectedIds.has(id);
     setSelectedImages(prev => {
       const newMap = new Map(prev);
       if (newMap.has(id)) {
@@ -575,9 +358,13 @@ const ViewImagesPage = () => {
       }
       return newMap;
     });
-  }, [images, filteredImages]);
 
-  const handleClearSelection = () => setSelectedImages(new Map());
+    // Update anchor and action type for next shift-click
+    setLastClickedId(id);
+    setLastActionWasSelect(!wasSelected);
+  }, [images, filteredImages, similarityMode, allSimilarityImages, lastClickedId, selectedIds, lastActionWasSelect]);
+
+  const handleClearSelection = useCallback(() => setSelectedImages(new Map()), []);
 
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
@@ -649,9 +436,37 @@ const ViewImagesPage = () => {
     handleClearSelection();
   };
 
-  const handleAnalyzeSelected = () => {
-    showToast(t('batch.analyzeComingSoon'), "info");
-  };
+  // Map analysis types to page keys (matches PAGES in AppLayout)
+
+
+  const handleAnalyzeSelected = useCallback((analysisType) => {
+    const selectedArray = Array.from(selectedImages.values());
+    if (selectedArray.length === 0) return;
+
+    // Validate selection for cross copy-move
+    if (analysisType === 'copyMoveCross' && selectedArray.length !== 2) {
+      showToast(t('analyze.selectTwoImages'), 'warning');
+      return;
+    }
+
+    // Determine mode based on analysis type
+    let mode = 'single';
+    if (analysisType === 'copyMoveCross') {
+      mode = 'cross';
+    } else if (analysisType === 'batchManipulation' || analysisType === 'batchCopyMove') {
+      mode = 'batch';
+    }
+
+    const startAnalysisData = {
+      imageIds: selectedArray.map(img => img.id || img.imageId),
+      targetPage: analysisTypeToPageKey[analysisType],
+      mode: mode  // 'single', 'cross', or 'batch'
+    };
+
+    sessionStorage.setItem('startAnalysis', JSON.stringify(startAnalysisData));
+    showToast(t('analyze.navigatingToTool'), 'success');
+    window.location.reload();
+  }, [selectedImages, t]);
 
   // Find similar images handler
   const handleFindSimilar = useCallback(() => {
@@ -664,7 +479,7 @@ const ViewImagesPage = () => {
     if (queryImage) {
       handleSimilaritySearch(queryImage);
     }
-  }, [selectedImages, handleSimilaritySearch]);
+  }, [selectedImages, handleSimilaritySearch, t]);
 
   // View metadata handler - opens lightbox for selected image
   const handleViewMetadata = useCallback(async () => {
@@ -697,21 +512,21 @@ const ViewImagesPage = () => {
     // After a successful extraction, refresh the gallery
     if (result.success && !result.pending) {
       // Extraction completed synchronously (edge case)
-      fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE });
+      fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE, imageType: filters.tags, dateFrom: filters.dateFrom, dateTo: filters.dateTo, search: searchQuery, sourceType: filters.sourceType });
       handleClearSelection();
     } else if (result.success && result.pending) {
       // Extraction started, clear selection but don't refresh yet
       // The hook will notify on completion
       handleClearSelection();
     }
-  }, [selectedImages, startExtraction, fetchImages, currentPage, IMAGES_PER_PAGE, handleClearSelection]);
+  }, [selectedImages, startExtraction, fetchImages, currentPage, IMAGES_PER_PAGE, handleClearSelection, filters, searchQuery]);
 
   // Refresh gallery when extraction completes
   useEffect(() => {
     if (extractionStatus === 'completed') {
-      fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE });
+      fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE, imageType: filters.tags, dateFrom: filters.dateFrom, dateTo: filters.dateTo, search: searchQuery, sourceType: filters.sourceType });
     }
-  }, [extractionStatus, fetchImages, currentPage, IMAGES_PER_PAGE]);
+  }, [extractionStatus, fetchImages, currentPage, IMAGES_PER_PAGE, filters, searchQuery]);
 
   const handleResetFilters = () => {
     setFilters({ sourceType: 'all', dateFrom: '', dateTo: '', tags: [] });
@@ -786,7 +601,7 @@ const ViewImagesPage = () => {
                   {similarityLoading && <FiRefreshCw className="animate-spin text-sm text-gray-400" />}
                 </h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {!similarityLoading && `${filteredImages.length} ${t('similarity.resultsFound')}`}
+                  {!similarityLoading && `${allSimilarityImages.length} ${t('similarity.resultsFound')}`}
                   {similarityLoading && t('similarity.searching')}
                 </p>
               </div>
@@ -850,6 +665,102 @@ const ViewImagesPage = () => {
               </button>
             </div>
           </div>
+
+          {/* Selection Buttons and Pagination for Similarity Mode */}
+          {allSimilarityImages.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-4 mt-4 pt-4 border-t border-amber-200 dark:border-amber-800/50">
+              {/* Selection Buttons */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => {
+                    setSelectedImages(prev => {
+                      const newMap = new Map(prev);
+                      filteredImages.forEach(img => newMap.set(img.id, img));
+                      return newMap;
+                    });
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors"
+                >
+                  {t('provenance.selectAllOnPage')}
+                </button>
+                <button
+                  onClick={() => {
+                    const pageIds = new Set(filteredImages.map(img => img.id));
+                    setSelectedImages(prev => {
+                      const newMap = new Map(prev);
+                      pageIds.forEach(id => newMap.delete(id));
+                      return newMap;
+                    });
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
+                >
+                  {t('provenance.clearPageSelection')}
+                </button>
+                <span className="mx-2 text-gray-300 dark:text-gray-600">|</span>
+                <button
+                  onClick={() => {
+                    setSelectedImages(prev => {
+                      const newMap = new Map(prev);
+                      allSimilarityImages.forEach(img => newMap.set(img.id, img));
+                      return newMap;
+                    });
+                    showToast(`${allSimilarityImages.length} ${t('provenance.imagesSelected')}`, 'success');
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-900/60 transition-colors"
+                >
+                  {t('similarity.selectAllResults')}
+                </button>
+                <button
+                  onClick={() => setSelectedImages(new Map())}
+                  className="px-3 py-1.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  {t('gallery.clearAllSelection')}
+                </button>
+                {selectedIds.size > 0 && (
+                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                    ({selectedIds.size} {t('common.selected')})
+                  </span>
+                )}
+              </div>
+
+              {/* Pagination Controls */}
+              {similarityTotalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSimilarityPage(1)}
+                    disabled={similarityPage === 1}
+                    className="px-2 py-1 text-xs rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    {t('gallery.first')}
+                  </button>
+                  <button
+                    onClick={() => setSimilarityPage(prev => Math.max(1, prev - 1))}
+                    disabled={similarityPage === 1}
+                    className="p-1 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <FiChevronLeft size={16} />
+                  </button>
+                  <span className="text-xs text-gray-600 dark:text-gray-300 min-w-[80px] text-center">
+                    {similarityPage}/{similarityTotalPages} ({allSimilarityImages.length})
+                  </span>
+                  <button
+                    onClick={() => setSimilarityPage(prev => Math.min(similarityTotalPages, prev + 1))}
+                    disabled={similarityPage === similarityTotalPages}
+                    className="p-1 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <FiChevronRight size={16} />
+                  </button>
+                  <button
+                    onClick={() => setSimilarityPage(similarityTotalPages)}
+                    disabled={similarityPage === similarityTotalPages}
+                    className="px-2 py-1 text-xs rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    {t('gallery.last')}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -938,7 +849,7 @@ const ViewImagesPage = () => {
 
                 <button
                   className="flex-shrink-0 p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-indigo-600 hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 transition-all shadow-sm"
-                  onClick={() => fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE })}
+                  onClick={() => fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE, imageType: filters.tags, dateFrom: filters.dateFrom, dateTo: filters.dateTo, search: searchQuery, sourceType: filters.sourceType })}
                   title={t('common.update')}
                 >
                   <FiRefreshCw />
@@ -963,6 +874,106 @@ const ViewImagesPage = () => {
               ))}
             </div>
           )}
+
+          {/* Top Selection Buttons */}
+          {pagination.total > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800/50">
+              <button
+                onClick={() => {
+                  setSelectedImages(prev => {
+                    const newMap = new Map(prev);
+                    filteredImages.forEach(img => newMap.set(img.id, img));
+                    return newMap;
+                  });
+                }}
+                className="px-3 py-1.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors"
+              >
+                {t('provenance.selectAllOnPage')}
+              </button>
+              <button
+                onClick={() => {
+                  const pageIds = new Set(filteredImages.map(img => img.id));
+                  setSelectedImages(prev => {
+                    const newMap = new Map(prev);
+                    pageIds.forEach(id => newMap.delete(id));
+                    return newMap;
+                  });
+                }}
+                className="px-3 py-1.5 text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
+              >
+                {t('provenance.clearPageSelection')}
+              </button>
+              <span className="mx-2 text-gray-300 dark:text-gray-600">|</span>
+              {/* Select All Filtered - only shows when filters are active */}
+              {hasActiveFilters && (
+                <button
+                  onClick={async () => {
+                    try {
+                      // Build query params matching API format
+                      const queryParams = {};
+                      if (filters.tags.length > 0) queryParams.image_type = filters.tags.join(',');
+                      if (filters.dateFrom) queryParams.date_from = filters.dateFrom;
+                      if (filters.dateTo) queryParams.date_to = filters.dateTo;
+                      if (searchQuery) queryParams.search = searchQuery;
+                      if (filters.sourceType && filters.sourceType !== 'all') queryParams.source_type = filters.sourceType;
+
+                      // Single lightweight API call to get filtered image IDs
+                      const data = await api.get('/images/ids', queryParams);
+                      const ids = data.ids || [];
+
+                      setSelectedImages(prev => {
+                        const newMap = new Map(prev);
+                        ids.forEach(id => newMap.set(id, { id }));
+                        return newMap;
+                      });
+                      showToast(`${ids.length} ${t('provenance.imagesSelected')}`, 'success');
+                    } catch (err) {
+                      console.error('Error fetching filtered image IDs:', err);
+                      showToast(t('common.error') || 'Error', 'error');
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/60 transition-colors"
+                >
+                  {t('gallery.selectAllFiltered')}
+                </button>
+              )}
+              {/* Select All - always visible, selects ALL images without filters */}
+              <button
+                onClick={async () => {
+                  try {
+                    // Single lightweight API call to get all image IDs
+                    const data = await api.get('/images/ids');
+                    const ids = data.ids || [];
+
+                    setSelectedImages(prev => {
+                      const newMap = new Map(prev);
+                      // Store just the ID as key, with minimal object for the Map
+                      ids.forEach(id => newMap.set(id, { id }));
+                      return newMap;
+                    });
+                    showToast(`${ids.length} ${t('provenance.imagesSelected')}`, 'success');
+                  } catch (err) {
+                    console.error('Error fetching all image IDs:', err);
+                    showToast(t('common.error') || 'Error', 'error');
+                  }
+                }}
+                className="px-3 py-1.5 text-xs font-medium bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-900/60 transition-colors"
+              >
+                {t('gallery.selectAllImages')}
+              </button>
+              <button
+                onClick={() => setSelectedImages(new Map())}
+                className="px-3 py-1.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                {t('gallery.clearAllSelection')}
+              </button>
+              {selectedIds.size > 0 && (
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                  ({selectedIds.size} {t('common.selected')})
+                </span>
+              )}
+            </div>
+          )}
         </header>
       )}
 
@@ -977,7 +988,7 @@ const ViewImagesPage = () => {
             <FiAlertTriangle className="text-5xl text-red-400 mb-4" />
             <h3 className="text-xl font-bold text-gray-900 dark:text-white">{t('gallery.errorLoading')}</h3>
             <p className="text-gray-500 mb-6">{error}</p>
-            <button onClick={() => fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE })} className="px-6 py-2 bg-indigo-600 text-white rounded-lg">{t('common.tryAgain')}</button>
+            <button onClick={() => fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE, imageType: filters.tags, dateFrom: filters.dateFrom, dateTo: filters.dateTo, search: searchQuery, sourceType: filters.sourceType })} className="px-6 py-2 bg-indigo-600 text-white rounded-lg">{t('common.tryAgain')}</button>
           </div>
         ) : filteredImages.length === 0 ? (
           <EmptyState
@@ -995,90 +1006,212 @@ const ViewImagesPage = () => {
                 <ImageCard
                   key={image.id}
                   image={image}
-                  onClick={(img, url) => {
-                    setLightboxImage(img);
-                    setLightboxUrl(url);
-                  }}
                   onSelect={handleSelect}
                   isSelected={selectedIds.has(image.id)}
                   isSelectionMode={selectedIds.size > 0}
                   similarityScore={image.similarityScore !== undefined ? image.similarityScore : null}
-                  rank={image.similarityScore !== undefined ? index + 1 : null}
+                  rank={image.similarityScore !== undefined ? (similarityMode ? (similarityPage - 1) * SIMILARITY_PER_PAGE + index + 1 : index + 1) : null}
+                  onToggleFlag={toggleFlag}
                 />
               ))}
             </div>
 
             {/* Bottom Pagination Controls */}
             {!similarityMode && pagination.total > IMAGES_PER_PAGE && (
-              <div className="flex items-center justify-center gap-4 mt-8 pb-8">
-                <button
-                  onClick={() => handlePageChange(1)}
-                  disabled={currentPage === 1 || loading}
-                  className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  {t('gallery.first')}
-                </button>
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={!pagination.hasPrev || loading}
-                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <FiChevronLeft />
-                </button>
+              <div className="flex flex-col items-center gap-4 mt-8 pb-8">
+                {/* Selection Buttons */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => {
+                      // Select all images on current page
+                      setSelectedImages(prev => {
+                        const newMap = new Map(prev);
+                        filteredImages.forEach(img => newMap.set(img.id, img));
+                        return newMap;
+                      });
+                    }}
+                    className="px-3 py-1.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors"
+                  >
+                    {t('provenance.selectAllOnPage')}
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Clear selection of images on current page only
+                      const pageIds = new Set(filteredImages.map(img => img.id));
+                      setSelectedImages(prev => {
+                        const newMap = new Map(prev);
+                        pageIds.forEach(id => newMap.delete(id));
+                        return newMap;
+                      });
+                    }}
+                    className="px-3 py-1.5 text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
+                  >
+                    {t('provenance.clearPageSelection')}
+                  </button>
+                  <span className="mx-2 text-gray-300 dark:text-gray-600">|</span>
+                  {/* Select All Filtered - only shows when filters are active */}
+                  {hasActiveFilters && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          let allImages = [];
+                          let page = 1;
+                          const perPage = 100;
+                          let hasMore = true;
 
-                {/* Page number buttons */}
-                <div className="flex items-center gap-1">
-                  {(() => {
-                    const pages = [];
-                    const totalPages = pagination.totalPages;
-                    const current = currentPage;
+                          while (hasMore) {
+                            // Build query params matching API format
+                            const queryParams = { page, per_page: perPage };
+                            if (filters.tags.length > 0) queryParams.image_type = filters.tags.join(',');
+                            if (filters.dateFrom) queryParams.date_from = filters.dateFrom;
+                            if (filters.dateTo) queryParams.date_to = filters.dateTo;
+                            if (searchQuery) queryParams.search = searchQuery;
+                            if (filters.sourceType && filters.sourceType !== 'all') queryParams.source_type = filters.sourceType;
+                            const data = await api.get('/images', queryParams);
+                            const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
+                            allImages = [...allImages, ...imageList];
 
-                    // Show at most 5 page buttons
-                    let start = Math.max(1, current - 2);
-                    let end = Math.min(totalPages, start + 4);
+                            hasMore = imageList.length >= perPage;
+                            page++;
+                            if (page > 50) break;
+                          }
 
-                    // Adjust start if we're near the end
-                    if (end - start < 4) {
-                      start = Math.max(1, end - 4);
-                    }
+                          setSelectedImages(prev => {
+                            const newMap = new Map(prev);
+                            allImages.forEach(img => newMap.set(img.id || img._id, img));
+                            return newMap;
+                          });
+                          showToast(`${allImages.length} ${t('provenance.imagesSelected')}`, 'success');
+                        } catch (err) {
+                          console.error('Error fetching filtered images:', err);
+                          showToast(t('common.error') || 'Error', 'error');
+                        }
+                      }}
+                      className="px-3 py-1.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/60 transition-colors"
+                    >
+                      {t('gallery.selectAllFiltered')}
+                    </button>
+                  )}
+                  {/* Select All - always visible, selects ALL images without filters */}
+                  <button
+                    onClick={async () => {
+                      try {
+                        let allImages = [];
+                        let page = 1;
+                        const perPage = 100;
+                        let hasMore = true;
 
-                    for (let i = start; i <= end; i++) {
-                      pages.push(
-                        <button
-                          key={i}
-                          onClick={() => handlePageChange(i)}
-                          disabled={loading}
-                          className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${i === current
-                            ? 'bg-indigo-600 text-white'
-                            : 'border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
-                            }`}
-                        >
-                          {i}
-                        </button>
-                      );
-                    }
-                    return pages;
-                  })()}
+                        while (hasMore) {
+                          // No filters applied - fetch all images
+                          const queryParams = { page, per_page: perPage };
+                          const data = await api.get('/images', queryParams);
+                          const imageList = Array.isArray(data) ? data : (data.items || data.images || []);
+                          allImages = [...allImages, ...imageList];
+
+                          hasMore = imageList.length >= perPage;
+                          page++;
+                          if (page > 50) break;
+                        }
+
+                        setSelectedImages(prev => {
+                          const newMap = new Map(prev);
+                          allImages.forEach(img => newMap.set(img.id || img._id, img));
+                          return newMap;
+                        });
+                        showToast(`${allImages.length} ${t('provenance.imagesSelected')}`, 'success');
+                      } catch (err) {
+                        console.error('Error fetching all images:', err);
+                        showToast(t('common.error') || 'Error', 'error');
+                      }
+                    }}
+                    className="px-3 py-1.5 text-xs font-medium bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-900/60 transition-colors"
+                  >
+                    {t('gallery.selectAllImages')}
+                  </button>
+                  <button
+                    onClick={() => setSelectedImages(new Map())}
+                    className="px-3 py-1.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    {t('gallery.clearAllSelection')}
+                  </button>
+                  {selectedIds.size > 0 && (
+                    <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                      ({selectedIds.size} {t('common.selected')})
+                    </span>
+                  )}
                 </div>
 
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={!pagination.hasNext || loading}
-                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <FiChevronRight />
-                </button>
-                <button
-                  onClick={() => handlePageChange(pagination.totalPages)}
-                  disabled={currentPage === pagination.totalPages || loading}
-                  className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  {t('gallery.last')}
-                </button>
+                {/* Pagination Buttons */}
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1 || loading}
+                    className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    {t('gallery.first')}
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={!pagination.hasPrev || loading}
+                    className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <FiChevronLeft />
+                  </button>
 
-                <span className="text-sm text-gray-500 dark:text-gray-400 ml-4">
-                  {pagination.total} {t('gallery.imagesTotal')}
-                </span>
+                  {/* Page number buttons */}
+                  <div className="flex items-center gap-1">
+                    {(() => {
+                      const pages = [];
+                      const totalPages = pagination.totalPages;
+                      const current = currentPage;
+
+                      // Show at most 5 page buttons
+                      let start = Math.max(1, current - 2);
+                      let end = Math.min(totalPages, start + 4);
+
+                      // Adjust start if we're near the end
+                      if (end - start < 4) {
+                        start = Math.max(1, end - 4);
+                      }
+
+                      for (let i = start; i <= end; i++) {
+                        pages.push(
+                          <button
+                            key={i}
+                            onClick={() => handlePageChange(i)}
+                            disabled={loading}
+                            className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${i === current
+                              ? 'bg-indigo-600 text-white'
+                              : 'border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                              }`}
+                          >
+                            {i}
+                          </button>
+                        );
+                      }
+                      return pages;
+                    })()}
+                  </div>
+
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={!pagination.hasNext || loading}
+                    className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <FiChevronRight />
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(pagination.totalPages)}
+                    disabled={currentPage === pagination.totalPages || loading}
+                    className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    {t('gallery.last')}
+                  </button>
+
+                  <span className="text-sm text-gray-500 dark:text-gray-400 ml-4">
+                    {pagination.total} {t('gallery.imagesTotal')}
+                  </span>
+                </div>
               </div>
             )}
           </>
@@ -1086,21 +1219,29 @@ const ViewImagesPage = () => {
       </div>
 
       {/* Lightbox */}
-      {lightboxImage && (
-        <LightboxModal
-          image={images.find(i => i.id === lightboxImage.id) || lightboxImage}
-          imageUrl={lightboxUrl}
-          onClose={() => {
-            setLightboxImage(null);
-            setLightboxUrl(null);
-          }}
-          onTagAdd={addImageTypes}
-          onTagRemove={removeImageType}
-          t={t}
-          locale={locale}
-        />
-      )}
-    </div>
+      {
+        lightboxImage && (
+          <LightboxModal
+            isOpen={!!lightboxImage}
+            onClose={() => {
+              setLightboxImage(null);
+              setLightboxUrl(null);
+            }}
+            imageUrl={lightboxUrl}
+            title={lightboxImage?.filename}
+            showSidebar={true}
+          >
+            <ImageMetadataSidebar
+              image={images.find(i => i.id === lightboxImage.id) || lightboxImage}
+              t={t}
+              locale={locale}
+              onTagAdd={addImageTypes}
+              onTagRemove={removeImageType}
+            />
+          </LightboxModal>
+        )
+      }
+    </div >
   );
 };
 

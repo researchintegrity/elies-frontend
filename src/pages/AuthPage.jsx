@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { FiAlertTriangle, FiMail, FiLock, FiUser, FiArrowRight, FiShield, FiGlobe } from 'react-icons/fi';
+import { useTheme } from '../hooks/useTheme';
+import { FiAlertTriangle, FiMail, FiLock, FiUser, FiArrowRight, FiShield, FiGlobe, FiSun, FiMoon } from 'react-icons/fi';
 
 // Animated floating orb component
 const FloatingOrb = ({ className, delay = 0 }) => (
@@ -24,7 +25,7 @@ const ErrorAlert = ({ message }) => {
 };
 
 // Modern input component with icon
-const InputField = ({ icon: Icon, label, id, ...props }) => (
+const InputField = ({ icon: IconComponent, label, id, ...props }) => (
   <div className="group">
     <label
       htmlFor={id}
@@ -34,7 +35,7 @@ const InputField = ({ icon: Icon, label, id, ...props }) => (
     </label>
     <div className="relative">
       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-        <Icon className="text-gray-400 group-focus-within:text-primary-500 transition-colors" />
+        <IconComponent className="text-gray-400 group-focus-within:text-primary-500 transition-colors" />
       </div>
       <input
         id={id}
@@ -60,6 +61,7 @@ const AuthPage = () => {
 
   const { login, register, loading, error } = useAuth();
   const { t, language, toggleLanguage } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -73,26 +75,49 @@ const AuthPage = () => {
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 dark:from-dark-deep dark:via-[#12121f] dark:to-dark-deep">
 
-      {/* Language Toggle - Fixed position */}
-      <button
-        onClick={toggleLanguage}
-        className="fixed top-6 right-6 z-50 group flex items-center gap-2 px-4 py-2.5 rounded-xl 
-                   bg-white/80 dark:bg-dark-card/80 backdrop-blur-xl
-                   border border-gray-200/50 dark:border-gray-700/50
-                   text-gray-600 dark:text-gray-300
-                   hover:bg-white dark:hover:bg-dark-card hover:border-gray-300 dark:hover:border-gray-600
-                   shadow-lg shadow-black/5 hover:shadow-xl
-                   transition-all duration-300"
-        title={language === 'pt' ? 'Switch to English' : 'Mudar para Português'}
-      >
-        <FiGlobe className="w-5 h-5 text-primary-500" />
-        <span className="text-sm font-semibold uppercase tracking-wide">
-          {language === 'pt' ? 'PT' : 'EN'}
-        </span>
-        <span className="text-xs text-gray-400 dark:text-gray-500 border-l border-gray-200 dark:border-gray-700 pl-2 ml-1">
-          {language === 'pt' ? 'English' : 'Português'}
-        </span>
-      </button>
+      {/* Settings Toggle - Fixed position */}
+      <div className="fixed top-6 right-6 z-50 flex items-center gap-2">
+        {/* Theme Toggle */}
+        <button
+          onClick={toggleTheme}
+          className="group flex items-center justify-center w-11 h-11 rounded-xl 
+                     bg-white/80 dark:bg-dark-card/80 backdrop-blur-xl
+                     border border-gray-200/50 dark:border-gray-700/50
+                     text-gray-600 dark:text-gray-300
+                     hover:bg-white dark:hover:bg-dark-card hover:border-gray-300 dark:hover:border-gray-600
+                     shadow-lg shadow-black/5 hover:shadow-xl
+                     transition-all duration-300"
+          title={theme === 'dark' ? (language === 'pt' ? 'Mudar para modo claro' : 'Switch to light mode') : (language === 'pt' ? 'Mudar para modo escuro' : 'Switch to dark mode')}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {theme === 'dark' ? (
+            <FiSun className="w-5 h-5 text-amber-400" />
+          ) : (
+            <FiMoon className="w-5 h-5 text-primary-500" />
+          )}
+        </button>
+
+        {/* Language Toggle */}
+        <button
+          onClick={toggleLanguage}
+          className="group flex items-center gap-2 px-4 py-2.5 rounded-xl 
+                     bg-white/80 dark:bg-dark-card/80 backdrop-blur-xl
+                     border border-gray-200/50 dark:border-gray-700/50
+                     text-gray-600 dark:text-gray-300
+                     hover:bg-white dark:hover:bg-dark-card hover:border-gray-300 dark:hover:border-gray-600
+                     shadow-lg shadow-black/5 hover:shadow-xl
+                     transition-all duration-300"
+          title={language === 'pt' ? 'Switch to English' : 'Mudar para Português'}
+        >
+          <FiGlobe className="w-5 h-5 text-primary-500" />
+          <span className="text-sm font-semibold uppercase tracking-wide">
+            {language === 'pt' ? 'PT' : 'EN'}
+          </span>
+          <span className="text-xs text-gray-400 dark:text-gray-500 border-l border-gray-200 dark:border-gray-700 pl-2 ml-1">
+            {language === 'pt' ? 'English' : 'Português'}
+          </span>
+        </button>
+      </div>
 
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">

@@ -16,6 +16,11 @@ import {
   FiLayers,
   FiChevronsLeft,
   FiMenu,
+  FiCpu,
+  FiShare2,
+  FiCopy,
+  FiActivity,
+  FiFlag,
 } from 'react-icons/fi';
 
 const Sidebar = ({ activePage, onNavigate, pages, isCollapsed = false, onToggle }) => {
@@ -55,24 +60,24 @@ const Sidebar = ({ activePage, onNavigate, pages, isCollapsed = false, onToggle 
     </div>
   );
 
-  const NavItem = ({ pageKey, icon: Icon, label, onClick }) => (
+  const NavItem = ({ pageKey, icon: IconComponent, label, onClick }) => (
     <button
       className={getItemClass(pageKey)}
       onClick={onClick || (() => onNavigate(pageKey))}
       title={isCollapsed ? label : undefined}
     >
       <ActiveIndicator pageKey={pageKey} />
-      <Icon className={getIconClass(pageKey)} />
+      <IconComponent className={getIconClass(pageKey)} />
       {!isCollapsed && <span className="truncate">{label}</span>}
     </button>
   );
 
-  const DisabledItem = ({ icon: Icon, label }) => (
+  const DisabledItem = ({ icon: IconComponent, label }) => (
     <button
       className={`flex items-center ${isCollapsed ? 'justify-center px-2' : 'gap-3 px-4'} py-3 rounded-xl w-full text-sm font-medium text-gray-500 dark:text-gray-500 cursor-not-allowed opacity-60`}
       title={isCollapsed ? label : undefined}
     >
-      <Icon className="w-5 h-5" />
+      <IconComponent className="w-5 h-5" />
       {!isCollapsed && (
         <>
           <span>{label}</span>
@@ -187,7 +192,7 @@ const Sidebar = ({ activePage, onNavigate, pages, isCollapsed = false, onToggle 
         <NavSection title={t('sidebar.images')}>
           <NavItem pageKey={pages.UPLOAD_IMAGE} icon={FiUpload} label={t('sidebar.uploadImages')} />
           <NavItem pageKey={pages.VIEW_IMAGES} icon={FiGrid} label={t('sidebar.gallery')} />
-          <NavItem pageKey={pages.ANNOTATION} icon={FiEdit} label={t('sidebar.annotate')} />
+          <NavItem pageKey={pages.FLAGGED_IMAGES} icon={FiFlag} label={t('sidebar.flagged') || 'Flagged'} />
         </NavSection>
 
         <NavSection title={t('sidebar.documents')}>
@@ -197,9 +202,22 @@ const Sidebar = ({ activePage, onNavigate, pages, isCollapsed = false, onToggle 
 
         <NavSection title={t('sidebar.tools')}>
           <NavItem pageKey={pages.CBIR_SEARCH} icon={FiSearch} label={t('sidebar.findSimilar')} />
+          <NavItem pageKey={pages.IMAGE_ANALYSIS} icon={FiCpu} label={t('sidebar.imageAnalysis') || 'Image Analysis'} />
+          <NavItem pageKey={pages.PROVENANCE} icon={FiShare2} label={t('sidebar.provenance') || 'Provenance'} />
+          <NavItem pageKey={pages.COPY_MOVE} icon={FiCopy} label={t('sidebar.copyMove') || 'Copy-Move Detection'} />
+          <NavItem pageKey={pages.MANIPULATION_DETECTION} icon={FiShield} label={t('sidebar.manipulationDetection') || 'Manipulation Detection'} />
+          <NavItem pageKey={pages.ANALYSIS_DASHBOARD} icon={FiActivity} label={t('sidebar.analysisDashboard') || 'Analysis Dashboard'} />
           <DisabledItem icon={FiTag} label={t('sidebar.tags')} />
           <DisabledItem icon={FiLayers} label={t('sidebar.categories')} />
         </NavSection>
+
+        {/* Admin Section - Only visible to admins */}
+        {user?.roles?.includes('admin') && (
+          <NavSection title={t('sidebar.admin') || 'Admin'}>
+            <NavItem pageKey={pages.ADMIN_DASHBOARD} icon={FiGrid} label={t('sidebar.adminDashboard') || 'Dashboard'} />
+            <NavItem pageKey={pages.ADMIN_USERS} icon={FiSettings} label={t('sidebar.adminUsers') || 'User Management'} />
+          </NavSection>
+        )}
 
         <NavSection title={t('sidebar.settings')}>
           <DisabledItem icon={FiSettings} label={t('sidebar.general')} />

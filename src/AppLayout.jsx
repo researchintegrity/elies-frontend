@@ -3,6 +3,7 @@ import React, { useState, Suspense, lazy } from 'react';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import LoadingFallback from './components/LoadingFallback';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useLanguage } from './context/LanguageContext';
 
 // ✅ CODE SPLITTING: Lazy load all pages
@@ -10,24 +11,86 @@ const UploadPDFPage = lazy(() => import('./pages/UploadPDFPage'));
 const UploadImagePage = lazy(() => import('./pages/UploadImagePage'));
 const ViewImagesPage = lazy(() => import('./pages/ViewImagesPage'));
 const ViewPDFPage = lazy(() => import('./pages/ViewPDFPage'));
-const AnnotationPage = lazy(() => import('./pages/AnnotationPage'));
+const FlaggedImagesPage = lazy(() => import('./pages/FlaggedImagesPage'));
+
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const CBIRSearchPage = lazy(() => import('./pages/CBIRSearchPage'));
+const ImageAnalysisPage = lazy(() => import('./pages/ImageAnalysisPage'));
+const ProvenancePage = lazy(() => import('./pages/ProvenancePage'));
+const CopyMovePage = lazy(() => import('./pages/CopyMovePage'));
+const ManipulationDetectionPage = lazy(() => import('./pages/ManipulationDetectionPage'));
+const AnalysisDashboardPage = lazy(() => import('./pages/AnalysisDashboardPage'));
+
+// Admin pages
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
 
 // Page keys
 const PAGES = {
   UPLOAD_IMAGE: 'uploadImage',
   VIEW_IMAGES: 'viewImages',
-  ANNOTATION: 'annotation',
+  FLAGGED_IMAGES: 'flaggedImages',
   UPLOAD_PDF: 'uploadPDF',
   VIEW_PDFS: 'viewPDFs',
   PROFILE: 'profile',
   SEARCH: 'search',
   CBIR_SEARCH: 'cbirSearch',
+  IMAGE_ANALYSIS: 'imageAnalysis',
+  PROVENANCE: 'provenance',
+  COPY_MOVE: 'copyMove',
+  MANIPULATION_DETECTION: 'manipulationDetection',
+  ANALYSIS_DASHBOARD: 'analysisDashboard',
+  // Admin pages
+  ADMIN_DASHBOARD: 'adminDashboard',
+  ADMIN_USERS: 'adminUsers',
 };
 
 function AppLayout() {
-  const [activePage, setActivePage] = useState(PAGES.VIEW_IMAGES);
+  // Check sessionStorage for reproduce/view results navigation
+  const getInitialPage = () => {
+    // First check for reproduce navigation (from Analysis Dashboard)
+    const reproduceData = sessionStorage.getItem('reproduceAnalysis');
+    if (reproduceData) {
+      try {
+        const { targetPage } = JSON.parse(reproduceData);
+        if (targetPage) {
+          return targetPage;
+        }
+      } catch (err) {
+        console.error('Failed to parse reproduce data:', err);
+      }
+    }
+
+    // Check for start analysis from Gallery
+    const startAnalysisData = sessionStorage.getItem('startAnalysis');
+    if (startAnalysisData) {
+      try {
+        const { targetPage } = JSON.parse(startAnalysisData);
+        if (targetPage) {
+          return targetPage;
+        }
+      } catch (err) {
+        console.error('Failed to parse start analysis data:', err);
+      }
+    }
+
+    // Then check for view results navigation
+    const viewResultsData = sessionStorage.getItem('viewResultsAnalysis');
+    if (viewResultsData) {
+      try {
+        const { targetPage } = JSON.parse(viewResultsData);
+        if (targetPage) {
+          return targetPage;
+        }
+      } catch (err) {
+        console.error('Failed to parse view results data:', err);
+      }
+    }
+
+    return PAGES.VIEW_IMAGES;
+  };
+
+  const [activePage, setActivePage] = useState(getInitialPage);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { t } = useLanguage();
 
@@ -39,8 +102,8 @@ function AppLayout() {
         return <UploadImagePage />;
       case PAGES.VIEW_IMAGES:
         return <ViewImagesPage />;
-      case PAGES.ANNOTATION:
-        return <AnnotationPage />;
+      case PAGES.FLAGGED_IMAGES:
+        return <FlaggedImagesPage onNavigate={setActivePage} />;
       case PAGES.UPLOAD_PDF:
         return <UploadPDFPage />;
       case PAGES.VIEW_PDFS:
@@ -51,6 +114,21 @@ function AppLayout() {
         return <div className="flex items-center justify-center h-full text-gray-400">{t('common.searchPage')}</div>;
       case PAGES.CBIR_SEARCH:
         return <CBIRSearchPage />;
+      case PAGES.IMAGE_ANALYSIS:
+        return <ImageAnalysisPage />;
+      case PAGES.PROVENANCE:
+        return <ProvenancePage />;
+      case PAGES.COPY_MOVE:
+        return <CopyMovePage onNavigate={setActivePage} />;
+      case PAGES.MANIPULATION_DETECTION:
+        return <ManipulationDetectionPage onNavigate={setActivePage} />;
+      case PAGES.ANALYSIS_DASHBOARD:
+        return <AnalysisDashboardPage />;
+      // Admin pages
+      case PAGES.ADMIN_DASHBOARD:
+        return <AdminDashboard />;
+      case PAGES.ADMIN_USERS:
+        return <AdminUsersPage />;
       default:
         return <ViewImagesPage />;
     }
@@ -74,11 +152,13 @@ function AppLayout() {
         <div className="flex-1 flex flex-col px-8 py-6 overflow-y-auto scrollbar-custom">
           <Topbar />
 
-          {/* Page Content with Suspense */}
+          {/* Page Content with Suspense and Error Boundary */}
           <div className="flex-1 animate-fade-in">
-            <Suspense fallback={<LoadingFallback />}>
-              {renderActivePage()}
-            </Suspense>
+            <ErrorBoundary>
+              <Suspense fallback={<LoadingFallback />}>
+                {renderActivePage()}
+              </Suspense>
+            </ErrorBoundary>
           </div>
         </div>
       </main>

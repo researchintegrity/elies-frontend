@@ -90,15 +90,17 @@ const PDFPanel = ({ doc, t }) => {
 
   useEffect(() => {
     let isMounted = true;
+    let blobUrl = null;
+
     const fetchPdf = async () => {
       try {
         setLoading(true);
         setError(null);
         setPdfBlobUrl(null);
         const blob = await api.download(`/documents/${doc.id}/download`);
-        const url = URL.createObjectURL(blob);
+        blobUrl = URL.createObjectURL(blob);
         if (isMounted) {
-          setPdfBlobUrl(url);
+          setPdfBlobUrl(blobUrl);
           setLoading(false);
         }
       } catch (err) {
@@ -110,9 +112,13 @@ const PDFPanel = ({ doc, t }) => {
       }
     };
     if (doc) fetchPdf();
+
     return () => {
       isMounted = false;
-      if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
+      // Revoke blob URL to prevent memory leaks
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
     };
   }, [doc, t]);
 
@@ -287,7 +293,7 @@ const DocumentListRow = ({ doc, onView, onDownload, onDelete, onRemoveWatermark,
 
 // --- Main Page Component ---
 const ViewPDFPage = () => {
-  const { documents, loading, error, fetchDocuments, deleteDocument, downloadDocument } = useDocuments();
+  const { documents, loading, fetchDocuments, deleteDocument, downloadDocument } = useDocuments();
   const { t, locale } = useLanguage();
   const [viewMode, setViewMode] = useState('grid');
   const [isSplitView, setIsSplitView] = useState(false);
@@ -295,7 +301,7 @@ const ViewPDFPage = () => {
   const [sortBy, setSortBy] = useState('newest');
   const [selectedDoc, setSelectedDoc] = useState(null);
 
-  const { removeWatermark, isRemoving } = useWatermarkRemoval((doc, level) => {
+  const { removeWatermark } = useWatermarkRemoval(() => {
     fetchDocuments();
   });
 
