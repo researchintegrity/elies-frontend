@@ -1,482 +1,109 @@
-// src/pages/CBIRSearchPage.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FiSearch,
   FiX,
   FiRefreshCw,
-  FiAlertTriangle,
-  FiCheck,
   FiChevronLeft,
   FiChevronRight,
   FiZap,
   FiTarget,
   FiLayers,
-  FiLink
+  FiCheck
 } from 'react-icons/fi';
 import { api } from '../services/api';
 import { API_BASE_URL } from '../config/api';
 import { showAlert, showToast } from '../utils/alert';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { SkeletonCard, EmptyState } from '../components/common';
-
-// Helper to get thumbnail URL with auth token
-const getThumbnailUrl = (imageId) => {
-  const token = localStorage.getItem('authToken');
-  return `${API_BASE_URL}/images/${imageId}/thumbnail${token ? `?token=${token}` : ''}`;
-};
-
-// --- Sub-Components ---
-
-// Image Card for Source Selection Gallery
-const SourceImageCard = ({ image, isSelected, onClick, imageUrl, loading, error }) => (
-  <div
-    onClick={onClick}
-    className={`group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-200 border-2 ${isSelected
-      ? 'border-indigo-500 ring-2 ring-indigo-500/30 shadow-lg scale-[1.02]'
-      : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
-      }`}
-  >
-    <div className="aspect-square bg-gray-100 dark:bg-gray-800 overflow-hidden">
-      {loading ? (
-        <div className="w-full h-full bg-gray-200 dark:bg-gray-700 animate-pulse" />
-      ) : error ? (
-        <div className="w-full h-full flex items-center justify-center text-gray-400">
-          <FiAlertTriangle size={24} />
-        </div>
-      ) : (
-        <img
-          src={imageUrl}
-          alt={image.filename}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-          loading="lazy"
-        />
-      )}
-    </div>
-
-    {isSelected && (
-      <div className="absolute top-2 right-2 bg-indigo-600 text-white p-1.5 rounded-full shadow-lg">
-        <FiCheck size={14} strokeWidth={3} />
-      </div>
-    )}
-
-    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-      <p className="text-white text-xs font-medium truncate">{image.filename}</p>
-      {image.imageType?.length > 0 && (
-        <div className="flex gap-1 mt-1 overflow-hidden">
-          {image.imageType.slice(0, 2).map(tag => (
-            <span key={tag} className="text-[9px] px-1.5 py-0.5 bg-white/20 text-white rounded">
-              #{tag}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  </div>
-);
-
-// Result Card for Search Results - uses thumbnail URL for fast loading
-const ResultCard = ({ result, rank, onClick, onMarkAsRelated, t }) => {
-  // Use thumbnail URL directly - browser handles caching
-  const imageUrl = result?.image_id ? getThumbnailUrl(result.image_id) : null;
-  const [error, setError] = useState(false);
-  const [linkingAsRelated, setLinkingAsRelated] = useState(false);
-
-  const similarityPercent = (result.similarity_score * 100).toFixed(1);
-  const getSimilarityTone = (score) => {
-    if (score >= 0.9) return 'green';
-    if (score >= 0.7) return 'amber';
-    return 'red';
-  };
-
-  const toneToClasses = (tone) => {
-    switch (tone) {
-      case 'green':
-        return 'text-green-700 border-green-600/40';
-      case 'amber':
-        return 'text-amber-700 border-amber-600/40';
-      default:
-        return 'text-red-700 border-red-600/40';
-    }
-  };
-
-  const similarityTone = getSimilarityTone(result.similarity_score);
-  const toneColors = {
-    green: 'bg-green-500',
-    amber: 'bg-amber-500',
-    red: 'bg-red-500'
-  };
-
-  return (
-    <div
-      onClick={() => onClick?.(result, imageUrl)}
-      className="group bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all cursor-pointer hover:shadow-lg"
-    >
-      <div className="aspect-square bg-gray-100 dark:bg-gray-900 overflow-hidden">
-        {error ? (
-          <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 bg-gray-50 dark:bg-gray-800">
-            <FiAlertTriangle size={24} className="mb-2 text-amber-500" />
-            <span className="text-xs">{t('cbir.error')}</span>
-          </div>
-        ) : (
-          <img
-            src={imageUrl}
-            alt={result.filename || 'Similar image'}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-            loading="lazy"
-            onError={() => setError(true)}
-          />
-        )}
-      </div>
-
-      <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-700">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-bold text-gray-500 dark:text-gray-400">#{rank}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className={`w-2 h-2 rounded-full ${toneColors[similarityTone]}`}></div>
-          <span className={`text-sm font-bold ${toneToClasses(similarityTone).split(' ')[0]}`}>
-            {similarityPercent}%
-          </span>
-        </div>
-      </div>
-
-      <div className="p-3">
-        <h4 className="font-medium text-gray-900 dark:text-gray-100 truncate text-sm mb-2" title={result.filename}>
-          {result.filename || t('cbir.noTags')}
-        </h4>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {result.image_type?.length > 0 ? (
-            result.image_type.slice(0, 2).map(tag => (
-              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 font-medium">
-                #{tag}
-              </span>
-            ))
-          ) : (
-            <span className="text-[10px] text-gray-400 italic">{t('cbir.noTags')}</span>
-          )}
-        </div>
-
-        <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
-          <span className="text-[10px] text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded capitalize">
-            {result.source_type === 'uploaded' ? 'Upload' : t('gallery.extracted')}
-          </span>
-          <span className="text-[10px] text-gray-400">
-            {result.file_size ? `${(result.file_size / 1024).toFixed(0)} KB` : ''}
-          </span>
-        </div>
-
-        {/* Mark as Related Button */}
-        {onMarkAsRelated && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setLinkingAsRelated(true);
-              onMarkAsRelated(result)
-                .finally(() => setLinkingAsRelated(false));
-            }}
-            disabled={linkingAsRelated}
-            className="w-full mt-2 flex items-center justify-center gap-1.5 px-2 py-1.5 text-[10px] font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg transition-colors disabled:opacity-50"
-          >
-            <FiLink size={10} />
-            {linkingAsRelated ? t('cbir.linking') || 'Linking...' : t('cbir.markAsRelated') || 'Mark as Related'}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// Lightbox for viewing images in detail
-const LightboxModal = ({ image, imageUrl, onClose, isResult = false, t }) => {
-  useEffect(() => {
-    if (!image) return;
-    const handleEsc = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [image, onClose]);
-
-  if (!image) return null;
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/95 z-[1000] flex backdrop-blur-md animate-in fade-in duration-200"
-      onClick={onClose}
-      role="dialog"
-    >
-      <div className="flex-1 flex items-center justify-center p-8 relative" onClick={e => e.stopPropagation()}>
-        <button
-          className="absolute top-6 left-6 text-white/50 hover:text-white transition-colors"
-          onClick={onClose}
-        >
-          <FiX size={32} />
-        </button>
-
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={image.filename}
-            className="max-h-[90vh] max-w-full object-contain rounded-lg shadow-2xl"
-          />
-        ) : (
-          <div className="w-full h-full max-h-[80vh] aspect-video flex items-center justify-center">
-            <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
-          </div>
-        )}
-      </div>
-
-      <div
-        className="w-[360px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 p-6 overflow-y-auto flex flex-col gap-6"
-        onClick={e => e.stopPropagation()}
-      >
-        <div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1 break-words">
-            {image.filename}
-          </h2>
-          {isResult && image.similarity_score !== undefined && (
-            <div className="text-sm text-indigo-600 dark:text-indigo-400 font-semibold mb-2">
-              {t('cbir.similarity')}: {(image.similarity_score * 100).toFixed(1)}%
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">{t('cbir.tags')}</h3>
-          <div className="flex flex-wrap gap-2">
-            {(image.imageType || image.image_type)?.length > 0 ? (
-              (image.imageType || image.image_type).map(tag => (
-                <span key={tag} className="text-xs px-2 py-1 rounded bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 font-medium">
-                  #{tag}
-                </span>
-              ))
-            ) : (
-              <span className="text-xs text-gray-400 italic">{t('cbir.noTags')}</span>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">{t('cbir.info')}</h3>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-              <span className="block text-gray-500 text-xs mb-1">{t('cbir.origin')}</span>
-              <span className="font-medium dark:text-gray-200 capitalize">
-                {(image.sourceType || image.source_type) === 'uploaded' ? 'Upload' : t('gallery.extracted')}
-              </span>
-            </div>
-            <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-              <span className="block text-gray-500 text-xs mb-1">{t('pdfs.size')}</span>
-              <span className="font-medium dark:text-gray-200">
-                {image.fileSize || image.file_size ? `${((image.fileSize || image.file_size) / 1024).toFixed(1)} KB` : 'N/A'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- Constants ---
-const IMAGES_PER_PAGE = 24;
-
-// --- Main Component ---
+import SourceImageCard from '../components/cbir/SourceImageCard';
+import ResultCard from '../components/cbir/ResultCard';
+import LightboxModal from '../components/cbir/LightboxModal';
+import { useGallery } from '../hooks/useGallery';
+import { useCBIRSearch } from '../hooks/useCBIRSearch';
 
 const CBIRSearchPage = () => {
   const { t } = useLanguage();
+  const { token } = useAuth();
 
-  // Gallery State
-  const [images, setImages] = useState([]);
-  const [imageUrls, setImageUrls] = useState({});
-  const [loadingImages, setLoadingImages] = useState(true);
-  const [errorImages, setErrorImages] = useState(null);
+  // Gallery Hook
+  const {
+    images,
+    loading: loadingImages,
+    error: errorImages,
+    totalImages,
+    page: galleryPage,
+    totalPages: totalGalleryPages,
+    filters: galleryFilters,
+    availableCategories,
+    setPage: setGalleryPage,
+    setFilters: setGalleryFilters,
+    refresh: refreshGallery
+  } = useGallery();
 
-  // Gallery Filters (for selecting source images)
-  const [galleryFilters, setGalleryFilters] = useState({
-    sourceType: 'all',
-    imageType: [],
-    search: ''
-  });
+  // Search Hook
+  const {
+    searching,
+    searchResults,
+    // error: searchError, // Handled locally via showToast/showAlert usually, or we can use it
+    topK,
+    minSimilarity,
+    categoryFilter,
+    setTopK,
+    setMinSimilarity,
+    setCategoryFilter,
+    search,
+    clearResults
+  } = useCBIRSearch();
 
-  // Selection State
+  // Local UI State
   const [selectedImage, setSelectedImage] = useState(null);
-
-  // Search Parameters
-  const [topK, setTopK] = useState(10);
-  const [minSimilarity, setMinSimilarity] = useState(0.8);
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [availableCategories, setAvailableCategories] = useState([]);
-
-  // Search State
-  const [searching, setSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState(null);
-
-  // Lightbox State
   const [lightboxImage, setLightboxImage] = useState(null);
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [lightboxIsResult, setLightboxIsResult] = useState(false);
 
-  // Gallery pagination
-  const [galleryPage, setGalleryPage] = useState(1);
-  const [totalImages, setTotalImages] = useState(0);
+  // Helper to get thumbnail URL with auth token
+  const getThumbnailUrl = (imageId) => {
+    return `${API_BASE_URL}/images/${imageId}/thumbnail${token ? `?token=${token}` : ''}`;
+  };
 
-  // Fetch images logic (defined before useEffect to avoid reference errors)
-  const fetchImages = useCallback(async (page = 1, filters = {}) => {
-    setLoadingImages(true);
-    setErrorImages(null);
-    try {
-      // Build query params with filters
-      const queryParams = { page, per_page: IMAGES_PER_PAGE };
-      if (filters.imageType && filters.imageType.length > 0) {
-        queryParams.image_type = filters.imageType.join(',');
-      }
-      if (filters.sourceType && filters.sourceType !== 'all') {
-        queryParams.source_type = filters.sourceType;
-      }
-      if (filters.search) {
-        queryParams.search = filters.search;
-      }
-
-      const data = await api.get('/images', queryParams);
-
-      let imageList = [];
-      let total = 0;
-
-      if (Array.isArray(data)) {
-        imageList = data;
-        total = data.length >= IMAGES_PER_PAGE ? page * IMAGES_PER_PAGE + 1 : (page - 1) * IMAGES_PER_PAGE + data.length;
-      } else if (data && typeof data === 'object') {
-        imageList = data.items || data.images || [];
-        total = data.total || data.total_count || imageList.length;
-      }
-
-      const limitedImageList = imageList.slice(0, IMAGES_PER_PAGE);
-
-      const transformed = limitedImageList.map(img => ({
-        id: img._id,
-        imageId: img._id,
-        filename: img.filename,
-        uploadedDate: img.uploaded_date,
-        fileSize: img.file_size,
-        sourceType: img.source_type,
-        imageType: img.image_type || []
-      }));
-
-      if (imageList.length > IMAGES_PER_PAGE && total < imageList.length) {
-        total = Math.max(total, page * IMAGES_PER_PAGE + (imageList.length - IMAGES_PER_PAGE));
-      }
-
-      setImages(transformed);
-      setTotalImages(total);
-    } catch (err) {
-      console.error('Error fetching images:', err);
-      setErrorImages(err.message);
-    } finally {
-      setLoadingImages(false);
-    }
-  }, []);
-
-  // Fetch images when page or gallery filters change
-  useEffect(() => {
-    fetchImages(galleryPage, galleryFilters);
-  }, [galleryPage, galleryFilters, fetchImages]);
-
-  // Fetch all available tags from backend (using dedicated endpoint for efficiency)
-  useEffect(() => {
-    const fetchTags = async () => {
-      try {
-        const tags = await api.get('/images/tags');
-        setAvailableCategories(tags);
-      } catch (err) {
-        console.error('Error fetching tags:', err);
-      }
-    };
-    fetchTags();
-  }, []);
-
-  // Load image URLs - use thumbnail URLs directly
-  useEffect(() => {
-    const newUrls = {};
-    for (const img of images) {
-      if (!imageUrls[img.id]) {
-        newUrls[img.id] = getThumbnailUrl(img.id);
-      }
-    }
-    if (Object.keys(newUrls).length > 0) {
-      setImageUrls(prev => ({ ...prev, ...newUrls }));
-    }
-  }, [images]);
+  // Clear selection on filter change handled by user logic, but here we might want to clear selection if the image is no longer visible?
+  // Actually, keeping selection is fine.
 
   // ESC key to clear selection
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         setSelectedImage(null);
+        setLightboxImage(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleSearch = async () => {
+  const handleSearchClick = async () => {
     if (!selectedImage) {
       showAlert(t('common.warning'), t('cbir.selectSourceFirst'), 'warning');
       return;
     }
-
-    setSearching(true);
-    setSearchResults(null);
-
     try {
-      const payload = {
-        image_id: selectedImage.id,
-        top_k: topK,
-        labels: categoryFilter !== 'all' ? [categoryFilter] : null
-      };
-
-      const response = await api.post('/cbir/search/sync', payload);
-
-      const filteredMatches = response.matches.filter(
-        match => match.image_id !== selectedImage.id && match.similarity_score >= minSimilarity
-      );
-
-      setSearchResults({
-        ...response,
-        matches: filteredMatches,
-        originalCount: response.matches_count,
-        filteredCount: filteredMatches.length
-      });
-
-      if (filteredMatches.length === 0) {
+      const results = await search(selectedImage.id);
+      if (results.length === 0) {
         showToast(t('cbir.noResultsWithCriteria'), 'info');
       } else {
-        showToast(`${t('similarity.found')} ${filteredMatches.length} ${t('similarity.similarImages')}`, 'success');
+        showToast(`${t('similarity.found')} ${results.length} ${t('similarity.similarImages')}`, 'success');
       }
     } catch (err) {
-      console.error('Search error:', err);
       showAlert(t('similarity.searchError'), err.message || t('similarity.searchErrorMessage'), 'error');
-    } finally {
-      setSearching(false);
     }
   };
 
-  const handleClearSearch = () => {
-    setSearchResults(null);
+  const handleClear = () => {
+    clearResults();
     setSelectedImage(null);
     setCategoryFilter('all');
   };
-
-  const totalGalleryPages = Math.ceil(totalImages / IMAGES_PER_PAGE);
-
-  const handlePageChange = useCallback((newPage) => {
-    const maxPage = Math.max(1, totalGalleryPages);
-    const boundedPage = Math.min(Math.max(1, newPage), maxPage);
-    if (boundedPage !== galleryPage) {
-      setGalleryPage(boundedPage);
-    }
-  }, [galleryPage, totalGalleryPages]);
 
   return (
     <div className="flex flex-col h-full bg-bg-main dark:bg-bg-main overflow-hidden">
@@ -495,7 +122,7 @@ const CBIRSearchPage = () => {
 
           {searchResults && (
             <button
-              onClick={handleClearSearch}
+              onClick={handleClear}
               className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
             >
               <FiX /> {t('cbir.clearSearch')}
@@ -529,7 +156,7 @@ const CBIRSearchPage = () => {
                 {/* Pagination controls */}
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handlePageChange(galleryPage - 1)}
+                    onClick={() => setGalleryPage(galleryPage - 1)}
                     disabled={galleryPage <= 1 || loadingImages}
                     className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
@@ -539,7 +166,7 @@ const CBIRSearchPage = () => {
                     {galleryPage}/{totalGalleryPages || 1} <span className="hidden sm:inline">({totalImages})</span>
                   </span>
                   <button
-                    onClick={() => handlePageChange(galleryPage + 1)}
+                    onClick={() => setGalleryPage(galleryPage + 1)}
                     disabled={galleryPage >= totalGalleryPages || loadingImages}
                     className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
@@ -557,12 +184,12 @@ const CBIRSearchPage = () => {
                     type="text"
                     placeholder={t('gallery.searchPlaceholder') || 'Search images...'}
                     value={galleryFilters.search}
-                    onChange={(e) => setGalleryFilters(f => ({ ...f, search: e.target.value }))}
+                    onChange={(e) => setGalleryFilters({ search: e.target.value })}
                     className="w-full pl-10 pr-8 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
                   />
                   {galleryFilters.search && (
                     <button
-                      onClick={() => setGalleryFilters(f => ({ ...f, search: '' }))}
+                      onClick={() => setGalleryFilters({ search: '' })}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                     >
                       <FiX size={16} />
@@ -573,10 +200,9 @@ const CBIRSearchPage = () => {
                 {/* Tag filter dropdown */}
                 <select
                   value={galleryFilters.imageType.length > 0 ? galleryFilters.imageType[0] : 'all'}
-                  onChange={(e) => setGalleryFilters(f => ({
-                    ...f,
+                  onChange={(e) => setGalleryFilters({
                     imageType: e.target.value === 'all' ? [] : [e.target.value]
-                  }))}
+                  })}
                   className="px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all cursor-pointer"
                 >
                   <option value="all">{t('cbir.allTypes') || 'All Types'}</option>
@@ -601,14 +227,14 @@ const CBIRSearchPage = () => {
             <div className="p-3 sm:p-5">
               {loadingImages ? (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-                  {[...Array(IMAGES_PER_PAGE)].map((_, i) => <SkeletonCard key={i} />)}
+                  {[...Array(24)].map((_, i) => <SkeletonCard key={i} />)}
                 </div>
               ) : errorImages ? (
                 <div className="text-center py-8">
                   <FiAlertTriangle className="text-4xl text-red-400 mx-auto mb-3" />
                   <p className="text-gray-600 dark:text-gray-400">{errorImages}</p>
                   <button
-                    onClick={() => fetchImages(galleryPage, galleryFilters)}
+                    onClick={refreshGallery}
                     className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
                   >
                     {t('common.tryAgain')}
@@ -620,7 +246,7 @@ const CBIRSearchPage = () => {
                   description={t('cbir.noImagesDescription')}
                   icon="image"
                   actionLabel={t('common.update')}
-                  onAction={() => fetchImages(1, galleryFilters)}
+                  onAction={() => setGalleryFilters({ search: '' })} // Simplistic action
                   showAction={true}
                 />
               ) : (
@@ -631,8 +257,8 @@ const CBIRSearchPage = () => {
                       image={img}
                       isSelected={selectedImage?.id === img.id}
                       onClick={() => setSelectedImage(img)}
-                      imageUrl={imageUrls[img.id]}
-                      error={!imageUrls[img.id]}
+                      imageUrl={getThumbnailUrl(img.id)}
+                    // error={!getThumbnailUrl(img.id)} // url is just a string, validation happens in img onError
                     />
                   ))}
                 </div>
@@ -733,15 +359,11 @@ const CBIRSearchPage = () => {
                 {selectedImage ? (
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-indigo-500 flex-shrink-0">
-                      {imageUrls[selectedImage.id] ? (
-                        <img
-                          src={imageUrls[selectedImage.id]}
-                          alt={selectedImage.filename}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gray-200 dark:bg-gray-700 animate-pulse" />
-                      )}
+                      <img
+                        src={getThumbnailUrl(selectedImage.id)}
+                        alt={selectedImage.filename}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div>
                       <p className="font-medium text-gray-900 dark:text-white text-sm">
@@ -759,7 +381,7 @@ const CBIRSearchPage = () => {
                 )}
 
                 <button
-                  onClick={handleSearch}
+                  onClick={handleSearchClick}
                   disabled={!selectedImage || searching}
                   className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-all shadow-lg shadow-indigo-500/20 disabled:shadow-none"
                 >
