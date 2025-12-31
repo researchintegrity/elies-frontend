@@ -25,7 +25,9 @@ const AnnotationOverlay = ({
     annotations = [],
     onAnnotationClick,
     selectedAnnotationId,
-    children
+    children,
+    className = '',
+    cropClassName = ''
 }) => {
 
     // Helper for colors
@@ -43,13 +45,13 @@ const AnnotationOverlay = ({
     };
 
     return (
-        <div className="relative inline-block max-w-full max-h-full">
+        <div className={`relative inline-block max-w-full max-h-full ${className}`}>
             <ReactCrop
                 crop={isActive ? crop : undefined}
                 onChange={isActive ? onChange : undefined}
                 onComplete={isActive ? onComplete : undefined}
                 disabled={!isActive}
-                className="max-w-full max-h-full"
+                className={`max-w-full max-h-full ${cropClassName}`}
                 keepSelection={true}
             >
                 {children}

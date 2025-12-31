@@ -1,25 +1,81 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../services/api';
-
+import { API_BASE_URL } from '../config/api';
 
 const IMAGES_PER_PAGE = 24;
 
+// Helper to get thumbnail URL with auth token
+export const getThumbnailUrl = (imageId) => {
+    const token = localStorage.getItem('authToken');
+    return `${API_BASE_URL}/images/${imageId}/thumbnail${token ? `?token=${token}` : ''}`;
+};
+
 export const useGallery = () => {
+    // Gallery State
     const [images, setImages] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [imageUrls, setImageUrls] = useState({});
+    const [loadingImages, setLoadingImages] = useState(true);
+
+    // Pagination
+    const [galleryPage, setGalleryPage] = useState(1);
     const [totalImages, setTotalImages] = useState(0);
-    const [page, setPage] = useState(1);
-    const [filters, setFilters] = useState({
-        sourceType: 'all',
-        imageType: [],
-        search: ''
-    });
+
+    // Filter State
+    const [filterSearch, setFilterSearch] = useState('');
+    const [filterDateFrom, setFilterDateFrom] = useState('');
+    const [filterDateTo, setFilterDateTo] = useState('');
+    const [filterImageType, setFilterImageType] = useState('');
     const [availableCategories, setAvailableCategories] = useState([]);
 
-    // const { token } = useAuth(); // If we need token for API calls, api service usually handles it via interceptors, but good to have if needed.
+    // Fetch images when page or filters change
+    const fetchImages = useCallback(async (page = 1) => {
+        setLoadingImages(true);
+        try {
+            // Build query params with filters
+            const queryParams = { page, per_page: IMAGES_PER_PAGE };
+            if (filterSearch) queryParams.search = filterSearch;
+            if (filterDateFrom) queryParams.date_from = filterDateFrom;
+            if (filterDateTo) queryParams.date_to = filterDateTo;
+            if (filterImageType) queryParams.image_type = filterImageType;
 
-    // Fetch available tags
+            const data = await api.get('/images', queryParams);
+
+            let imageList = [];
+            let total = 0;
+
+            if (Array.isArray(data)) {
+                imageList = data;
+                total = data.length >= IMAGES_PER_PAGE ? page * IMAGES_PER_PAGE + 1 : (page - 1) * IMAGES_PER_PAGE + data.length;
+            } else if (data && typeof data === 'object') {
+                imageList = data.items || data.images || [];
+                total = data.total || data.total_count || imageList.length;
+            }
+
+            const transformed = imageList.slice(0, IMAGES_PER_PAGE).map(img => ({
+                id: img._id,
+                filename: img.filename,
+                fileSize: img.file_size,
+                sourceType: img.source_type,
+                mimeType: img.mime_type || 'image/jpeg',
+                // Include EXIF metadata from API (try both naming conventions)
+                exifMetadata: img.exifMetadata || img.exif_metadata || null
+            }));
+
+            setImages(transformed);
+            setTotalImages(total);
+        } catch (err) {
+            console.error('Error fetching images:', err);
+        } finally {
+            setLoadingImages(false);
+        }
+    }, [filterSearch, filterDateFrom, filterDateTo, filterImageType]);
+
+    // Initial fetch and on page/filter change
+    useEffect(() => {
+        fetchImages(galleryPage);
+    }, [galleryPage, fetchImages]);
+
+    // Fetch categories
     useEffect(() => {
         const fetchTags = async () => {
             try {
@@ -32,88 +88,60 @@ export const useGallery = () => {
         fetchTags();
     }, []);
 
-    const fetchImages = useCallback(async (pageNum = page, currentFilters = filters) => {
-        setLoading(true);
-        setError(null);
-        try {
-            const queryParams = { page: pageNum, per_page: IMAGES_PER_PAGE };
-            if (currentFilters.imageType && currentFilters.imageType.length > 0) {
-                queryParams.image_type = currentFilters.imageType.join(',');
-            }
-            if (currentFilters.sourceType && currentFilters.sourceType !== 'all') {
-                queryParams.source_type = currentFilters.sourceType;
-            }
-            if (currentFilters.search) {
-                queryParams.search = currentFilters.search;
-            }
-
-            const data = await api.get('/images', queryParams);
-
-            let imageList = [];
-            let total = 0;
-
-            if (Array.isArray(data)) {
-                imageList = data;
-                total = data.length >= IMAGES_PER_PAGE ? pageNum * IMAGES_PER_PAGE + 1 : (pageNum - 1) * IMAGES_PER_PAGE + data.length;
-            } else if (data && typeof data === 'object') {
-                imageList = data.items || data.images || [];
-                total = data.total || data.total_count || imageList.length;
-            }
-
-            const limitedImageList = imageList.slice(0, IMAGES_PER_PAGE);
-
-            const transformed = limitedImageList.map(img => ({
-                id: img._id,
-                imageId: img._id,
-                filename: img.filename,
-                uploadedDate: img.uploaded_date,
-                fileSize: img.file_size,
-                sourceType: img.source_type,
-                imageType: img.image_type || []
-            }));
-
-            if (imageList.length > IMAGES_PER_PAGE && total < imageList.length) {
-                total = Math.max(total, pageNum * IMAGES_PER_PAGE + (imageList.length - IMAGES_PER_PAGE));
-            }
-
-            setImages(transformed);
-            setTotalImages(total);
-        } catch (err) {
-            console.error('Error fetching images:', err);
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    }, [page, filters]); // Removed specific dependencies to allow calling with explicit args
-
-    // Trigger fetch when page or filters change
+    // Load image URLs - use thumbnail URLs directly for gallery display
     useEffect(() => {
-        fetchImages(page, filters);
-    }, [page, filters, fetchImages]);
+        const newUrls = {};
+        let hasNew = false;
 
-    const handlePageChange = useCallback((newPage) => {
-        const totalPages = Math.ceil(totalImages / IMAGES_PER_PAGE);
-        const maxPage = Math.max(1, totalPages);
-        const boundedPage = Math.min(Math.max(1, newPage), maxPage);
-        setPage(boundedPage);
-    }, [totalImages]);
+        for (const img of images) {
+            if (!imageUrls[img.id]) {
+                newUrls[img.id] = getThumbnailUrl(img.id);
+                hasNew = true;
+            }
+        }
 
-    const handleFilterChange = useCallback((newFilters) => {
-        setFilters(prev => ({ ...prev, ...newFilters }));
-        setPage(1); // Reset to page 1 on filter change
-    }, []);
+        if (hasNew) {
+            setImageUrls(prev => ({ ...prev, ...newUrls }));
+        }
+    }, [images, imageUrls]);
 
-    return {
+    const totalPages = Math.ceil(totalImages / IMAGES_PER_PAGE);
+
+    return useMemo(() => ({
         images,
-        loading,
-        error,
+        imageUrls,
+        setImageUrls, // Exposed in case we need to update Manually
+        loadingImages,
         totalImages,
-        page,
-        totalPages: Math.ceil(totalImages / IMAGES_PER_PAGE),
-        filters,
+        galleryPage,
+        setGalleryPage,
+        totalPages,
+        filters: {
+            search: filterSearch,
+            dateFrom: filterDateFrom,
+            dateTo: filterDateTo,
+            imageType: filterImageType
+        },
+        setFilters: {
+            setSearch: setFilterSearch,
+            setDateFrom: setFilterDateFrom,
+            setDateTo: setFilterDateTo,
+            setImageType: setFilterImageType
+        },
         availableCategories,
-        setPage: handlePageChange,
-        setFilters: handleFilterChange,
-        refresh: () => fetchImages(page, filters)
-    };
+        refresh: () => fetchImages(galleryPage)
+    }), [
+        images,
+        imageUrls,
+        loadingImages,
+        totalImages,
+        galleryPage,
+        totalPages,
+        filterSearch,
+        filterDateFrom,
+        filterDateTo,
+        filterImageType,
+        availableCategories,
+        fetchImages
+    ]);
 };
