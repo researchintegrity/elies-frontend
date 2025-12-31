@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import * as d3 from 'd3';
-import { FiZoomIn, FiZoomOut, FiMaximize2 } from 'react-icons/fi';
+import { FiZoomIn, FiZoomOut, FiMaximize2, FiSliders, FiEye, FiEyeOff } from 'react-icons/fi';
 import { useLanguage } from '../context/LanguageContext';
 
 /**
@@ -8,8 +8,10 @@ import { useLanguage } from '../context/LanguageContext';
  * 
  * Displays a provenance graph with:
  * - Nodes as circular image thumbnails
- * - Edges showing content sharing relationships
+ * - Spanning tree edges (darker, solid) for primary structure
+ * - All match edges (lighter, dashed) - toggleable
  * - Interactive pan/zoom
+ * - Graph settings panel with tightness and depth control
  * - Node selection for details
  */
 const ProvenanceGraph = ({
@@ -26,42 +28,150 @@ const ProvenanceGraph = ({
     const { t } = useLanguage();
     const svgRef = useRef(null);
     const containerRef = useRef(null);
+    const simulationRef = useRef(null);
     const [dimensions, setDimensions] = useState({ width, height });
     const [selectedNode, setSelectedNode] = useState(null);
+    const [tightness, setTightness] = useState(50); // 0-100 slider value
+    const [showControls, setShowControls] = useState(false);
+    const [showAllEdges, setShowAllEdges] = useState(true);
+    const [visualDepth, setVisualDepth] = useState(10); // 1-10, 10 means show all
+    const [depthSliderValue, setDepthSliderValue] = useState(10); // Local slider state for smooth dragging
 
-    // Process nodes and edges for D3
+    // Create spanning tree edge lookup for efficient checking
+    const spanningEdgeSet = useMemo(() => {
+        const set = new Set();
+        const safeSpanningEdges = Array.isArray(spanningTreeEdges) ? spanningTreeEdges : [];
+        safeSpanningEdges.forEach(e => {
+            const source = e.source || e.image1_id;
+            const target = e.target || e.image2_id;
+            const key = [source, target].sort().join('-');
+            set.add(key);
+        });
+        return set;
+    }, [spanningTreeEdges]);
+
+    // Compute node depths using BFS from query node
+    const nodeDepths = useMemo(() => {
+        const depths = new Map();
+        if (!nodes || !nodes.length || !queryImageId) return depths;
+
+        const safeAllEdges = Array.isArray(edges) ? edges : [];
+
+        // Build adjacency list
+        const adjacency = new Map();
+        safeAllEdges.forEach(e => {
+            const source = e.source || e.image1_id;
+            const target = e.target || e.image2_id;
+            if (!adjacency.has(source)) adjacency.set(source, []);
+            if (!adjacency.has(target)) adjacency.set(target, []);
+            adjacency.get(source).push(target);
+            adjacency.get(target).push(source);
+        });
+
+        // BFS from query node
+        const queue = [queryImageId];
+        depths.set(queryImageId, 0);
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const currentDepth = depths.get(current);
+            const neighbors = adjacency.get(current) || [];
+
+            for (const neighbor of neighbors) {
+                if (!depths.has(neighbor)) {
+                    depths.set(neighbor, currentDepth + 1);
+                    queue.push(neighbor);
+                }
+            }
+        }
+
+        return depths;
+    }, [nodes, edges, queryImageId]);
+
+    // Get max depth in the graph
+    const maxDepthInGraph = useMemo(() => {
+        let max = 0;
+        nodeDepths.forEach(depth => {
+            if (depth > max) max = depth;
+        });
+        return max;
+    }, [nodeDepths]);
+
+    // Process nodes and edges for D3 with depth filtering
     const graphData = useMemo(() => {
-        if (!nodes || !nodes.length) return { nodes: [], links: [] };
+        if (!nodes || !nodes.length) return { nodes: [], links: [], spanningLinks: [], totalNodes: 0 };
 
         // Create a map of node IDs
         const nodeMap = new Map(nodes.map((n, i) => [n.id, i]));
 
-        // Use spanning tree edges if available, otherwise use all edges
-        const safeSpanningEdges = Array.isArray(spanningTreeEdges) ? spanningTreeEdges : [];
         const safeAllEdges = Array.isArray(edges) ? edges : [];
-        const edgesToUse = safeSpanningEdges.length > 0 ? safeSpanningEdges : safeAllEdges;
 
-        const processedNodes = nodes.map(n => ({
-            ...n,
-            isQuery: n.id === queryImageId || n.is_query,
-        }));
+        // Find nodes that have at least one edge (connected nodes)
+        const connectedNodeIds = new Set();
+        safeAllEdges.forEach(e => {
+            const source = e.source || e.image1_id;
+            const target = e.target || e.image2_id;
+            if (source) connectedNodeIds.add(source);
+            if (target) connectedNodeIds.add(target);
+        });
 
-        // Handle different edge formats from API
-        const processedLinks = edgesToUse
+        // Filter nodes by depth (if visualDepth < 10, filter; if 10, show all)
+        const effectiveMaxDepth = visualDepth >= 10 ? Infinity : visualDepth;
+
+        // Filter to only include connected nodes within depth limit
+        const processedNodes = nodes
+            .filter(n => {
+                // Always include query
+                if (n.id === queryImageId || n.is_query) return true;
+                // Must be connected
+                if (!connectedNodeIds.has(n.id)) return false;
+                // Check depth
+                const depth = nodeDepths.get(n.id);
+                return depth !== undefined && depth <= effectiveMaxDepth;
+            })
+            .map(n => ({
+                ...n,
+                isQuery: n.id === queryImageId || n.is_query,
+                depth: nodeDepths.get(n.id) || 0,
+            }));
+
+        // Create set of visible node IDs for edge filtering
+        const visibleNodeIds = new Set(processedNodes.map(n => n.id));
+
+        // Process all edges and mark which are spanning tree edges
+        const allLinks = safeAllEdges
             .map(e => {
                 const source = e.source || e.image1_id;
                 const target = e.target || e.image2_id;
+                const edgeKey = [source, target].sort().join('-');
+                const isSpanning = spanningEdgeSet.has(edgeKey);
+
                 return {
                     source,
                     target,
                     weight: e.shared_area_source || e.shared_area_img1 || e.weight || 50,
                     keypoints: e.matched_keypoints || 0,
+                    isSpanning,
                 };
             })
-            .filter(e => e.source && e.target && nodeMap.has(e.source) && nodeMap.has(e.target));
+            .filter(e =>
+                e.source && e.target &&
+                nodeMap.has(e.source) && nodeMap.has(e.target) &&
+                visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target)
+            );
 
-        return { nodes: processedNodes, links: processedLinks };
-    }, [nodes, edges, spanningTreeEdges, queryImageId]);
+        // Separate spanning and non-spanning links
+        const spanningLinks = allLinks.filter(l => l.isSpanning);
+
+        // Count total connected nodes (for info display)
+        const totalNodes = nodes.filter(n =>
+            n.id === queryImageId || n.is_query || connectedNodeIds.has(n.id)
+        ).length;
+
+        console.log(`Provenance Graph: showing ${processedNodes.length}/${totalNodes} nodes at depth ${visualDepth}`);
+
+        return { nodes: processedNodes, links: allLinks, spanningLinks, totalNodes };
+    }, [nodes, edges, spanningEdgeSet, queryImageId, nodeDepths, visualDepth]);
 
     // Handle container resize
     useEffect(() => {
@@ -80,6 +190,23 @@ const ProvenanceGraph = ({
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    // Update simulation when tightness changes
+    useEffect(() => {
+        if (simulationRef.current) {
+            // Map tightness (0-100) to distance (200-50) - inverse relationship
+            const linkDistance = 200 - (tightness * 1.5);
+            // Map tightness to link strength (0.1-0.8)
+            const linkStrength = 0.1 + (tightness / 100) * 0.7;
+
+            simulationRef.current
+                .force('link')
+                .distance(linkDistance)
+                .strength(d => d.isSpanning ? linkStrength : 0);
+
+            simulationRef.current.alpha(0.3).restart();
+        }
+    }, [tightness]);
+
     // D3 visualization
     useEffect(() => {
         if (!svgRef.current || !graphData.nodes.length) return;
@@ -97,7 +224,7 @@ const ProvenanceGraph = ({
             const imageUrl = getImageUrl ? getImageUrl(node.id) : null;
             if (imageUrl) {
                 defs.append('pattern')
-                    .attr('id', `img-${node.id}`)
+                    .attr('id', `prov-img-${node.id}`)
                     .attr('patternUnits', 'objectBoundingBox')
                     .attr('width', 1)
                     .attr('height', 1)
@@ -111,7 +238,7 @@ const ProvenanceGraph = ({
 
         // Add drop shadow filter
         const filter = defs.append('filter')
-            .attr('id', 'drop-shadow')
+            .attr('id', 'prov-drop-shadow')
             .attr('height', '130%');
 
         filter.append('feGaussianBlur')
@@ -141,34 +268,56 @@ const ProvenanceGraph = ({
 
         svg.call(zoom);
 
-        // Create force simulation
+        // Calculate initial distances based on tightness
+        const linkDistance = 200 - (tightness * 1.5);
+        const linkStrength = 0.1 + (tightness / 100) * 0.7;
+
+        // Create force simulation - only spanning edges exert force
         const simulation = d3.forceSimulation(graphData.nodes)
             .force('link', d3.forceLink(graphData.links)
                 .id(d => d.id)
-                .distance(120)
-                .strength(0.5))
+                .distance(linkDistance)
+                .strength(d => d.isSpanning ? linkStrength : 0))
             .force('charge', d3.forceManyBody().strength(-300))
             .force('center', d3.forceCenter(w / 2, h / 2))
             .force('x', d3.forceX(w / 2).strength(gravity))
             .force('y', d3.forceY(h / 2).strength(gravity))
             .force('collision', d3.forceCollide().radius(40));
 
-        // Create edges (links)
-        const link = g.append('g')
-            .attr('class', 'links')
+        simulationRef.current = simulation;
+
+        // Separate spanning and non-spanning edges for different rendering
+        const nonSpanningLinks = graphData.links.filter(l => !l.isSpanning && showAllEdges);
+        const spanningLinks = graphData.links.filter(l => l.isSpanning);
+
+        // Create non-spanning edges (lighter, dashed) - rendered first (behind)
+        g.append('g')
+            .attr('class', 'non-spanning-links')
             .selectAll('line')
-            .data(graphData.links)
+            .data(nonSpanningLinks)
             .enter()
             .append('line')
-            .attr('stroke', '#94a3b8')
-            .attr('stroke-width', d => Math.max(2, Math.min(6, d.weight / 20)))
-            .attr('stroke-opacity', 0.6);
+            .attr('stroke', '#cbd5e1')
+            .attr('stroke-width', 1.5)
+            .attr('stroke-opacity', 0.4)
+            .attr('stroke-dasharray', '4,4');
 
-        // Create edge labels
+        // Create spanning edges (darker, solid) - rendered on top
+        const spanningLink = g.append('g')
+            .attr('class', 'spanning-links')
+            .selectAll('line')
+            .data(spanningLinks)
+            .enter()
+            .append('line')
+            .attr('stroke', '#475569')
+            .attr('stroke-width', d => Math.max(2, Math.min(6, d.weight / 20)))
+            .attr('stroke-opacity', 0.8);
+
+        // Create edge labels for spanning edges
         const linkLabels = g.append('g')
             .attr('class', 'link-labels')
             .selectAll('text')
-            .data(graphData.links)
+            .data(spanningLinks)
             .enter()
             .append('text')
             .attr('font-size', '10px')
@@ -205,11 +354,11 @@ const ProvenanceGraph = ({
             .attr('r', d => d.isQuery ? 35 : 28)
             .attr('fill', d => {
                 const imageUrl = getImageUrl ? getImageUrl(d.id) : null;
-                return imageUrl ? `url(#img-${d.id})` : (d.isQuery ? '#10b981' : '#6366f1');
+                return imageUrl ? `url(#prov-img-${d.id})` : (d.isQuery ? '#10b981' : '#6366f1');
             })
             .attr('stroke', d => d.isQuery ? '#10b981' : '#e2e8f0')
             .attr('stroke-width', d => d.isQuery ? 4 : 2)
-            .attr('filter', 'url(#drop-shadow)')
+            .attr('filter', 'url(#prov-drop-shadow)')
             .on('click', (event, d) => {
                 event.stopPropagation();
                 setSelectedNode(d);
@@ -263,7 +412,15 @@ const ProvenanceGraph = ({
 
         // Simulation tick
         simulation.on('tick', () => {
-            link
+            // Update non-spanning links
+            g.selectAll('.non-spanning-links line')
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+
+            // Update spanning links
+            spanningLink
                 .attr('x1', d => d.source.x)
                 .attr('y1', d => d.source.y)
                 .attr('x2', d => d.target.x)
@@ -282,8 +439,9 @@ const ProvenanceGraph = ({
         // Cleanup
         return () => {
             simulation.stop();
+            simulationRef.current = null;
         };
-    }, [graphData, dimensions, getImageUrl, onNodeClick, gravity]);
+    }, [graphData, dimensions, getImageUrl, onNodeClick, gravity, showAllEdges, tightness]);
 
     // Zoom controls
     const handleZoomIn = () => {
@@ -349,79 +507,232 @@ const ProvenanceGraph = ({
                 >
                     <FiMaximize2 className="w-5 h-5 text-gray-600 dark:text-gray-300" />
                 </button>
+                <button
+                    onClick={() => setShowControls(!showControls)}
+                    className={`p-2 rounded-lg shadow-md transition-colors ${showControls
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                    title={t('provenance.graphSettings') || 'Graph Settings'}
+                >
+                    <FiSliders className={`w-5 h-5 ${showControls ? 'text-white' : 'text-gray-600 dark:text-gray-300'}`} />
+                </button>
             </div>
 
-            {/* Legend */}
-            <div className="absolute bottom-4 left-4 flex items-center gap-4 bg-white/90 dark:bg-gray-800/90 px-3 py-2 rounded-lg shadow-md text-xs">
-                <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-full bg-emerald-500 border-2 border-white" />
-                    <span className="text-gray-600 dark:text-gray-300">{t('provenance.queryImage')}</span>
-                </div>
-            </div>
-
-            {/* Selected Node Info */}
-            {selectedNode && (
-                <div className="absolute top-4 left-4 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 max-w-[280px] z-20 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95 transition-all animate-in fade-in slide-in-from-left-4">
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                        <h3 className="font-semibold text-gray-900 dark:text-white text-sm leading-tight">
-                            {t('provenance.imageDetails')}
-                        </h3>
-                        <button
-                            onClick={() => setSelectedNode(null)}
-                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-
-                    <div className="space-y-3">
-                        {/* Thumbnail */}
-                        <div className="w-full h-32 bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 relative group">
-                            {(() => {
-                                const url = getImageUrl ? getImageUrl(selectedNode.id) : null;
-                                return url ? (
-                                    <img src={url} alt={selectedNode.label} className="w-full h-full object-contain" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                        <span className="text-xs">{t('provenance.noPreview')}</span>
-                                    </div>
-                                );
-                            })()}
+            {/* Graph Settings Panel */}
+            {showControls && (
+                <div className="absolute top-4 right-16 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-20 w-64 animate-in fade-in slide-in-from-right-4">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                        {t('provenance.graphSettings') || 'Graph Settings'}
+                    </h3>
+                    <div className="space-y-4">
+                        {/* Visualization Depth Slider */}
+                        <div>
+                            <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
+                                {t('provenance.visualDepth') || 'Visualization Depth'}
+                                <span className="ml-2 text-emerald-500 font-medium">
+                                    {depthSliderValue >= 10 ? (t('provenance.all') || 'All') : depthSliderValue}
+                                </span>
+                            </label>
+                            <input
+                                type="range"
+                                min="1"
+                                max="10"
+                                value={depthSliderValue}
+                                onChange={(e) => setDepthSliderValue(Number(e.target.value))}
+                                onMouseUp={() => setVisualDepth(depthSliderValue)}
+                                onTouchEnd={() => setVisualDepth(depthSliderValue)}
+                                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                            />
+                            <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                                <span>1</span>
+                                <span>{t('provenance.hops') || 'hops'}</span>
+                                <span>{t('provenance.all') || 'All'}</span>
+                            </div>
+                            <p className="text-[10px] text-gray-400 mt-1">
+                                {t('provenance.depthHint') || 'Filter nodes by distance from query'}
+                            </p>
                         </div>
 
-                        {/* Metadata */}
-                        <div className="space-y-2 text-xs">
-                            <div>
-                                <span className="text-gray-500 dark:text-gray-400 block mb-0.5">{t('provenance.filename')}</span>
-                                <span className="font-medium text-gray-900 dark:text-gray-100 break-words">
-                                    {selectedNode.label || 'N/A'}
-                                </span>
+                        {/* Tightness Slider */}
+                        <div>
+                            <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
+                                {t('provenance.graphTightness') || 'Graph Tightness'}
+                            </label>
+                            <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={tightness}
+                                onChange={(e) => setTightness(Number(e.target.value))}
+                                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                            />
+                            <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                                <span>{t('provenance.loose') || 'Loose'}</span>
+                                <span>{t('provenance.tight') || 'Tight'}</span>
                             </div>
+                        </div>
 
-                            <div>
-                                <span className="text-gray-500 dark:text-gray-400 block mb-0.5">{t('provenance.imageId')}</span>
-                                <code className="bg-gray-100 dark:bg-gray-900 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300 font-mono text-[10px] block truncate">
-                                    {selectedNode.id}
-                                </code>
-                            </div>
-
-                            <div className="flex gap-2 pt-1">
-                                {selectedNode.isQuery ? (
-                                    <span className="px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-md font-medium">
-                                        {t('provenance.queryImage')}
-                                    </span>
-                                ) : (
-                                    <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-md font-medium">
-                                        {t('provenance.referenceImage')}
-                                    </span>
-                                )}
-                            </div>
+                        {/* Show All Edges Toggle */}
+                        <div
+                            className="flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 p-2 -mx-2 rounded transition-colors"
+                            onClick={() => setShowAllEdges(!showAllEdges)}
+                        >
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {t('provenance.showAllMatches') || 'Show all matches'}
+                            </span>
+                            {showAllEdges ? (
+                                <FiEye size={16} className="text-emerald-500" />
+                            ) : (
+                                <FiEyeOff size={16} className="text-gray-400" />
+                            )}
                         </div>
                     </div>
                 </div>
             )}
+
+            {/* Graph Info Overlay */}
+            <div className="absolute top-4 left-4 bg-white/90 dark:bg-gray-800/90 px-3 py-2 rounded-lg shadow-sm backdrop-blur-sm border border-gray-100 dark:border-gray-700 pointer-events-none">
+                <div className="text-xs space-y-1">
+                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                        <span className="font-medium">{t('provenance.depth') || 'Depth'}:</span>
+                        <span>{visualDepth >= 10 ? (t('provenance.all') || 'All') : visualDepth}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                        <span className="font-medium">{t('provenance.visible') || 'Visible'}:</span>
+                        <span>{graphData.nodes.length > 0 ? graphData.nodes.length - 1 : 0}</span>
+                    </div>
+                    {graphData.totalNodes > graphData.nodes.length && (
+                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-1 mt-1">
+                            <span className="font-medium">{t('provenance.total') || 'Total'}:</span>
+                            <span>{graphData.totalNodes - 1}</span>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Legend */}
+            <div className="absolute bottom-4 left-4 flex flex-col gap-2 bg-white/90 dark:bg-gray-800/90 px-3 py-2 rounded-lg shadow-md text-xs">
+                <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full bg-emerald-500 border-2 border-white" />
+                    <span className="text-gray-600 dark:text-gray-300">{t('provenance.queryImage')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="w-6 h-0.5 bg-gray-600" />
+                    <span className="text-gray-600 dark:text-gray-300">{t('provenance.spanningTree') || 'Spanning tree'}</span>
+                </div>
+                <div
+                    className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50 p-1 -m-1 rounded transition-colors"
+                    onClick={() => setShowAllEdges(!showAllEdges)}
+                    title={showAllEdges ? t('provenance.hideAllMatches') || "Hide all matches" : t('provenance.showAllMatches') || "Show all matches"}
+                >
+                    <div className="w-6 h-0.5 bg-gray-300 border-dashed border-t border-gray-400" style={{ borderStyle: 'dashed' }} />
+                    <span className={`text-gray-600 dark:text-gray-300 ${!showAllEdges ? 'text-gray-400' : ''}`}>
+                        {t('provenance.allMatches') || 'All matches'}
+                    </span>
+                    {showAllEdges ? (
+                        <FiEye size={10} className="text-gray-400 ml-auto" />
+                    ) : (
+                        <FiEyeOff size={10} className="text-gray-400 ml-auto" />
+                    )}
+                </div>
+            </div>
+
+            {/* Selected Node Info */}
+            {selectedNode && (() => {
+                // Parse label to extract filename and tag (format: "filename (tag)" or just "filename")
+                const labelMatch = (selectedNode.label || '').match(/^(.+?)\s*\(([^)]+)\)$/);
+                const displayFilename = labelMatch ? labelMatch[1] : (selectedNode.label || 'N/A');
+                const displayTag = labelMatch ? labelMatch[2] : null;
+
+                // Also check for tags array from node data
+                const nodeTags = selectedNode.tags || [];
+
+                return (
+                    <div className="absolute top-4 left-4 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 max-w-[280px] z-30 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95 transition-all animate-in fade-in slide-in-from-left-4">
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                            <h3 className="font-semibold text-gray-900 dark:text-white text-sm leading-tight">
+                                {t('provenance.imageDetails')}
+                            </h3>
+                            <button
+                                onClick={() => setSelectedNode(null)}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="space-y-3">
+                            {/* Thumbnail */}
+                            <div className="w-full h-32 bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 relative group">
+                                {(() => {
+                                    const url = getImageUrl ? getImageUrl(selectedNode.id) : null;
+                                    return url ? (
+                                        <img src={url} alt={selectedNode.label} className="w-full h-full object-contain" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                            <span className="text-xs">{t('provenance.noPreview')}</span>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+
+                            {/* Metadata */}
+                            <div className="space-y-2 text-xs">
+                                <div>
+                                    <span className="text-gray-500 dark:text-gray-400 block mb-0.5">{t('provenance.filename')}</span>
+                                    <span className="font-medium text-gray-900 dark:text-gray-100 break-words">
+                                        {displayFilename}
+                                    </span>
+                                </div>
+
+                                {/* Tags - from parsed label or node data */}
+                                {(displayTag || nodeTags.length > 0) && (
+                                    <div>
+                                        <span className="text-gray-500 dark:text-gray-400 block mb-1">{t('provenance.tags') || 'Tags'}</span>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {displayTag && (
+                                                <span className="text-blue-600 dark:text-blue-400 font-medium">
+                                                    #{displayTag}
+                                                </span>
+                                            )}
+                                            {nodeTags.map((tag, idx) => (
+                                                <span
+                                                    key={idx}
+                                                    className="text-blue-600 dark:text-blue-400 font-medium"
+                                                >
+                                                    #{tag}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div>
+                                    <span className="text-gray-500 dark:text-gray-400 block mb-0.5">{t('provenance.depth') || 'Depth'}</span>
+                                    <span className="font-medium text-gray-900 dark:text-gray-100">
+                                        {selectedNode.depth === 0 ? (t('provenance.queryImage') || 'Query') : `${selectedNode.depth} ${t('provenance.hopsFromQuery') || 'hop(s) from query'}`}
+                                    </span>
+                                </div>
+
+                                <div className="flex gap-2 pt-1">
+                                    {selectedNode.isQuery ? (
+                                        <span className="px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-md font-medium">
+                                            {t('provenance.queryImage')}
+                                        </span>
+                                    ) : (
+                                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-md font-medium">
+                                            {t('provenance.referenceImage')}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* SVG Canvas */}
             <svg

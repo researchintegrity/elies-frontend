@@ -218,9 +218,12 @@ const ResultsViewer = ({ analysisId, status, results, statusMessage, t }) => {
     const hasResults = hasPredMap || hasConfMap || (results?.files && results.files.length > 0);
 
     useEffect(() => {
-        // Cleanup previous URLs
-        if (predMapUrl) URL.revokeObjectURL(predMapUrl);
-        if (confMapUrl) URL.revokeObjectURL(confMapUrl);
+        // Track URLs created in this effect run for proper cleanup
+        let predUrl = null;
+        let confUrl = null;
+        let isCancelled = false;
+
+        // Reset state when dependencies change
         setPredMapUrl(null);
         setConfMapUrl(null);
         setError(null);
@@ -236,7 +239,10 @@ const ResultsViewer = ({ analysisId, status, results, statusMessage, t }) => {
             if (hasPredMap || results?.files?.some(f => f.includes('_pred_map'))) {
                 try {
                     const blob = await api.download(`/analyses/${analysisId}/results/pred_map/download`);
-                    setPredMapUrl(URL.createObjectURL(blob));
+                    if (!isCancelled) {
+                        predUrl = URL.createObjectURL(blob);
+                        setPredMapUrl(predUrl);
+                    }
                 } catch (err) {
                     console.error('Failed to download pred_map:', err);
                     errors.push(`Prediction Map: ${err.message}`);
@@ -247,25 +253,33 @@ const ResultsViewer = ({ analysisId, status, results, statusMessage, t }) => {
             if (hasConfMap || results?.files?.some(f => f.includes('_conf_map'))) {
                 try {
                     const blob = await api.download(`/analyses/${analysisId}/results/conf_map/download`);
-                    setConfMapUrl(URL.createObjectURL(blob));
+                    if (!isCancelled) {
+                        confUrl = URL.createObjectURL(blob);
+                        setConfMapUrl(confUrl);
+                    }
                 } catch (err) {
                     console.error('Failed to download conf_map:', err);
                     errors.push(`Confidence Map: ${err.message}`);
                 }
             }
 
-            if (errors.length > 0 && !predMapUrl && !confMapUrl) {
-                setError(errors.join('; '));
+            if (!isCancelled) {
+                // Only set error if both failed
+                if (errors.length > 0 && !predUrl && !confUrl) {
+                    setError(errors.join('; '));
+                }
+                setLoading(false);
             }
-            setLoading(false);
         };
         loadResults();
 
         return () => {
-            if (predMapUrl) URL.revokeObjectURL(predMapUrl);
-            if (confMapUrl) URL.revokeObjectURL(confMapUrl);
+            isCancelled = true;
+            if (predUrl) URL.revokeObjectURL(predUrl);
+            if (confUrl) URL.revokeObjectURL(confUrl);
         };
-    }, [status, results, analysisId, hasResults, hasPredMap, hasConfMap, predMapUrl, confMapUrl]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [status, results, analysisId]);
 
     if (status === 'pending' || status === 'processing') {
         return (

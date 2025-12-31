@@ -71,7 +71,7 @@ const ImageViewerPanel = ({
     image,
     annotations,
     onImageClick,
-    onLinkComplete,
+    _onLinkComplete,
     placeholder,
 }) => {
     const { state, actions, computed } = useDualAnnotation();
@@ -1391,7 +1391,7 @@ const DualImageComparisonModalInner = ({
     const [linkedImageIds, setLinkedImageIds] = useState([]);
     const [analysisHistory, setAnalysisHistory] = useState([]);
     const [isLoadingAnalyses, setIsLoadingAnalyses] = useState(false);
-    const [pendingAutoSave, setPendingAutoSave] = useState(false);
+    const [_pendingAutoSave, _setPendingAutoSave] = useState(false); // TODO: Implement auto-save feature
 
     const initializedRef = useRef(null);
     const pollIntervalRef = useRef(null);

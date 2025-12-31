@@ -717,6 +717,24 @@ const translations = {
         'provenance.startOver': 'Recomeçar',
         'provenance.newAnalysis': 'Nova Análise',
         'provenance.queryImageConfigureHint': 'Configure os parâmetros para análise desta imagem',
+        // Graph Settings
+        'provenance.graphSettings': 'Configurações do Grafo',
+        'provenance.graphTightness': 'Compactação do Grafo',
+        'provenance.loose': 'Solto',
+        'provenance.tight': 'Compacto',
+        'provenance.showAllMatches': 'Mostrar todas as correspondências',
+        'provenance.hideAllMatches': 'Ocultar correspondências extras',
+        'provenance.spanningTree': 'Árvore geradora',
+        'provenance.allMatches': 'Todas correspondências',
+        'provenance.visualDepth': 'Profundidade de Visualização',
+        'provenance.all': 'Todos',
+        'provenance.hops': 'sal(tos)',
+        'provenance.depthHint': 'Filtrar nós por distância da consulta',
+        'provenance.depth': 'Profundidade',
+        'provenance.visible': 'Visíveis',
+        'provenance.total': 'Total',
+        'provenance.hopsFromQuery': 'salto(s) da consulta',
+        'provenance.tags': 'Tags',
 
         // Copy-Move Detection
         'sidebar.copyMove': 'Detecção Copy-Move',
@@ -821,6 +839,11 @@ const translations = {
         'copyMove.batchDashboardNotice': 'Os resultados individuais estão disponíveis no Painel de Análises',
 
         'copyMove.selectMultiple': 'Clique para selecionar imagens para análise em lote',
+        'copyMove.markAsRelated': 'Marcar estas imagens como relacionadas',
+        'copyMove.linkedAsRelated': 'Vinculando imagens como relacionadas',
+        'copyMove.linkedAsRelatedDone': 'Imagens vinculadas como relacionadas',
+        'copyMove.linking': 'Vinculando...',
+        'copyMove.linkError': 'Falha ao vincular imagens',
 
 
         // Manipulation Detection (TruFor)
@@ -1829,6 +1852,24 @@ const translations = {
         'provenance.startOver': 'Start Over',
         'provenance.newAnalysis': 'New Analysis',
         'provenance.queryImageConfigureHint': 'Configure parameters for analyzing this image',
+        // Graph Settings
+        'provenance.graphSettings': 'Graph Settings',
+        'provenance.graphTightness': 'Graph Tightness',
+        'provenance.loose': 'Loose',
+        'provenance.tight': 'Tight',
+        'provenance.showAllMatches': 'Show all matches',
+        'provenance.hideAllMatches': 'Hide extra matches',
+        'provenance.spanningTree': 'Spanning tree',
+        'provenance.allMatches': 'All matches',
+        'provenance.visualDepth': 'Visualization Depth',
+        'provenance.all': 'All',
+        'provenance.hops': 'hops',
+        'provenance.depthHint': 'Filter nodes by distance from query',
+        'provenance.depth': 'Depth',
+        'provenance.visible': 'Visible',
+        'provenance.total': 'Total',
+        'provenance.hopsFromQuery': 'hop(s) from query',
+        'provenance.tags': 'Tags',
 
         // Copy-Move Detection
         'sidebar.copyMove': 'Copy-Move Detection',
@@ -1933,6 +1974,11 @@ const translations = {
         'copyMove.batchDashboardNotice': 'Individual results are available in the Analysis Dashboard',
 
         'copyMove.selectMultiple': 'Click to select images for batch analysis',
+        'copyMove.markAsRelated': 'Mark these images as related',
+        'copyMove.linkedAsRelated': 'Linking images as related',
+        'copyMove.linkedAsRelatedDone': 'Images linked as related',
+        'copyMove.linking': 'Linking...',
+        'copyMove.linkError': 'Failed to link images',
 
 
         // Manipulation Detection (TruFor)

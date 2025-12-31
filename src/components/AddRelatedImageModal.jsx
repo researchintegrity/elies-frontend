@@ -74,7 +74,7 @@ const AddRelatedImageModal = ({
             setPage(1);
             fetchImages(1, false);
         }
-    }, [isOpen]);
+    }, [isOpen, fetchImages]);
 
     // Debounced search
     useEffect(() => {
@@ -83,7 +83,7 @@ const AddRelatedImageModal = ({
             fetchImages(1, false);
         }, 300);
         return () => clearTimeout(timer);
-    }, [searchQuery]);
+    }, [searchQuery, fetchImages, isOpen]);
 
     // Load more images
     const loadMore = () => {

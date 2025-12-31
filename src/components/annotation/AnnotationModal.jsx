@@ -134,8 +134,7 @@ const AnnotationModalInner = ({
             setIsLoadingHistory(true);
             try {
                 // Determine result type more robustly (similar to AnalysisDetailsPanel)
-                let resultType = 'result'; // default
-                let apiType = 'result';
+                let apiType = 'result'; // default
 
                 if (analysis.results) {
                     if (analysis.results.pred_map) {

@@ -628,7 +628,7 @@ const FlaggedImageDetailPanel = ({
   const [selectedAnalysisTool, setSelectedAnalysisTool] = useState(null); // Null initially
   const [analysisOverlayCanvas, setAnalysisOverlayCanvas] = useState(null);
   const [originalCanvas, setOriginalCanvas] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [_isAnalyzing, setIsAnalyzing] = useState(false); // Used for analysis state tracking
   const analysisTimeoutRef = useRef(null);
 
   // Load original canvas when modal opens or image changes

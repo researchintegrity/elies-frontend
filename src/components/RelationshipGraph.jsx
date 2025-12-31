@@ -405,7 +405,7 @@ const RelationshipGraph = ({
             simulation.stop();
             simulationRef.current = null;
         };
-    }, [graphData, dimensions, getImageUrl, onNodeClick, gravity, showWeakRelations]);
+    }, [graphData, dimensions, getImageUrl, onNodeClick, gravity, showWeakRelations, tightness]);
 
     // Zoom controls
     const handleZoomIn = () => {

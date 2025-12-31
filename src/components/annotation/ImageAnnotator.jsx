@@ -11,10 +11,10 @@
  * Replicates Label Studio-style UX for image annotation.
  */
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { 
-    useAnnotation, 
-    AnnotationProvider, 
-    ShapeTypes, 
+import {
+    useAnnotation,
+    AnnotationProvider,
+    ShapeTypes,
     ToolTypes,
 } from '../../context/AnnotationContext';
 import {
@@ -50,11 +50,11 @@ const ImageAnnotatorInner = ({
     const { t } = useLanguage();
     const { state, actions } = useAnnotation();
     const { activeTool, isDrawing, currentShape, selectedId, annotations } = state;
-    
+
     // Refs
     const containerRef = useRef(null);
     const imageRef = useRef(null);
-    
+
     // Local state
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
@@ -62,7 +62,7 @@ const ImageAnnotatorInner = ({
     const [setPan] = useState({ x: 0, y: 0 });
     const [isSaving, setIsSaving] = useState(false);
     const [showPanel, setShowPanel] = useState(initialShowLabelsPanel);
-    
+
     // Interaction state
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState(null);
@@ -70,22 +70,22 @@ const ImageAnnotatorInner = ({
     const [activeHandle, setActiveHandle] = useState(null);
     const [activePointIndex, setActivePointIndex] = useState(null);
     const [draggedAnnotation, setDraggedAnnotation] = useState(null);
-    
+
     // Initialize with existing annotations
     useEffect(() => {
         if (imageId) {
             actions.setImage({ id: imageId, dimensions: imageDimensions });
         }
-    }, [imageId]);
-    
+    }, [imageId, actions, imageDimensions]);
+
     useEffect(() => {
         if (existingAnnotations.length > 0 && imageSize.width > 0) {
             // Convert from percent to pixel coordinates
-            const pixelAnnotations = existingAnnotations.map(ann => 
+            const pixelAnnotations = existingAnnotations.map(ann =>
                 fromPercentCoords(ann, imageSize)
             );
             actions.setAnnotations(pixelAnnotations);
-            
+
             // Set next group ID based on existing annotations
             const maxGroupId = existingAnnotations
                 .filter(a => a.groupId)
@@ -94,8 +94,8 @@ const ImageAnnotatorInner = ({
                 actions.setNextGroupId(maxGroupId + 1);
             }
         }
-    }, [existingAnnotations, imageSize]);
-    
+    }, [existingAnnotations, imageSize, actions]);
+
     // Handle image load
     const handleImageLoad = useCallback((e) => {
         const { naturalWidth, naturalHeight } = e.target;
@@ -103,30 +103,30 @@ const ImageAnnotatorInner = ({
         setImageLoaded(true);
         actions.setImageDimensions({ width: naturalWidth, height: naturalHeight });
     }, [actions]);
-    
+
     // Get mouse position relative to image
     const getMousePosition = useCallback((e) => {
         if (!imageRef.current) return { x: 0, y: 0 };
-        
+
         const rect = imageRef.current.getBoundingClientRect();
         return {
             x: (e.clientX - rect.left) / zoom,
             y: (e.clientY - rect.top) / zoom,
         };
     }, [zoom]);
-    
+
     // Mouse down handler
     const handleMouseDown = useCallback((e) => {
         if (readOnly || e.button !== 0) return; // Left click only
-        
+
         const pos = getMousePosition(e);
         setDragStart(pos);
-        
+
         // Handle based on active tool
         if (activeTool === ToolTypes.SELECT) {
             // Check if clicking on an annotation
             const clickedAnnotation = findAnnotationAtPoint(pos, annotations);
-            
+
             if (clickedAnnotation) {
                 // Check for resize handle
                 if (selectedId === clickedAnnotation.id) {
@@ -138,7 +138,7 @@ const ImageAnnotatorInner = ({
                         setIsDragging(true);
                         return;
                     }
-                    
+
                     // Check for polygon point
                     if (clickedAnnotation.type === ShapeTypes.POLYGON) {
                         const pointIdx = findClosestPolygonPoint(pos, clickedAnnotation.points, 15);
@@ -151,7 +151,7 @@ const ImageAnnotatorInner = ({
                         }
                     }
                 }
-                
+
                 // Start move
                 actions.selectAnnotation(clickedAnnotation.id);
                 setDragType('move');
@@ -165,7 +165,7 @@ const ImageAnnotatorInner = ({
             // Start drawing rectangle or ellipse
             setDragType('draw');
             setIsDragging(true);
-            
+
             actions.startDrawing({
                 type: activeTool === ToolTypes.RECTANGLE ? ShapeTypes.RECTANGLE : ShapeTypes.ELLIPSE,
                 x: pos.x,
@@ -193,7 +193,7 @@ const ImageAnnotatorInner = ({
                         return;
                     }
                 }
-                
+
                 // Add new point
                 actions.addPolygonPoint(pos);
             }
@@ -205,23 +205,23 @@ const ImageAnnotatorInner = ({
             }
         }
     }, [activeTool, annotations, selectedId, isDrawing, currentShape, getMousePosition, actions, readOnly]);
-    
+
     // Mouse move handler
     const handleMouseMove = useCallback((e) => {
         const pos = getMousePosition(e);
-        
+
         // Update polygon preview
         if (isDrawing && activeTool === ToolTypes.POLYGON) {
             actions.updateDrawing({ previewPoint: pos });
         }
-        
+
         // Handle drag operations
         if (isDragging && dragStart) {
             const delta = {
                 x: pos.x - dragStart.x,
                 y: pos.y - dragStart.y,
             };
-            
+
             if (dragType === 'draw') {
                 // Update shape size while drawing
                 actions.updateDrawing({
@@ -242,14 +242,14 @@ const ImageAnnotatorInner = ({
                 actions.updateAnnotation(updated);
             }
         }
-        
+
         // Hover detection (only in select mode)
         if (activeTool === ToolTypes.SELECT && !isDragging) {
             const hoveredAnnotation = findAnnotationAtPoint(pos, annotations);
             actions.hoverAnnotation(hoveredAnnotation?.id || null);
         }
     }, [isDragging, dragStart, dragType, draggedAnnotation, activeHandle, activePointIndex, activeTool, isDrawing, getMousePosition, annotations, actions]);
-    
+
     // Mouse up handler
     const handleMouseUp = useCallback(() => {
         if (dragType === 'draw' && currentShape) {
@@ -260,7 +260,7 @@ const ImageAnnotatorInner = ({
                 actions.cancelDrawing();
             }
         }
-        
+
         // Reset drag state (but not for polygon which uses clicks)
         if (activeTool !== ToolTypes.POLYGON || dragType !== null) {
             setIsDragging(false);
@@ -271,31 +271,31 @@ const ImageAnnotatorInner = ({
             setDraggedAnnotation(null);
         }
     }, [dragType, currentShape, activeTool, actions]);
-    
+
     // Double click to finish polygon
     const handleDoubleClick = useCallback(() => {
         if (isDrawing && activeTool === ToolTypes.POLYGON && currentShape?.points?.length >= 3) {
             actions.finishDrawing();
         }
     }, [isDrawing, activeTool, currentShape, actions]);
-    
+
     // Mouse leave handler
     const handleMouseLeave = useCallback(() => {
         actions.hoverAnnotation(null);
     }, [actions]);
-    
+
     // Annotation click handler (from SVG layer)
     const handleAnnotationMouseDown = useCallback((e, annotation) => {
         e.stopPropagation();
-        
+
         if (activeTool === ToolTypes.DELETE) {
             actions.deleteAnnotation(annotation.id);
             return;
         }
-        
+
         if (activeTool === ToolTypes.SELECT) {
             const pos = getMousePosition(e);
-            
+
             // Check for resize handle first
             if (selectedId === annotation.id) {
                 const handle = getHandleAtPoint(pos, annotation);
@@ -308,7 +308,7 @@ const ImageAnnotatorInner = ({
                     return;
                 }
             }
-            
+
             // Select and start move
             actions.selectAnnotation(annotation.id);
             setDragStart(pos);
@@ -317,39 +317,39 @@ const ImageAnnotatorInner = ({
             setIsDragging(true);
         }
     }, [activeTool, selectedId, getMousePosition, actions]);
-    
+
     // Handle resize handle mouse down
     const handleHandleMouseDown = useCallback((e, annotation, handle) => {
         e.stopPropagation();
         const pos = getMousePosition(e);
-        
+
         setDragStart(pos);
         setDragType('resize');
         setActiveHandle(handle);
         setDraggedAnnotation({ ...annotation });
         setIsDragging(true);
     }, [getMousePosition]);
-    
+
     // Handle polygon point mouse down
     const handlePolygonPointMouseDown = useCallback((e, annotation, pointIndex) => {
         e.stopPropagation();
         const pos = getMousePosition(e);
-        
+
         setDragStart(pos);
         setDragType('polygon-point');
         setActivePointIndex(pointIndex);
         setDraggedAnnotation({ ...annotation });
         setIsDragging(true);
     }, [getMousePosition]);
-    
+
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (readOnly) return;
-            
+
             // Ignore if typing in input
             if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
-            
+
             // Escape - cancel drawing
             if (e.key === 'Escape') {
                 if (isDrawing) {
@@ -358,7 +358,7 @@ const ImageAnnotatorInner = ({
                     actions.clearSelection();
                 }
             }
-            
+
             // Delete - delete selected
             if (e.key === 'Delete' || e.key === 'Backspace') {
                 if (selectedId && !isDrawing) {
@@ -366,19 +366,19 @@ const ImageAnnotatorInner = ({
                     actions.deleteSelected();
                 }
             }
-            
+
             // Ctrl+Z - Undo
             if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
                 e.preventDefault();
                 actions.undo();
             }
-            
+
             // Ctrl+Y or Ctrl+Shift+Z - Redo
             if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
                 e.preventDefault();
                 actions.redo();
             }
-            
+
             // Tool shortcuts
             if (!e.ctrlKey && !e.metaKey) {
                 switch (e.key.toLowerCase()) {
@@ -397,30 +397,30 @@ const ImageAnnotatorInner = ({
                 }
             }
         };
-        
+
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isDrawing, selectedId, actions, readOnly]);
-    
+
     // Zoom controls
     const handleZoomIn = useCallback(() => {
         setZoom(z => Math.min(4, z + 0.25));
     }, []);
-    
+
     const handleZoomOut = useCallback(() => {
         setZoom(z => Math.max(0.25, z - 0.25));
     }, []);
-    
+
     const handleFitToScreen = useCallback(() => {
         setZoom(1);
         setPan({ x: 0, y: 0 });
     }, [setPan]);
-    
+
     // Wheel zoom
     useEffect(() => {
         const container = containerRef.current;
         if (!container) return;
-        
+
         const handleWheel = (e) => {
             if (e.ctrlKey || e.metaKey) {
                 e.preventDefault();
@@ -428,19 +428,19 @@ const ImageAnnotatorInner = ({
                 setZoom(z => Math.min(4, Math.max(0.25, z + delta)));
             }
         };
-        
+
         container.addEventListener('wheel', handleWheel, { passive: false });
         return () => container.removeEventListener('wheel', handleWheel);
     }, []);
-    
+
     // Save handler
     const handleSave = useCallback(async () => {
         if (!onSave) return;
-        
+
         setIsSaving(true);
         try {
             // Convert to percent coordinates for storage
-            const percentAnnotations = annotations.map(ann => 
+            const percentAnnotations = annotations.map(ann =>
                 toPercentCoords(ann, imageSize)
             );
             await onSave(percentAnnotations);
@@ -451,14 +451,14 @@ const ImageAnnotatorInner = ({
             setIsSaving(false);
         }
     }, [onSave, annotations, imageSize, actions]);
-    
+
     // Export handler
     const handleExport = useCallback(() => {
         const exportData = exportAnnotationsToJSON(
             annotations.map(ann => toPercentCoords(ann, imageSize)),
             { id: imageId, filename: '', width: imageSize.width, height: imageSize.height }
         );
-        
+
         const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -466,12 +466,12 @@ const ImageAnnotatorInner = ({
         a.download = `annotations-${imageId || 'image'}-${Date.now()}.json`;
         a.click();
         URL.revokeObjectURL(url);
-        
+
         if (onExport) {
             onExport(exportData);
         }
     }, [annotations, imageSize, imageId, onExport]);
-    
+
     if (!imageUrl) {
         return (
             <div className="flex items-center justify-center h-full bg-gray-100 dark:bg-gray-900">
@@ -482,7 +482,7 @@ const ImageAnnotatorInner = ({
             </div>
         );
     }
-    
+
     return (
         <div className="flex flex-col h-full bg-gray-100 dark:bg-gray-900">
             {/* Toolbar */}
@@ -498,15 +498,14 @@ const ImageAnnotatorInner = ({
                     hasUnsavedChanges={state.isModified}
                 />
             )}
-            
+
             {/* Main Content */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Image Canvas Area */}
-                <div 
+                <div
                     ref={containerRef}
-                    className={`flex-1 overflow-auto flex items-center justify-center p-4 ${
-                        zoom > 1 ? 'cursor-grab active:cursor-grabbing' : ''
-                    }`}
+                    className={`flex-1 overflow-auto flex items-center justify-center p-4 ${zoom > 1 ? 'cursor-grab active:cursor-grabbing' : ''
+                        }`}
                 >
                     <div
                         className="relative"
@@ -529,7 +528,7 @@ const ImageAnnotatorInner = ({
                                 maxHeight: zoom === 1 ? 'calc(100vh - 200px)' : 'none',
                             }}
                         />
-                        
+
                         {/* SVG Annotation Layer */}
                         {imageLoaded && (
                             <SVGAnnotationLayer
@@ -547,7 +546,7 @@ const ImageAnnotatorInner = ({
                         )}
                     </div>
                 </div>
-                
+
                 {/* Labels Panel */}
                 {showPanel && !readOnly && (
                     <div className="w-72 flex-none">
@@ -555,7 +554,7 @@ const ImageAnnotatorInner = ({
                     </div>
                 )}
             </div>
-            
+
             {/* Instructions Footer */}
             {isDrawing && activeTool === ToolTypes.POLYGON && (
                 <div className="px-4 py-2 bg-indigo-600 text-white text-sm text-center">

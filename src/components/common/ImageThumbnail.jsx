@@ -46,7 +46,10 @@ export const useImageLoader = (imageId) => {
                 URL.revokeObjectURL(imageUrl);
             }
         };
-    }, [imageId]); // Only depend on imageId, not loadImage
+        // Note: imageUrl is intentionally excluded to avoid cleanup on state update
+        // loadImage is stable due to useCallback with [imageId] dependency
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [imageId, loadImage]);
 
     const retry = useCallback(() => {
         loadImage();
