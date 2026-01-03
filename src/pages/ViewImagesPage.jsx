@@ -440,29 +440,59 @@ const ViewImagesPage = () => {
     if (tagsToRemove.length === 0) return;
 
     const selectedArray = Array.from(selectedImages.values());
-    let successCount = 0;
+    const successfulTags = new Set();
+    const failedTags = new Set();
+    let errorCount = 0;
 
-    for (const tag of tagsToRemove) {
-      for (const img of selectedArray) {
-        await removeImageType(img, tag, { silent: true });
+    // Iterate over images first, then tags - more logical grouping per image
+    for (const img of selectedArray) {
+      for (const tag of tagsToRemove) {
+        try {
+          await removeImageType(img, tag, { silent: true });
+          successfulTags.add(tag);
+        } catch (err) {
+          console.error(`Error removing tag "${tag}" from image ${img.id}:`, err);
+          failedTags.add(tag);
+          errorCount++;
+        }
       }
-      successCount++;
     }
 
-    // Update local selectedImages state to remove the tags from imageType arrays
-    // This ensures the Common Tags section updates immediately in the UI
-    setSelectedImages(prev => {
-      const newMap = new Map();
-      for (const [id, img] of prev) {
-        newMap.set(id, {
-          ...img,
-          imageType: (img.imageType || []).filter(t => !tagsToRemove.includes(t))
-        });
-      }
-      return newMap;
-    });
+    // Determine which tags were fully successful (removed from ALL images)
+    const fullySuccessfulTags = [...successfulTags].filter(tag => !failedTags.has(tag));
 
-    showToast(`${successCount} ${t('batchTag.tagsRemoved') || 'tags removed from'} ${selectedArray.length} ${t('batch.images')}`);
+    // Only update local state for tags that were successfully removed from all images
+    if (fullySuccessfulTags.length > 0) {
+      setSelectedImages(prev => {
+        const newMap = new Map();
+        for (const [id, img] of prev) {
+          newMap.set(id, {
+            ...img,
+            imageType: (img.imageType || []).filter(t => !fullySuccessfulTags.includes(t))
+          });
+        }
+        return newMap;
+      });
+    }
+
+    // Show appropriate feedback based on results
+    const tagsRemovedCount = fullySuccessfulTags.length;
+    const imagesCount = selectedArray.length;
+
+    if (errorCount > 0 && tagsRemovedCount > 0) {
+      showToast(
+        `${tagsRemovedCount} ${t('batchTag.tagsRemoved') || 'tag(s) removed'}. ${errorCount} ${t('batchTag.errorOccurred') || 'error(s) occurred'}.`,
+        'warning'
+      );
+    } else if (errorCount > 0) {
+      showToast(t('batchTag.removeError') || 'Failed to remove tags. Please try again.', 'error');
+    } else {
+      showToast(
+        `${tagsRemovedCount} ${t('batchTag.tagsRemoved') || 'tag(s) removed from'} ${imagesCount} ${t('batch.images') || 'image(s)'}`,
+        'success'
+      );
+    }
+
     // Refresh images to reflect changes
     fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE, imageType: filters.tags, dateFrom: filters.dateFrom, dateTo: filters.dateTo, search: searchQuery, sourceType: filters.sourceType });
   };

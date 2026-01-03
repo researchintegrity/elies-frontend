@@ -13,7 +13,7 @@ const BatchTagModal = ({ isOpen, onClose, onConfirm, onRemoveTags, selectedImage
     const commonTags = useMemo(() => {
         if (!selectedImages || selectedImages.length === 0) return [];
         const allTagSets = selectedImages.map(img => new Set(img.imageType || []));
-        if (allTagSets.length === 0 || allTagSets[0].size === 0) return [];
+        // Use first image's tags as base, filter to only those present in ALL images
         return [...allTagSets[0]].filter(tag =>
             allTagSets.every(set => set.has(tag))
         ).sort();
@@ -68,7 +68,7 @@ const BatchTagModal = ({ isOpen, onClose, onConfirm, onRemoveTags, selectedImage
                 {/* Content */}
                 <div className="p-6 space-y-5">
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {t('batchTag.description')} <strong className="text-gray-900 dark:text-white">{count} {t('batchTag.selectedImages')}</strong>.
+                        {t('batchTag.description')} <strong className="text-gray-900 dark:text-white">{count} {t('batchTag.selectedImages')}</strong>. {t('batchTag.addToExisting')}
                     </p>
 
                     {/* Common Tags Section (Remove) */}
@@ -121,9 +121,6 @@ const BatchTagModal = ({ isOpen, onClose, onConfirm, onRemoveTags, selectedImage
                             onRemove={(tag) => setTags(prev => prev.filter(t => t !== tag))}
                             onInputChange={setInputValue}
                         />
-                        <p className="text-xs text-gray-400 dark:text-gray-500">
-                            {t('batchTag.addToExisting')}
-                        </p>
                     </div>
                 </div>
 
