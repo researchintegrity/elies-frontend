@@ -88,7 +88,7 @@ const Sidebar = ({ activePage, onNavigate, pages, isCollapsed = false, onToggle 
   );
 
   return (
-    <nav className={`relative bg-white dark:bg-dark-deep h-screen flex flex-col border-r border-gray-200/80 dark:border-gray-800/50 overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-[72px]' : 'w-[280px]'}`}>
+    <nav className={`sticky top-0 bg-white dark:bg-dark-deep h-screen flex flex-col border-r border-gray-200/80 dark:border-gray-800/50 overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-[72px]' : 'w-[280px]'}`}>
       {/* Subtle gradient accent at top */}
       <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-primary-500/5 to-transparent pointer-events-none" />
 
