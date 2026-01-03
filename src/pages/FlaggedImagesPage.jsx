@@ -108,6 +108,16 @@ const FlaggedImagesPage = ({ onNavigate }) => {
     }
   }, [flaggedImages, selectedImage]);
 
+  // Keep selectedImage in sync with flaggedImages data (e.g., after tag updates)
+  useEffect(() => {
+    if (selectedImage && flaggedImages.length > 0) {
+      const updated = flaggedImages.find(img => img.id === selectedImage.id);
+      if (updated && JSON.stringify(updated.imageType) !== JSON.stringify(selectedImage.imageType)) {
+        setSelectedImage(updated);
+      }
+    }
+  }, [flaggedImages, selectedImage]);
+
   // Refresh when extraction completes
   useEffect(() => {
     if (extractionStatus === 'completed') {
@@ -296,11 +306,40 @@ const FlaggedImagesPage = ({ onNavigate }) => {
     const selectedArray = Array.from(selectedImages.values());
     let successCount = 0;
     for (const img of selectedArray) {
-      await addImageTypes(img, newTags);
+      await addImageTypes(img, newTags, { silent: true });
       successCount++;
     }
     showToast(`${newTags.length} ${t('batch.tagsAdded') || 'tags added to'} ${successCount} ${t('batch.images') || 'images'}`);
     handleClearSelection();
+    fetchFlaggedImages();
+  };
+
+  const handleBatchRemoveTags = async (tagsToRemove) => {
+    if (tagsToRemove.length === 0) return;
+    const selectedArray = Array.from(selectedImages.values());
+    let successCount = 0;
+    for (const tag of tagsToRemove) {
+      for (const img of selectedArray) {
+        await removeImageType(img, tag, { silent: true });
+      }
+      successCount++;
+    }
+
+    // Update local selectedImages state to remove the tags from imageType arrays
+    // This ensures the Common Tags section updates immediately in the UI
+    setSelectedImages(prev => {
+      const newMap = new Map();
+      for (const [id, img] of prev) {
+        newMap.set(id, {
+          ...img,
+          imageType: (img.imageType || []).filter(t => !tagsToRemove.includes(t))
+        });
+      }
+      return newMap;
+    });
+
+    showToast(`${successCount} ${t('batchTag.tagsRemoved') || 'tags removed from'} ${selectedArray.length} ${t('batch.images') || 'images'}`);
+    fetchFlaggedImages();
   };
 
   const handleAnalyzeSelected = useCallback((analysisType) => {
@@ -399,7 +438,7 @@ const FlaggedImagesPage = ({ onNavigate }) => {
   return (
     <div className="w-full h-full flex flex-col relative overflow-hidden">
       {/* Modals */}
-      <BatchTagModal isOpen={isBatchTagModalOpen} onClose={() => setIsBatchTagModalOpen(false)} onConfirm={handleBatchTagConfirm} count={selectedIds.size} />
+      <BatchTagModal isOpen={isBatchTagModalOpen} onClose={() => setIsBatchTagModalOpen(false)} onConfirm={handleBatchTagConfirm} onRemoveTags={handleBatchRemoveTags} selectedImages={Array.from(selectedImages.values())} count={selectedIds.size} />
       <LightboxModal isOpen={!!lightboxImage} imageUrl={lightboxUrl} onClose={() => { setLightboxImage(null); setLightboxUrl(null); }} title={lightboxImage?.filename}>
         <ImageMetadataSidebar image={lightboxImage} t={t} locale={locale} onTagAdd={handleAddTag} onTagRemove={handleRemoveTag} />
       </LightboxModal>

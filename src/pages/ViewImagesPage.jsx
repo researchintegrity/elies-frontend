@@ -429,11 +429,42 @@ const ViewImagesPage = () => {
     let successCount = 0;
 
     for (const img of selectedArray) {
-      await addImageTypes(img, newTags);
+      await addImageTypes(img, newTags, { silent: true });
       successCount++;
     }
     showToast(`${newTags.length} ${t('batch.tagsAdded')} ${successCount} ${t('batch.images')}`);
     handleClearSelection();
+  };
+
+  const handleBatchRemoveTags = async (tagsToRemove) => {
+    if (tagsToRemove.length === 0) return;
+
+    const selectedArray = Array.from(selectedImages.values());
+    let successCount = 0;
+
+    for (const tag of tagsToRemove) {
+      for (const img of selectedArray) {
+        await removeImageType(img, tag, { silent: true });
+      }
+      successCount++;
+    }
+
+    // Update local selectedImages state to remove the tags from imageType arrays
+    // This ensures the Common Tags section updates immediately in the UI
+    setSelectedImages(prev => {
+      const newMap = new Map();
+      for (const [id, img] of prev) {
+        newMap.set(id, {
+          ...img,
+          imageType: (img.imageType || []).filter(t => !tagsToRemove.includes(t))
+        });
+      }
+      return newMap;
+    });
+
+    showToast(`${successCount} ${t('batchTag.tagsRemoved') || 'tags removed from'} ${selectedArray.length} ${t('batch.images')}`);
+    // Refresh images to reflect changes
+    fetchImages({ page: currentPage, per_page: IMAGES_PER_PAGE, imageType: filters.tags, dateFrom: filters.dateFrom, dateTo: filters.dateTo, search: searchQuery, sourceType: filters.sourceType });
   };
 
   // Map analysis types to page keys (matches PAGES in AppLayout)
@@ -544,6 +575,8 @@ const ViewImagesPage = () => {
         isOpen={isBatchTagModalOpen}
         onClose={() => setIsBatchTagModalOpen(false)}
         onConfirm={handleBatchTagConfirm}
+        onRemoveTags={handleBatchRemoveTags}
+        selectedImages={Array.from(selectedImages.values())}
         count={selectedIds.size}
       />
 
