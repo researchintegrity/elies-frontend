@@ -9,9 +9,11 @@ import {
   FiCheck,
   FiUpload
 } from 'react-icons/fi';
-import { useDocuments } from '../hooks/useDocuments';
+import { api } from '../services/api';
+import { useExtractionProgress } from '../hooks/useExtractionProgress';
 import { useLanguage } from '../context/LanguageContext';
 import { showAlert, showToast } from '../utils/alert';
+import ExtractionProgressBar from '../components/common/ExtractionProgressBar';
 
 function formatBytes(bytes, decimals = 2) {
   if (bytes === 0) return '0 Bytes';
@@ -24,7 +26,8 @@ function formatBytes(bytes, decimals = 2) {
 
 const UploadPDFPage = () => {
   const [files, setFiles] = useState([]);
-  const { uploadDocument } = useDocuments();
+  const [isUploading, setIsUploading] = useState(false);
+  const { extractionStatus, isExtracting, startExtractionPolling, reset: resetExtraction } = useExtractionProgress();
   const { t } = useLanguage();
 
   const onDrop = useCallback((acceptedFiles) => {
@@ -41,6 +44,7 @@ const UploadPDFPage = () => {
 
   const removeAllFiles = () => {
     setFiles([]);
+    resetExtraction();
   };
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
@@ -58,39 +62,76 @@ const UploadPDFPage = () => {
       return;
     }
 
-    console.log("Starting file upload...");
+    setIsUploading(true);
+    resetExtraction();
 
+    const uploadedDocIds = [];
     let successCount = 0;
     let failureCount = 0;
 
     for (const file of files) {
-      console.log(`Uploading PDF: ${file.name} `);
+      try {
+        // Upload document and get the response with document ID
+        const formData = new FormData();
+        formData.append('file', file);
+        const data = await api.post('/documents/upload', formData, true);
 
-      const result = await uploadDocument(file);
-
-      if (result.success) {
-        console.log(`Success: ${file.name}`);
+        if (data && data._id) {
+          uploadedDocIds.push(data._id);
+        }
         successCount++;
-      } else {
-        console.error(`Failed: ${file.name}`, result.error);
+      } catch (err) {
+        console.error(`Failed: ${file.name}`, err);
         failureCount++;
-        showToast(`${t('common.error')}: ${file.name}: ${result.error}`, 'error');
+        showToast(`${t('common.error')}: ${file.name}: ${err.message}`, 'error');
       }
     }
 
+    setIsUploading(false);
+
     if (successCount > 0) {
-      if (failureCount === 0) {
-        showAlert(t('common.success'), `${successCount} ${t('upload.pdfsUploaded')}`, 'success');
-        removeAllFiles();
+      if (failureCount > 0) {
+        showToast(
+          `${successCount} uploaded, ${failureCount} failed`,
+          'warning'
+        );
       } else {
-        showAlert(t('upload.uploadPartial'), `${successCount} ${t('upload.successCount')}, ${failureCount} ${t('upload.failureCount')}.`, 'warning');
+        showToast(
+          `${successCount} ${t('upload.pdfsUploaded') || 'PDF(s) uploaded'}`,
+          'success'
+        );
       }
+
+      // Start polling for extraction progress
+      if (uploadedDocIds.length > 0) {
+        startExtractionPolling(uploadedDocIds);
+      }
+
+      // Clear files after successful upload
+      setFiles([]);
     } else {
       showAlert(t('common.error'), t('upload.uploadFailed'), 'error');
     }
   };
 
+  const handleExtractionComplete = (status) => {
+    if (status.status === 'completed') {
+      showAlert(
+        t('common.success'),
+        `${status.total_extracted} ${t('upload.imagesExtracted') || 'images extracted from'} ${status.total_documents} PDF(s)`,
+        'success'
+      );
+    } else if (status.status === 'partial') {
+      showAlert(
+        t('upload.uploadPartial') || 'Partially Completed',
+        `${status.completed_documents - status.failed_documents} completed, ${status.failed_documents} failed`,
+        'warning'
+      );
+    }
+  };
+
   const hasFiles = files.length > 0;
+  const isProcessing = isUploading || isExtracting;
 
   return (
     <div className="flex justify-center items-center min-h-[80vh] p-8">
@@ -112,9 +153,17 @@ const UploadPDFPage = () => {
           </p>
         </div>
 
+        {/* Extraction Progress Bar */}
+        {(isExtracting || extractionStatus?.status === 'completed' || extractionStatus?.status === 'partial') && (
+          <ExtractionProgressBar
+            status={extractionStatus}
+            onComplete={handleExtractionComplete}
+          />
+        )}
+
         {/* Dropzone or File List */}
         <input {...getInputProps()} />
-        {!hasFiles ? (
+        {!hasFiles && !isExtracting ? (
           <div
             {...getRootProps()}
             className={`border-2 border-dashed rounded-2xl px-8 py-16 text-center cursor-pointer 
@@ -141,7 +190,7 @@ const UploadPDFPage = () => {
               </span>
             </div>
           </div>
-        ) : (
+        ) : hasFiles && (
           <div className="w-full animate-fade-in">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg text-gray-900 dark:text-white font-semibold">
@@ -150,8 +199,10 @@ const UploadPDFPage = () => {
               <button
                 className="bg-transparent border border-gray-200 dark:border-gray-700 text-gray-500 
                   px-4 py-2 rounded-lg cursor-pointer flex items-center gap-2 text-sm transition-all duration-200
-                  hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white hover:border-gray-300"
+                  hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white hover:border-gray-300
+                  disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={open}
+                disabled={isProcessing}
               >
                 <FiPlus /> {t('common.addMore')}
               </button>
@@ -163,6 +214,7 @@ const UploadPDFPage = () => {
                   key={file.id}
                   file={file}
                   onRemove={removeFile}
+                  disabled={isProcessing}
                 />
               ))}
             </div>
@@ -177,7 +229,7 @@ const UploadPDFPage = () => {
               hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800
               disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={removeAllFiles}
-            disabled={!hasFiles}
+            disabled={!hasFiles || isProcessing}
           >
             {t('common.cancel')}
           </button>
@@ -187,9 +239,17 @@ const UploadPDFPage = () => {
               hover:bg-red-600 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-red-500/30
               disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
             onClick={handleSubmit}
-            disabled={!hasFiles}
+            disabled={!hasFiles || isProcessing}
           >
-            <FiCheck /> {t('upload.completeUpload')}
+            {isUploading ? (
+              <>
+                <span className="animate-spin">⟳</span> {t('upload.uploading') || 'Uploading...'}
+              </>
+            ) : (
+              <>
+                <FiCheck /> {t('upload.completeUpload')}
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -199,7 +259,7 @@ const UploadPDFPage = () => {
 
 
 // PDF File Item Component
-const PDFFileItem = ({ file, onRemove }) => {
+const PDFFileItem = ({ file, onRemove, disabled = false }) => {
   return (
     <div className="flex items-center px-4 py-4 bg-gray-50 dark:bg-dark-card/50 border border-gray-200 dark:border-gray-700 
       rounded-xl gap-6 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-dark-card">
@@ -229,8 +289,10 @@ const PDFFileItem = ({ file, onRemove }) => {
       <button
         className="bg-transparent border-none text-gray-400 cursor-pointer p-2 rounded-lg 
           transition-all duration-200 flex items-center justify-center
-          hover:bg-red-500/10 hover:text-red-500"
+          hover:bg-red-500/10 hover:text-red-500
+          disabled:opacity-50 disabled:cursor-not-allowed"
         onClick={() => onRemove(file.id)}
+        disabled={disabled}
       >
         <FiTrash2 />
       </button>
@@ -239,3 +301,4 @@ const PDFFileItem = ({ file, onRemove }) => {
 };
 
 export default UploadPDFPage;
+
