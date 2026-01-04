@@ -66,17 +66,36 @@ export const useDocuments = () => {
         setError(null);
 
         try {
-            // Calculate offset for backend (0-indexed)
-            const offset = (page - 1) * pageSize;
-
-            // Fetch with pagination params
+            // Fetch with pagination params (using page/per_page for proper PaginatedDocumentResponse)
             const data = await api.get('/documents', {
-                limit: pageSize,
-                offset: offset
+                page: page,
+                per_page: pageSize
             });
 
-            // Transform data to match component expectations
-            if (Array.isArray(data)) {
+            // Handle PaginatedDocumentResponse format
+            if (data && typeof data === 'object' && 'items' in data) {
+                // New paginated response format
+                const transformedDocs = data.items.map(doc => ({
+                    id: doc._id,
+                    filename: doc.filename,
+                    uploadedDate: doc.uploaded_date,
+                    fileSize: doc.file_size,
+                    extractionStatus: doc.extraction_status || 'pending',
+                    extractedImageCount: doc.extracted_image_count || 0
+                }));
+
+                setDocuments(transformedDocs);
+
+                // Use actual pagination data from backend
+                setPagination(prev => ({
+                    ...prev,
+                    currentPage: data.page,
+                    pageSize: data.per_page,
+                    totalDocuments: data.total,
+                    totalPages: data.total_pages
+                }));
+            } else if (Array.isArray(data)) {
+                // Legacy array response format (fallback)
                 const transformedDocs = data.map(doc => ({
                     id: doc._id,
                     filename: doc.filename,
@@ -88,19 +107,15 @@ export const useDocuments = () => {
 
                 setDocuments(transformedDocs);
 
-                // Update pagination state
-                // Since backend doesn't return total count, we estimate based on returned items
+                // Estimate pagination for legacy format
                 const hasMore = transformedDocs.length === pageSize;
-
                 setPagination(prev => ({
                     ...prev,
                     currentPage: page,
                     pageSize: pageSize,
-                    // Estimate total documents based on current page and results
                     totalDocuments: hasMore
                         ? Math.max(prev.totalDocuments, page * pageSize + 1)
                         : (page - 1) * pageSize + transformedDocs.length,
-                    // Estimate total pages
                     totalPages: hasMore
                         ? Math.max(prev.totalPages, page + 1)
                         : page

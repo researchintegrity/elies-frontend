@@ -399,8 +399,8 @@ const ViewPDFPage = () => {
     deleteDocument,
     downloadDocument,
     goToPage,
-    nextPage,
-    prevPage
+    nextPage: _nextPage,
+    prevPage: _prevPage,
   } = useDocuments();
 
   const { t, locale } = useLanguage();
