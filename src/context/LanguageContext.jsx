@@ -259,6 +259,10 @@ const translations = {
         'batchTag.addToExisting': 'Elas serão adicionadas às tags existentes.',
         'batchTag.newTags': 'Novas Tags',
         'batchTag.addTags': 'Adicionar Tags',
+        'batchTag.commonTags': 'Tags em Comum',
+        'batchTag.removeTag': 'Remover tag',
+        'batchTag.noCommonTags': 'Nenhuma tag em comum entre as imagens selecionadas',
+        'batchTag.tagsRemoved': 'tags removidas de',
 
         // Admin
         'admin.dashboard': 'Painel Administrativo',
@@ -1402,6 +1406,10 @@ const translations = {
         'batchTag.addToExisting': 'They will be added to existing tags.',
         'batchTag.newTags': 'New Tags',
         'batchTag.addTags': 'Add Tags',
+        'batchTag.commonTags': 'Common Tags',
+        'batchTag.removeTag': 'Remove tag',
+        'batchTag.noCommonTags': 'No common tags among selected images',
+        'batchTag.tagsRemoved': 'tags removed from',
 
         // Admin
         'admin.dashboard': 'Admin Dashboard',
