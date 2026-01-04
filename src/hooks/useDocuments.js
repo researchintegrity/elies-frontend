@@ -1,23 +1,81 @@
 // src/hooks/useDocuments.js
-import { useState, useCallback } from 'react';
+/**
+ * Custom hook for managing document operations with pagination support.
+ * 
+ * Features:
+ * - Paginated document fetching
+ * - Document upload, delete, and download
+ * - Automatic state management
+ * 
+ * @module useDocuments
+ */
+import { useState, useCallback, useRef } from 'react';
 import { api } from '../services/api';
 import { showAlert, showToast, showConfirm } from '../utils/alert';
 import { useLanguage } from '../context/LanguageContext';
 
+// =============================================================================
+// Constants
+// =============================================================================
+const DEFAULT_PAGE_SIZE = 12; // Documents per page
+
+// =============================================================================
+// Hook Definition
+// =============================================================================
 export const useDocuments = () => {
     const { t } = useLanguage();
+
+    // --- State ---
     const [documents, setDocuments] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    const fetchDocuments = useCallback(async (params = { limit: 100, offset: 0 }) => {
+    // --- Pagination State ---
+    const [pagination, setPagination] = useState({
+        currentPage: 1,
+        totalPages: 1,
+        totalDocuments: 0,
+        pageSize: DEFAULT_PAGE_SIZE
+    });
+
+    // Use ref to avoid stale closure issues in useCallback
+    const paginationRef = useRef(pagination);
+    paginationRef.current = pagination;
+
+    // ==========================================================================
+    // Fetch Documents (with Pagination)
+    // ==========================================================================
+    /**
+     * Fetches documents with pagination support.
+     * 
+     * @param {Object} options - Fetch options
+     * @param {number} options.page - Page number (1-indexed)
+     * @param {number} options.pageSize - Items per page
+     * @returns {Promise<void>}
+     */
+    const fetchDocuments = useCallback(async (options = {}) => {
+        // Use ref to get current values without dependency issues
+        const currentPagination = paginationRef.current;
+
+        const {
+            page = currentPagination.currentPage,
+            pageSize = currentPagination.pageSize
+        } = options;
+
         setLoading(true);
         setError(null);
+
         try {
-            const data = await api.get('/documents', params);
+            // Calculate offset for backend (0-indexed)
+            const offset = (page - 1) * pageSize;
+
+            // Fetch with pagination params
+            const data = await api.get('/documents', {
+                limit: pageSize,
+                offset: offset
+            });
 
             // Transform data to match component expectations
-            // The backend returns a direct list of documents
             if (Array.isArray(data)) {
                 const transformedDocs = data.map(doc => ({
                     id: doc._id,
@@ -27,24 +85,94 @@ export const useDocuments = () => {
                     extractionStatus: doc.extraction_status || 'pending',
                     extractedImageCount: doc.extracted_image_count || 0
                 }));
+
                 setDocuments(transformedDocs);
+
+                // Update pagination state
+                // Since backend doesn't return total count, we estimate based on returned items
+                const hasMore = transformedDocs.length === pageSize;
+
+                setPagination(prev => ({
+                    ...prev,
+                    currentPage: page,
+                    pageSize: pageSize,
+                    // Estimate total documents based on current page and results
+                    totalDocuments: hasMore
+                        ? Math.max(prev.totalDocuments, page * pageSize + 1)
+                        : (page - 1) * pageSize + transformedDocs.length,
+                    // Estimate total pages
+                    totalPages: hasMore
+                        ? Math.max(prev.totalPages, page + 1)
+                        : page
+                }));
             } else {
                 throw new Error('Invalid API response format');
             }
         } catch (err) {
             console.error('Error fetching documents:', err);
             setError(err.message);
-            // Optional: showToast(t('document.fetchError'), 'error');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, []); // No dependencies - uses ref for current pagination values
 
+    // ==========================================================================
+    // Pagination Controls
+    // ==========================================================================
+
+    /**
+     * Navigate to a specific page.
+     * @param {number} page - Target page number
+     */
+    const goToPage = useCallback((page) => {
+        const currentPagination = paginationRef.current;
+        if (page >= 1 && page <= currentPagination.totalPages) {
+            fetchDocuments({ page });
+        }
+    }, [fetchDocuments]);
+
+    /**
+     * Navigate to the next page.
+     */
+    const nextPage = useCallback(() => {
+        const currentPagination = paginationRef.current;
+        if (currentPagination.currentPage < currentPagination.totalPages) {
+            fetchDocuments({ page: currentPagination.currentPage + 1 });
+        }
+    }, [fetchDocuments]);
+
+    /**
+     * Navigate to the previous page.
+     */
+    const prevPage = useCallback(() => {
+        const currentPagination = paginationRef.current;
+        if (currentPagination.currentPage > 1) {
+            fetchDocuments({ page: currentPagination.currentPage - 1 });
+        }
+    }, [fetchDocuments]);
+
+    /**
+     * Change the number of items per page.
+     * @param {number} newSize - New page size
+     */
+    const setPageSize = useCallback((newSize) => {
+        setPagination(prev => ({ ...prev, pageSize: newSize }));
+        fetchDocuments({ page: 1, pageSize: newSize });
+    }, [fetchDocuments]);
+
+    // ==========================================================================
+    // Document Operations
+    // ==========================================================================
+
+    /**
+     * Upload a new document.
+     * @param {File} file - File to upload
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
     const uploadDocument = useCallback(async (file) => {
         try {
             const formData = new FormData();
             formData.append('file', file);
-
             await api.post('/documents/upload', formData, true);
             return { success: true };
         } catch (err) {
@@ -53,6 +181,11 @@ export const useDocuments = () => {
         }
     }, []);
 
+    /**
+     * Delete a document with confirmation.
+     * @param {Object} doc - Document to delete
+     * @returns {Promise<boolean>}
+     */
     const deleteDocument = useCallback(async (doc) => {
         const confirmed = await showConfirm(
             t('document.confirmDeleteTitle'),
@@ -64,6 +197,13 @@ export const useDocuments = () => {
         try {
             await api.delete(`/documents/${doc.id}`);
             setDocuments(prev => prev.filter(d => d.id !== doc.id));
+
+            // Update pagination count
+            setPagination(prev => ({
+                ...prev,
+                totalDocuments: Math.max(0, prev.totalDocuments - 1)
+            }));
+
             showToast(t('document.deleteSuccess'), 'success');
             return true;
         } catch (err) {
@@ -72,6 +212,11 @@ export const useDocuments = () => {
         }
     }, [t]);
 
+    /**
+     * Download a document.
+     * @param {Object} doc - Document to download
+     * @returns {Promise<boolean>}
+     */
     const downloadDocument = useCallback(async (doc) => {
         try {
             const blob = await api.download(`/documents/${doc.id}/download`);
@@ -91,13 +236,28 @@ export const useDocuments = () => {
         }
     }, [t]);
 
+    // ==========================================================================
+    // Return Hook API
+    // ==========================================================================
     return {
+        // Data
         documents,
         loading,
         error,
+
+        // Pagination state
+        pagination,
+
+        // Document operations
         fetchDocuments,
         uploadDocument,
         deleteDocument,
-        downloadDocument
+        downloadDocument,
+
+        // Pagination controls
+        goToPage,
+        nextPage,
+        prevPage,
+        setPageSize
     };
 };

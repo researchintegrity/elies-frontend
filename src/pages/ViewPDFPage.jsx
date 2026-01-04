@@ -1,9 +1,22 @@
 // src/pages/ViewPDFPage.jsx
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+/**
+ * PDF Documents Viewer Page
+ * 
+ * Features:
+ * - Paginated document list
+ * - Grid/List/Split view modes
+ * - Search and sort functionality
+ * - Watermark removal integration
+ * - PDF preview modal
+ * 
+ * @module ViewPDFPage
+ */
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   FiLoader, FiAlertTriangle, FiRefreshCw, FiDownload, FiTrash2,
   FiSearch, FiGrid, FiList, FiFileText, FiEye, FiX,
-  FiUploadCloud, FiColumns, FiDroplet, FiCheck
+  FiUploadCloud, FiColumns, FiDroplet, FiCheck,
+  FiChevronLeft, FiChevronRight, FiChevronsLeft, FiChevronsRight
 } from 'react-icons/fi';
 import { useDocuments } from '../hooks/useDocuments';
 import { useWatermarkRemoval } from '../hooks/useWatermarkRemoval';
@@ -13,7 +26,9 @@ import PDFViewer from '../components/PDFViewer';
 import { useLanguage } from '../context/LanguageContext';
 import { SkeletonCard, EmptyState } from '../components/common';
 
-// --- Watermark Actions Component ---
+// =============================================================================
+// Watermark Action Menu Component
+// =============================================================================
 const WatermarkActionMenu = ({ doc, onRemoveWatermark, t }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef(null);
@@ -82,7 +97,9 @@ const WatermarkActionMenu = ({ doc, onRemoveWatermark, t }) => {
   );
 };
 
-// --- PDF Panel (Loader/Error Handling) ---
+// =============================================================================
+// PDF Panel Component (Loader/Error Handling)
+// =============================================================================
 const PDFPanel = ({ doc, t }) => {
   const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -115,7 +132,6 @@ const PDFPanel = ({ doc, t }) => {
 
     return () => {
       isMounted = false;
-      // Revoke blob URL to prevent memory leaks
       if (blobUrl) {
         URL.revokeObjectURL(blobUrl);
       }
@@ -143,7 +159,9 @@ const PDFPanel = ({ doc, t }) => {
   return <PDFViewer url={pdfBlobUrl} filename={doc.filename} />;
 };
 
-// --- Modal ---
+// =============================================================================
+// PDF Viewer Modal Component
+// =============================================================================
 const PDFViewerModal = ({ doc, onClose, locale }) => {
   useEffect(() => {
     const handleEsc = (e) => { if (e.key === 'Escape') onClose(); };
@@ -180,7 +198,9 @@ const PDFViewerModal = ({ doc, onClose, locale }) => {
   );
 };
 
-// --- Card Component ---
+// =============================================================================
+// Document Card Component (Grid View)
+// =============================================================================
 const DocumentCard = ({ doc, onView, onDownload, onDelete, onRemoveWatermark, t }) => {
   return (
     <div className="group relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-indigo-500/50 flex flex-col hover:z-20">
@@ -234,7 +254,9 @@ const DocumentCard = ({ doc, onView, onDownload, onDelete, onRemoveWatermark, t 
   );
 };
 
-// --- List Row Component ---
+// =============================================================================
+// Document List Row Component (List View)
+// =============================================================================
 const DocumentListRow = ({ doc, onView, onDownload, onDelete, onRemoveWatermark, isActive, isCompact, t }) => {
   return (
     <div
@@ -291,28 +313,127 @@ const DocumentListRow = ({ doc, onView, onDownload, onDelete, onRemoveWatermark,
   );
 };
 
-// --- Main Page Component ---
+// =============================================================================
+// Pagination Controls Component
+// =============================================================================
+/**
+ * Reusable pagination controls component.
+ * 
+ * @param {Object} props - Component props
+ * @param {number} props.currentPage - Current page number (1-indexed)
+ * @param {number} props.totalPages - Total number of pages
+ * @param {number} props.totalItems - Total number of items
+ * @param {Function} props.onPageChange - Callback when page changes
+ * @param {boolean} props.loading - Whether data is loading
+ * @param {Object} props.t - Translation function
+ */
+const PaginationControls = ({ currentPage, totalPages, totalItems, onPageChange, loading, t }) => {
+  // Don't render if only one page
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 shadow-sm">
+      {/* First Page */}
+      <button
+        onClick={() => onPageChange(1)}
+        disabled={currentPage === 1 || loading}
+        className="p-1.5 rounded-md text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        title={t('gallery.first')}
+      >
+        <FiChevronsLeft size={18} />
+      </button>
+
+      {/* Previous Page */}
+      <button
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1 || loading}
+        className="p-1.5 rounded-md text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        title={t('gallery.previousPage')}
+      >
+        <FiChevronLeft size={18} />
+      </button>
+
+      {/* Page Info */}
+      <span className="text-sm text-gray-600 dark:text-gray-300 min-w-[80px] text-center font-medium">
+        {currentPage} / {totalPages}
+      </span>
+
+      {/* Next Page */}
+      <button
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={currentPage >= totalPages || loading}
+        className="p-1.5 rounded-md text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        title={t('gallery.nextPage')}
+      >
+        <FiChevronRight size={18} />
+      </button>
+
+      {/* Last Page */}
+      <button
+        onClick={() => onPageChange(totalPages)}
+        disabled={currentPage >= totalPages || loading}
+        className="p-1.5 rounded-md text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        title={t('gallery.last')}
+      >
+        <FiChevronsRight size={18} />
+      </button>
+
+      {/* Total Items Indicator */}
+      <span className="text-xs text-gray-400 dark:text-gray-500 ml-2 hidden sm:inline">
+        ({totalItems} {t('pdfs.documentsTotal')})
+      </span>
+    </div>
+  );
+};
+
+// =============================================================================
+// Main Page Component
+// =============================================================================
 const ViewPDFPage = () => {
-  const { documents, loading, fetchDocuments, deleteDocument, downloadDocument } = useDocuments();
+  // --- Data Hooks ---
+  const {
+    documents,
+    loading,
+    pagination,
+    fetchDocuments,
+    deleteDocument,
+    downloadDocument,
+    goToPage,
+    nextPage,
+    prevPage
+  } = useDocuments();
+
   const { t, locale } = useLanguage();
+
+  // --- UI State ---
   const [viewMode, setViewMode] = useState('grid');
   const [isSplitView, setIsSplitView] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('newest');
   const [selectedDoc, setSelectedDoc] = useState(null);
 
+  // --- Watermark Removal ---
   const { removeWatermark } = useWatermarkRemoval(() => {
     fetchDocuments();
   });
 
-  useEffect(() => { fetchDocuments(); }, [fetchDocuments]);
+  // --- Initial Data Fetch ---
+  useEffect(() => {
+    fetchDocuments({ page: 1 });
+  }, [fetchDocuments]);
 
+  // --- Filtered & Sorted Documents ---
+  // Note: Filtering is done client-side for search (backend pagination + client search)
   const filteredDocuments = useMemo(() => {
     let result = [...documents];
+
+    // Client-side search filtering
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter(doc => doc.filename.toLowerCase().includes(query));
     }
+
+    // Client-side sorting
     result.sort((a, b) => {
       switch (sortBy) {
         case 'newest': return new Date(b.uploadedDate) - new Date(a.uploadedDate);
@@ -323,25 +444,53 @@ const ViewPDFPage = () => {
         default: return 0;
       }
     });
+
     return result;
   }, [documents, searchQuery, sortBy]);
 
+  // --- Event Handlers ---
   const handleDocumentClick = (doc) => setSelectedDoc(doc);
   const handleCloseModal = () => setSelectedDoc(null);
 
+  /**
+   * Handle page change from pagination controls.
+   * @param {number} page - Target page number
+   */
+  const handlePageChange = useCallback((page) => {
+    goToPage(page);
+    // Scroll to top when changing pages
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [goToPage]);
+
+  // ==========================================================================
+  // Render
+  // ==========================================================================
   return (
     <div className="w-full h-full flex flex-col p-6 md:p-8 overflow-hidden relative text-gray-900 dark:text-gray-100 transition-colors duration-300">
 
       {/* Header & Toolbar */}
       <header className="flex flex-wrap justify-between items-center mb-6 md:mb-8 gap-4 pb-4 md:pb-6 border-b border-gray-200 dark:border-gray-800">
         <div>
-          <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-1">{t('pdfs.title')}</h2>
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-1">
+            {t('pdfs.title')}
+            {loading && <FiRefreshCw className="inline-block ml-2 animate-spin text-lg text-gray-400" />}
+          </h2>
           <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium">
             {loading ? t('common.loading') : `${filteredDocuments.length} ${t('pdfs.documentsFound')}`}
           </span>
         </div>
 
-        <div className="flex flex-wrap gap-2 sm:gap-3 flex-1 justify-end">
+        <div className="flex flex-wrap gap-2 sm:gap-3 flex-1 justify-end items-center">
+          {/* Pagination Controls */}
+          <PaginationControls
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.totalDocuments}
+            onPageChange={handlePageChange}
+            loading={loading}
+            t={t}
+          />
+
           {/* Search */}
           <div className="relative flex-1 min-w-[120px] max-w-xs group">
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
@@ -453,6 +602,20 @@ const ViewPDFPage = () => {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Bottom Pagination (for long lists) */}
+          {!loading && filteredDocuments.length > 0 && pagination.totalPages > 1 && (
+            <div className="flex justify-center py-4">
+              <PaginationControls
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalDocuments}
+                onPageChange={handlePageChange}
+                loading={loading}
+                t={t}
+              />
             </div>
           )}
         </div>
