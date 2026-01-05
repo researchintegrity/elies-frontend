@@ -27,6 +27,7 @@ export const useExtractionProgress = () => {
     const pollIntervalRef = useRef(null);
     const pollCountRef = useRef(0);
     const documentIdsRef = useRef([]);
+    const isMountedRef = useRef(true);
 
     /**
      * Stop polling for extraction status
@@ -99,6 +100,8 @@ export const useExtractionProgress = () => {
                 status: completed === total ? (failed > 0 ? 'partial' : 'completed') : 'processing'
             };
 
+            if (!isMountedRef.current) return false;
+
             setExtractionStatus(status);
 
             // Check if all done
@@ -107,6 +110,8 @@ export const useExtractionProgress = () => {
                 setIsExtracting(false);
                 return true;
             }
+
+            if (!isMountedRef.current) return false;
 
             return false;
         } catch (err) {
@@ -166,7 +171,9 @@ export const useExtractionProgress = () => {
 
     // Cleanup on unmount
     useEffect(() => {
+        isMountedRef.current = true;
         return () => {
+            isMountedRef.current = false;
             if (pollIntervalRef.current) {
                 clearInterval(pollIntervalRef.current);
             }

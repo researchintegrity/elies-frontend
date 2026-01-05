@@ -27,6 +27,7 @@ export const useIndexingProgress = () => {
     const pollIntervalRef = useRef(null);
     const pollCountRef = useRef(0);
     const currentJobIdRef = useRef(null);
+    const isMountedRef = useRef(true);
 
     /**
      * Stop polling for indexing status
@@ -46,6 +47,9 @@ export const useIndexingProgress = () => {
     const pollStatus = useCallback(async (jobId) => {
         try {
             const response = await api.get(`/images/indexing-status/${jobId}`);
+            
+            if (!isMountedRef.current) return false;
+
             setIndexingStatus(response);
 
             // Check if job is finished
@@ -58,6 +62,8 @@ export const useIndexingProgress = () => {
 
             return false; // Still in progress
         } catch (err) {
+            if (!isMountedRef.current) return false;
+
             console.error('Error polling indexing status:', err);
             // Don't fail immediately on network errors, keep trying
             pollCountRef.current++;
@@ -113,7 +119,9 @@ export const useIndexingProgress = () => {
 
     // Cleanup on unmount
     useEffect(() => {
+        isMountedRef.current = true;
         return () => {
+            isMountedRef.current = false;
             if (pollIntervalRef.current) {
                 clearInterval(pollIntervalRef.current);
             }

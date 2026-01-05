@@ -18,26 +18,34 @@ const ExtractionProgressBar = ({ status, onComplete }) => {
         total_extracted = 0,
         progress_percent = 0,
         current_step = '',
-        status: jobStatus = 'pending'
+        status: jobStatus = 'pending',
+        documents = []
     } = status || {};
 
     const isComplete = jobStatus === 'completed' || jobStatus === 'partial';
     const isFailed = jobStatus === 'failed';
 
-    // Track if we've already called onComplete
-    const completedRef = useRef(false);
+    // Create a unique ID for this extraction job based on document IDs
+    const jobIdentifier = documents.map(d => d.id).sort().join(',');
+
+    // Track which jobs we've already called onComplete for
+    const completedJobRef = useRef(null);
+    const onCompleteRef = useRef(onComplete);
+
+    useEffect(() => {
+        onCompleteRef.current = onComplete;
+    }, [onComplete]);
 
     // Call onComplete only once when status changes to complete
     useEffect(() => {
-        if (isComplete && onComplete && status && !completedRef.current) {
-            completedRef.current = true;
-            onComplete(status);
+        if (isComplete && status && jobIdentifier && completedJobRef.current !== jobIdentifier) {
+            completedJobRef.current = jobIdentifier;
+            if (onCompleteRef.current) {
+                onCompleteRef.current(status);
+            }
         }
-        // Reset when status changes to non-complete
-        if (!isComplete) {
-            completedRef.current = false;
-        }
-    }, [isComplete, onComplete, status]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isComplete, jobIdentifier]);
 
     if (!status) return null;
 

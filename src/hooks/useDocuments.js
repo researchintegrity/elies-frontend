@@ -108,6 +108,8 @@ export const useDocuments = () => {
                 setDocuments(transformedDocs);
 
                 // Estimate pagination for legacy format
+                // NOTE: This is an estimation. If the number of items equals pageSize, we assume there are more items.
+                // This might cause an extra empty page if the total count is exactly a multiple of pageSize.
                 const hasMore = transformedDocs.length === pageSize;
                 setPagination(prev => ({
                     ...prev,
@@ -214,10 +216,18 @@ export const useDocuments = () => {
             setDocuments(prev => prev.filter(d => d.id !== doc.id));
 
             // Update pagination count
-            setPagination(prev => ({
-                ...prev,
-                totalDocuments: Math.max(0, prev.totalDocuments - 1)
-            }));
+            setPagination(prev => {  
+                const newTotal = Math.max(0, prev.totalDocuments - 1);  
+                const pageSize = prev.pageSize || DEFAULT_PAGE_SIZE;  
+                const totalPages = Math.max(1, Math.ceil(newTotal / pageSize));  
+                const newCurrentPage = Math.min(prev.currentPage, totalPages);  
+
+                return {  
+                    ...prev,  
+                    totalDocuments: newTotal,  
+                    currentPage: newCurrentPage  
+                };  
+            });  
 
             showToast(t('document.deleteSuccess'), 'success');
             return true;

@@ -26,14 +26,22 @@ const IndexingProgressBar = ({ status, onComplete }) => {
 
     // Track which job_ids we've already called onComplete for
     const completedJobRef = useRef(null);
+    const onCompleteRef = useRef(onComplete);
+
+    useEffect(() => {
+        onCompleteRef.current = onComplete;
+    }, [onComplete]);
 
     // Call onComplete only once when status changes to complete
     useEffect(() => {
-        if (isComplete && onComplete && status && job_id && completedJobRef.current !== job_id) {
+        if (isComplete && status && job_id && completedJobRef.current !== job_id) {
             completedJobRef.current = job_id;
-            onComplete(status);
+            if (onCompleteRef.current) {
+                onCompleteRef.current(status);
+            }
         }
-    }, [isComplete, onComplete, status, job_id]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isComplete, job_id]);
 
     if (!status) return null;
 

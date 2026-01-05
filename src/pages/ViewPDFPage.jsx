@@ -133,6 +133,7 @@ const PDFPanel = ({ doc, t }) => {
     return () => {
       isMounted = false;
       if (blobUrl) {
+        // Revoke blob URL to prevent memory leaks 
         URL.revokeObjectURL(blobUrl);
       }
     };
