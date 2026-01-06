@@ -3,7 +3,7 @@
  * Custom hook for managing document operations with pagination support.
  * 
  * Features:
- * - Paginated document fetching
+ * - Paginated document fetching (compatible with backend PaginatedDocumentResponse)
  * - Document upload, delete, and download
  * - Automatic state management
  * 
@@ -17,7 +17,7 @@ import { useLanguage } from '../context/LanguageContext';
 // =============================================================================
 // Constants
 // =============================================================================
-const DEFAULT_PAGE_SIZE = 12; // Documents per page
+const DEFAULT_PAGE_SIZE = 12; // Documents per page (matches backend default)
 
 // =============================================================================
 // Hook Definition
@@ -35,7 +35,9 @@ export const useDocuments = () => {
         currentPage: 1,
         totalPages: 1,
         totalDocuments: 0,
-        pageSize: DEFAULT_PAGE_SIZE
+        pageSize: DEFAULT_PAGE_SIZE,
+        hasNext: false,
+        hasPrev: false
     });
 
     // Use ref to avoid stale closure issues in useCallback
@@ -47,6 +49,14 @@ export const useDocuments = () => {
     // ==========================================================================
     /**
      * Fetches documents with pagination support.
+     * Backend returns PaginatedDocumentResponse with:
+     *   - items: DocumentResponse[]
+     *   - total: int
+     *   - page: int
+     *   - per_page: int
+     *   - total_pages: int
+     *   - has_next: bool
+     *   - has_prev: bool
      * 
      * @param {Object} options - Fetch options
      * @param {number} options.page - Page number (1-indexed)
@@ -66,18 +76,19 @@ export const useDocuments = () => {
         setError(null);
 
         try {
-            // Calculate offset for backend (0-indexed)
-            const offset = (page - 1) * pageSize;
-
-            // Fetch with pagination params
-            const data = await api.get('/documents', {
-                limit: pageSize,
-                offset: offset
+            // Fetch with pagination params (matching backend query params)
+            const response = await api.get('/documents', {
+                page: page,
+                per_page: pageSize
             });
 
-            // Transform data to match component expectations
-            if (Array.isArray(data)) {
-                const transformedDocs = data.map(doc => ({
+            // DEBUG: Log the response to understand its structure
+            console.log('useDocuments API Response:', response);
+
+            // Backend returns PaginatedDocumentResponse structure
+            if (response && response.items) {
+                // Transform items to match component expectations
+                const transformedDocs = response.items.map(doc => ({
                     id: doc._id,
                     filename: doc.filename,
                     uploadedDate: doc.uploaded_date,
@@ -88,22 +99,42 @@ export const useDocuments = () => {
 
                 setDocuments(transformedDocs);
 
-                // Update pagination state
-                // Since backend doesn't return total count, we estimate based on returned items
-                const hasMore = transformedDocs.length === pageSize;
+                // Update pagination state from backend response
+                setPagination({
+                    currentPage: response.page,
+                    totalPages: response.total_pages,
+                    totalDocuments: response.total,
+                    pageSize: response.per_page,
+                    hasNext: response.has_next,
+                    hasPrev: response.has_prev
+                });
+            } else if (Array.isArray(response)) {
+                // Fallback for legacy array response (backwards compatibility)
+                const transformedDocs = response.map(doc => ({
+                    id: doc._id,
+                    filename: doc.filename,
+                    uploadedDate: doc.uploaded_date,
+                    fileSize: doc.file_size,
+                    extractionStatus: doc.extraction_status || 'pending',
+                    extractedImageCount: doc.extracted_image_count || 0
+                }));
 
+                setDocuments(transformedDocs);
+
+                // Estimate pagination for legacy response
+                const hasMore = transformedDocs.length === pageSize;
                 setPagination(prev => ({
                     ...prev,
                     currentPage: page,
                     pageSize: pageSize,
-                    // Estimate total documents based on current page and results
                     totalDocuments: hasMore
                         ? Math.max(prev.totalDocuments, page * pageSize + 1)
                         : (page - 1) * pageSize + transformedDocs.length,
-                    // Estimate total pages
                     totalPages: hasMore
                         ? Math.max(prev.totalPages, page + 1)
-                        : page
+                        : page,
+                    hasNext: hasMore,
+                    hasPrev: page > 1
                 }));
             } else {
                 throw new Error('Invalid API response format');
@@ -136,7 +167,7 @@ export const useDocuments = () => {
      */
     const nextPage = useCallback(() => {
         const currentPagination = paginationRef.current;
-        if (currentPagination.currentPage < currentPagination.totalPages) {
+        if (currentPagination.hasNext) {
             fetchDocuments({ page: currentPagination.currentPage + 1 });
         }
     }, [fetchDocuments]);
@@ -146,7 +177,7 @@ export const useDocuments = () => {
      */
     const prevPage = useCallback(() => {
         const currentPagination = paginationRef.current;
-        if (currentPagination.currentPage > 1) {
+        if (currentPagination.hasPrev) {
             fetchDocuments({ page: currentPagination.currentPage - 1 });
         }
     }, [fetchDocuments]);
