@@ -53,6 +53,15 @@ const translations = {
         'topbar.title': 'ELIS Scientific Integrity',
         'topbar.subtitle': 'Ferramentas avançadas para análise de imagens científicas',
 
+        // Notifications
+        'notifications.title': 'Notificações',
+        'notifications.unread': 'não lidas',
+        'notifications.markAllRead': 'Marcar todas como lidas',
+        'notifications.clearAll': 'Limpar todas',
+        'notifications.empty': 'Nenhuma notificação',
+        'notifications.emptyDesc': 'Você será notificado quando processos terminarem',
+        'notifications.justNow': 'Agora',
+
         // Common
         'common.loading': 'Carregando...',
         'common.pleaseWait': 'Aguarde um momento...',
@@ -405,6 +414,7 @@ const translations = {
         'pdfs.size': 'Tamanho',
         'pdfs.status': 'Status',
         'pdfs.actions': 'Ações',
+        'pdfs.documentsTotal': 'documentos no total',
         'pdfs.goToUpload': 'Vá para a página de upload',
         'document.confirmDeleteTitle': 'Tem certeza?',
         'document.confirmDeleteMessage': 'Deseja realmente excluir o documento "{filename}"? Esta ação não pode ser desfeita.',
@@ -1201,6 +1211,15 @@ const translations = {
         'topbar.title': 'ELIS Scientific Integrity',
         'topbar.subtitle': 'Advanced tools for scientific image analysis',
 
+        // Notifications
+        'notifications.title': 'Notifications',
+        'notifications.unread': 'unread',
+        'notifications.markAllRead': 'Mark all as read',
+        'notifications.clearAll': 'Clear all',
+        'notifications.empty': 'No notifications',
+        'notifications.emptyDesc': 'You will be notified when processes complete',
+        'notifications.justNow': 'Just now',
+
         // Common
         'common.loading': 'Loading...',
         'common.pleaseWait': 'Please wait...',
@@ -1552,6 +1571,7 @@ const translations = {
         'pdfs.size': 'Size',
         'pdfs.status': 'Status',
         'pdfs.actions': 'Actions',
+        'pdfs.documentsTotal': 'documents total',
         'pdfs.goToUpload': 'Go to the upload page',
         'document.confirmDeleteTitle': 'Are you sure?',
         'document.confirmDeleteMessage': 'Do you really want to delete the document "{filename}"? This action cannot be undone.',

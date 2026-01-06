@@ -1,9 +1,18 @@
 // src/components/Topbar.jsx
+/**
+ * Topbar Component
+ * 
+ * Main application header with title, notifications, language toggle,
+ * theme toggle, user info, and logout button.
+ * 
+ * @module Topbar
+ */
 import React from 'react';
-import { FiLogOut, FiSun, FiMoon, FiBell, FiGlobe } from 'react-icons/fi';
+import { FiLogOut, FiSun, FiMoon, FiGlobe } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../hooks/useTheme';
 import { useLanguage } from '../context/LanguageContext';
+import NotificationsDropdown from './NotificationsDropdown';
 
 const Topbar = () => {
   const { logout, user } = useAuth();
@@ -24,12 +33,8 @@ const Topbar = () => {
 
       {/* Right: Actions */}
       <div className="flex items-center gap-2">
-        {/* Notifications */}
-        <button className="relative p-2.5 rounded-xl bg-gray-100/80 dark:bg-dark-card/50 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-dark-card hover:text-gray-700 dark:hover:text-white transition-all duration-200 border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
-          <FiBell className="w-5 h-5" />
-          {/* Notification badge */}
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary-500 rounded-full ring-2 ring-white dark:ring-dark-deep" />
-        </button>
+        {/* Notifications Dropdown */}
+        <NotificationsDropdown />
 
         {/* Language Toggle */}
         <button
