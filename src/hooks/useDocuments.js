@@ -3,7 +3,7 @@
  * Custom hook for managing document operations with pagination support.
  * 
  * Features:
- * - Paginated document fetching
+ * - Paginated document fetching (compatible with backend PaginatedDocumentResponse)
  * - Document upload, delete, and download
  * - Automatic state management
  * 
@@ -17,7 +17,7 @@ import { useLanguage } from '../context/LanguageContext';
 // =============================================================================
 // Constants
 // =============================================================================
-const DEFAULT_PAGE_SIZE = 12; // Documents per page
+const DEFAULT_PAGE_SIZE = 12; // Documents per page (matches backend default)
 
 // =============================================================================
 // Hook Definition
@@ -35,7 +35,9 @@ export const useDocuments = () => {
         currentPage: 1,
         totalPages: 1,
         totalDocuments: 0,
-        pageSize: DEFAULT_PAGE_SIZE
+        pageSize: DEFAULT_PAGE_SIZE,
+        hasNext: false,
+        hasPrev: false
     });
 
     // Use ref to avoid stale closure issues in useCallback
@@ -47,6 +49,14 @@ export const useDocuments = () => {
     // ==========================================================================
     /**
      * Fetches documents with pagination support.
+     * Backend returns PaginatedDocumentResponse with:
+     *   - items: DocumentResponse[]
+     *   - total: int
+     *   - page: int
+     *   - per_page: int
+     *   - total_pages: int
+     *   - has_next: bool
+     *   - has_prev: bool
      * 
      * @param {Object} options - Fetch options
      * @param {number} options.page - Page number (1-indexed)
@@ -108,8 +118,6 @@ export const useDocuments = () => {
                 setDocuments(transformedDocs);
 
                 // Estimate pagination for legacy format
-                // NOTE: This is an estimation. If the number of items equals pageSize, we assume there are more items.
-                // This might cause an extra empty page if the total count is exactly a multiple of pageSize.
                 const hasMore = transformedDocs.length === pageSize;
                 setPagination(prev => ({
                     ...prev,
@@ -120,7 +128,9 @@ export const useDocuments = () => {
                         : (page - 1) * pageSize + transformedDocs.length,
                     totalPages: hasMore
                         ? Math.max(prev.totalPages, page + 1)
-                        : page
+                        : page,
+                    hasNext: hasMore,
+                    hasPrev: page > 1
                 }));
             } else {
                 throw new Error('Invalid API response format');
@@ -153,7 +163,7 @@ export const useDocuments = () => {
      */
     const nextPage = useCallback(() => {
         const currentPagination = paginationRef.current;
-        if (currentPagination.currentPage < currentPagination.totalPages) {
+        if (currentPagination.hasNext) {
             fetchDocuments({ page: currentPagination.currentPage + 1 });
         }
     }, [fetchDocuments]);
@@ -163,7 +173,7 @@ export const useDocuments = () => {
      */
     const prevPage = useCallback(() => {
         const currentPagination = paginationRef.current;
-        if (currentPagination.currentPage > 1) {
+        if (currentPagination.hasPrev) {
             fetchDocuments({ page: currentPagination.currentPage - 1 });
         }
     }, [fetchDocuments]);
