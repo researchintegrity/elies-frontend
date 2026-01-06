@@ -2,6 +2,20 @@ import React, { useRef, useEffect } from 'react';
 import { FiLoader, FiCheck, FiAlertCircle, FiImage } from 'react-icons/fi';
 
 /**
+ * Sanitize text content for safe rendering.
+ * Strips HTML tags and limits length as defense-in-depth.
+ */
+const sanitizeText = (text, maxLength = 200) => {
+    if (typeof text !== 'string') return '';
+    // Strip any HTML tags
+    const stripped = text.replace(/<[^>]*>/g, '');
+    // Limit length to prevent UI overflow
+    return stripped.length > maxLength
+        ? stripped.substring(0, maxLength) + '...'
+        : stripped;
+};
+
+/**
  * Progress bar component for batch image indexing.
  * Shows current progress with animated bar and status text.
  * 
@@ -18,7 +32,8 @@ const IndexingProgressBar = ({ status, onComplete }) => {
         progress_percent = 0,
         current_step = '',
         status: jobStatus = 'pending',
-        job_id = ''
+        job_id = '',
+        errors = []
     } = status || {};
 
     const isComplete = jobStatus === 'completed' || jobStatus === 'partial';
@@ -155,6 +170,25 @@ const IndexingProgressBar = ({ status, onComplete }) => {
                             </span>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* Error messages (if failed) */}
+            {isFailed && errors.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-800">
+                    <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3">
+                        <p className="text-sm font-medium text-red-800 dark:text-red-200 mb-1">
+                            Upload failed - Images were not saved
+                        </p>
+                        <ul className="text-xs text-red-600 dark:text-red-300 space-y-1">
+                            {errors.slice(0, 3).map((error, idx) => (
+                                <li key={idx}>• {sanitizeText(error)}</li>
+                            ))}
+                            {errors.length > 3 && (
+                                <li className="text-red-400">...and {errors.length - 3} more</li>
+                            )}
+                        </ul>
+                    </div>
                 </div>
             )}
         </div>
