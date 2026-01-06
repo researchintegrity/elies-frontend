@@ -118,6 +118,7 @@ export const useDocuments = () => {
                 setDocuments(transformedDocs);
 
                 // Estimate pagination for legacy format
+
                 const hasMore = transformedDocs.length === pageSize;
                 setPagination(prev => ({
                     ...prev,
