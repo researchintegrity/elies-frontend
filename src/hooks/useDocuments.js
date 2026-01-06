@@ -76,12 +76,18 @@ export const useDocuments = () => {
         setError(null);
 
         try {
+<<<<<<< HEAD
             // Fetch with pagination params (matching backend query params)
             const response = await api.get('/documents', {
+=======
+            // Fetch with pagination params (using page/per_page for proper PaginatedDocumentResponse)
+            const data = await api.get('/documents', {
+>>>>>>> c75cec94987693cc159dc3c497f4e43805b2e3ac
                 page: page,
                 per_page: pageSize
             });
 
+<<<<<<< HEAD
             // DEBUG: Log the response to understand its structure
             console.log('useDocuments API Response:', response);
 
@@ -89,6 +95,11 @@ export const useDocuments = () => {
             if (response && response.items) {
                 // Transform items to match component expectations
                 const transformedDocs = response.items.map(doc => ({
+=======
+            // Handle PaginatedDocumentResponse format
+            if (data && typeof data === 'object' && 'items' in data) {
+                // New paginated response format
+                const transformedDocs = data.items.map(doc => ({
                     id: doc._id,
                     filename: doc.filename,
                     uploadedDate: doc.uploaded_date,
@@ -99,6 +110,29 @@ export const useDocuments = () => {
 
                 setDocuments(transformedDocs);
 
+                // Use actual pagination data from backend
+                setPagination(prev => ({
+                    ...prev,
+                    currentPage: data.page,
+                    pageSize: data.per_page,
+                    totalDocuments: data.total,
+                    totalPages: data.total_pages
+                }));
+            } else if (Array.isArray(data)) {
+                // Legacy array response format (fallback)
+                const transformedDocs = data.map(doc => ({
+>>>>>>> c75cec94987693cc159dc3c497f4e43805b2e3ac
+                    id: doc._id,
+                    filename: doc.filename,
+                    uploadedDate: doc.uploaded_date,
+                    fileSize: doc.file_size,
+                    extractionStatus: doc.extraction_status || 'pending',
+                    extractedImageCount: doc.extracted_image_count || 0
+                }));
+
+                setDocuments(transformedDocs);
+
+<<<<<<< HEAD
                 // Update pagination state from backend response
                 setPagination({
                     currentPage: response.page,
@@ -122,6 +156,9 @@ export const useDocuments = () => {
                 setDocuments(transformedDocs);
 
                 // Estimate pagination for legacy response
+=======
+                // Estimate pagination for legacy format
+>>>>>>> c75cec94987693cc159dc3c497f4e43805b2e3ac
                 const hasMore = transformedDocs.length === pageSize;
                 setPagination(prev => ({
                     ...prev,
