@@ -53,6 +53,15 @@ const translations = {
         'topbar.title': 'ELIS Scientific Integrity',
         'topbar.subtitle': 'Ferramentas avançadas para análise de imagens científicas',
 
+        // Notifications
+        'notifications.title': 'Notificações',
+        'notifications.unread': 'não lidas',
+        'notifications.markAllRead': 'Marcar todas como lidas',
+        'notifications.clearAll': 'Limpar todas',
+        'notifications.empty': 'Nenhuma notificação',
+        'notifications.emptyDesc': 'Você será notificado quando processos terminarem',
+        'notifications.justNow': 'Agora',
+
         // Common
         'common.loading': 'Carregando...',
         'common.pleaseWait': 'Aguarde um momento...',
@@ -1197,6 +1206,15 @@ const translations = {
         // Topbar
         'topbar.title': 'ELIS Scientific Integrity',
         'topbar.subtitle': 'Advanced tools for scientific image analysis',
+
+        // Notifications
+        'notifications.title': 'Notifications',
+        'notifications.unread': 'unread',
+        'notifications.markAllRead': 'Mark all as read',
+        'notifications.clearAll': 'Clear all',
+        'notifications.empty': 'No notifications',
+        'notifications.emptyDesc': 'You will be notified when processes complete',
+        'notifications.justNow': 'Just now',
 
         // Common
         'common.loading': 'Loading...',
