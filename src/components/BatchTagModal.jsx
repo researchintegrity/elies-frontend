@@ -1,12 +1,23 @@
-import React, { useState } from 'react';
-import { FiX, FiTag } from 'react-icons/fi';
+import React, { useState, useMemo } from 'react';
+import { FiX, FiTag, FiPlus, FiMinus } from 'react-icons/fi';
 import TagInput from './TagInput';
 import { useLanguage } from '../context/LanguageContext';
 
-const BatchTagModal = ({ isOpen, onClose, onConfirm, count }) => {
+const BatchTagModal = ({ isOpen, onClose, onConfirm, onRemoveTags, selectedImages = [], count }) => {
     const { t } = useLanguage();
     const [tags, setTags] = useState([]);
     const [inputValue, setInputValue] = useState('');
+    const [removingTag, setRemovingTag] = useState(null);
+
+    // Calculate common tags (intersection of all imageType arrays from selected images)
+    const commonTags = useMemo(() => {
+        if (!selectedImages || selectedImages.length === 0) return [];
+        const allTagSets = selectedImages.map(img => new Set(img.imageType || []));
+        // Use first image's tags as base, filter to only those present in ALL images
+        return [...allTagSets[0]].filter(tag =>
+            allTagSets.every(set => set.has(tag))
+        ).sort();
+    }, [selectedImages]);
 
     if (!isOpen) return null;
 
@@ -20,6 +31,16 @@ const BatchTagModal = ({ isOpen, onClose, onConfirm, count }) => {
         setTags([]);
         setInputValue('');
         onClose();
+    };
+
+    const handleRemoveTag = async (tag) => {
+        if (!onRemoveTags) return;
+        setRemovingTag(tag);
+        try {
+            await onRemoveTags([tag]);
+        } finally {
+            setRemovingTag(null);
+        }
     };
 
     return (
@@ -45,14 +66,55 @@ const BatchTagModal = ({ isOpen, onClose, onConfirm, count }) => {
                 </div>
 
                 {/* Content */}
-                <div className="p-6 space-y-4">
+                <div className="p-6 space-y-5">
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {t('batchTag.description')} <strong className="text-gray-900 dark:text-white">{count} {t('batchTag.selectedImages')}</strong>.
-                        {' '}{t('batchTag.addToExisting')}
+                        {t('batchTag.description')} <strong className="text-gray-900 dark:text-white">{count} {t('batchTag.selectedImages')}</strong>. {t('batchTag.addToExisting')}
                     </p>
 
+                    {/* Common Tags Section (Remove) */}
+                    {onRemoveTags && (
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                                <FiMinus size={12} />
+                                {t('batchTag.commonTags') || 'Common Tags'}
+                            </label>
+                            {commonTags.length > 0 ? (
+                                <div className="flex flex-wrap gap-2 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    {commonTags.map(tag => (
+                                        <span
+                                            key={tag}
+                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 text-sm font-medium border border-rose-200 dark:border-rose-500/30"
+                                        >
+                                            #{tag}
+                                            <button
+                                                onClick={() => handleRemoveTag(tag)}
+                                                disabled={removingTag === tag}
+                                                className="hover:text-rose-800 dark:hover:text-rose-200 p-0.5 rounded-full hover:bg-rose-200 dark:hover:bg-rose-800 transition-colors disabled:opacity-50"
+                                                title={t('batchTag.removeTag') || 'Remove tag'}
+                                            >
+                                                {removingTag === tag ? (
+                                                    <span className="block w-3 h-3 border-2 border-rose-400 border-t-transparent rounded-full animate-spin" />
+                                                ) : (
+                                                    <FiX size={14} />
+                                                )}
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-gray-400 dark:text-gray-500 italic p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    {t('batchTag.noCommonTags') || 'No common tags among selected images'}
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Add Tags Section */}
                     <div className="space-y-2">
-                        <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('batchTag.newTags')}</label>
+                        <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                            <FiPlus size={12} />
+                            {t('batchTag.newTags')}
+                        </label>
                         <TagInput
                             tags={tags}
                             onAdd={(tag) => setTags(prev => [...prev, tag])}
@@ -84,3 +146,4 @@ const BatchTagModal = ({ isOpen, onClose, onConfirm, count }) => {
 };
 
 export default BatchTagModal;
+

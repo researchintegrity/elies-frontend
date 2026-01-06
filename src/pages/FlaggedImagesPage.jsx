@@ -108,6 +108,30 @@ const FlaggedImagesPage = ({ onNavigate }) => {
     }
   }, [flaggedImages, selectedImage]);
 
+  // Keep selectedImage in sync with flaggedImages data (e.g., after tag updates)
+  useEffect(() => {
+    if (!selectedImage || flaggedImages.length === 0) return;
+    
+    const updated = flaggedImages.find(img => img.id === selectedImage.id);
+    if (!updated) return;
+    
+    // Compare imageType arrays using Set for order-independent comparison
+    const currentTags = selectedImage.imageType || [];
+    const updatedTags = updated.imageType || [];
+    
+    if (currentTags.length !== updatedTags.length) {
+      setSelectedImage(updated);
+      return;
+    }
+    
+    const currentSet = new Set(currentTags);
+    const hasChanged = updatedTags.some(tag => !currentSet.has(tag));
+    
+    if (hasChanged) {
+      setSelectedImage(updated);
+    }
+  }, [flaggedImages, selectedImage]);
+
   // Refresh when extraction completes
   useEffect(() => {
     if (extractionStatus === 'completed') {
@@ -296,11 +320,71 @@ const FlaggedImagesPage = ({ onNavigate }) => {
     const selectedArray = Array.from(selectedImages.values());
     let successCount = 0;
     for (const img of selectedArray) {
-      await addImageTypes(img, newTags);
+      await addImageTypes(img, newTags, { silent: true });
       successCount++;
     }
     showToast(`${newTags.length} ${t('batch.tagsAdded') || 'tags added to'} ${successCount} ${t('batch.images') || 'images'}`);
     handleClearSelection();
+    fetchFlaggedImages();
+  };
+
+  const handleBatchRemoveTags = async (tagsToRemove) => {
+    if (tagsToRemove.length === 0) return;
+    const selectedArray = Array.from(selectedImages.values());
+    const successfulTags = new Set();
+    const failedTags = new Set();
+    let errorCount = 0;
+
+    // Iterate over images first, then tags - more logical grouping per image
+    for (const img of selectedArray) {
+      for (const tag of tagsToRemove) {
+        try {
+          await removeImageType(img, tag, { silent: true });
+          successfulTags.add(tag);
+        } catch (err) {
+          console.error(`Error removing tag "${tag}" from image ${img.id}:`, err);
+          failedTags.add(tag);
+          errorCount++;
+        }
+      }
+    }
+
+    // Determine which tags were fully successful (removed from ALL images)
+    const fullySuccessfulTags = [...successfulTags].filter(tag => !failedTags.has(tag));
+
+    // Only update local state for tags that were successfully removed from all images
+    if (fullySuccessfulTags.length > 0) {
+      setSelectedImages(prev => {
+        const newMap = new Map();
+        for (const [id, img] of prev) {
+          newMap.set(id, {
+            ...img,
+            imageType: (img.imageType || []).filter(t => !fullySuccessfulTags.includes(t))
+          });
+        }
+        return newMap;
+      });
+    }
+
+    // Show appropriate feedback based on results
+    const tagsRemovedCount = fullySuccessfulTags.length;
+    const imagesCount = selectedArray.length;
+
+    if (errorCount > 0 && tagsRemovedCount > 0) {
+      showToast(
+        `${tagsRemovedCount} ${t('batchTag.tagsRemoved') || 'tag(s) removed'}. ${errorCount} ${t('batchTag.errorOccurred') || 'error(s) occurred'}.`,
+        'warning'
+      );
+    } else if (errorCount > 0) {
+      showToast(t('batchTag.removeError') || 'Failed to remove tags. Please try again.', 'error');
+    } else {
+      showToast(
+        `${tagsRemovedCount} ${t('batchTag.tagsRemoved') || 'tag(s) removed from'} ${imagesCount} ${t('batch.images') || 'image(s)'}`,
+        'success'
+      );
+    }
+
+    fetchFlaggedImages();
   };
 
   const handleAnalyzeSelected = useCallback((analysisType) => {
@@ -399,7 +483,7 @@ const FlaggedImagesPage = ({ onNavigate }) => {
   return (
     <div className="w-full h-full flex flex-col relative overflow-hidden">
       {/* Modals */}
-      <BatchTagModal isOpen={isBatchTagModalOpen} onClose={() => setIsBatchTagModalOpen(false)} onConfirm={handleBatchTagConfirm} count={selectedIds.size} />
+      <BatchTagModal isOpen={isBatchTagModalOpen} onClose={() => setIsBatchTagModalOpen(false)} onConfirm={handleBatchTagConfirm} onRemoveTags={handleBatchRemoveTags} selectedImages={Array.from(selectedImages.values())} count={selectedIds.size} />
       <LightboxModal isOpen={!!lightboxImage} imageUrl={lightboxUrl} onClose={() => { setLightboxImage(null); setLightboxUrl(null); }} title={lightboxImage?.filename}>
         <ImageMetadataSidebar image={lightboxImage} t={t} locale={locale} onTagAdd={handleAddTag} onTagRemove={handleRemoveTag} />
       </LightboxModal>

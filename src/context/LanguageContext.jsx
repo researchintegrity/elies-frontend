@@ -53,6 +53,15 @@ const translations = {
         'topbar.title': 'ELIS Scientific Integrity',
         'topbar.subtitle': 'Ferramentas avançadas para análise de imagens científicas',
 
+        // Notifications
+        'notifications.title': 'Notificações',
+        'notifications.unread': 'não lidas',
+        'notifications.markAllRead': 'Marcar todas como lidas',
+        'notifications.clearAll': 'Limpar todas',
+        'notifications.empty': 'Nenhuma notificação',
+        'notifications.emptyDesc': 'Você será notificado quando processos terminarem',
+        'notifications.justNow': 'Agora',
+
         // Common
         'common.loading': 'Carregando...',
         'common.pleaseWait': 'Aguarde um momento...',
@@ -262,6 +271,10 @@ const translations = {
         'batchTag.addToExisting': 'Elas serão adicionadas às tags existentes.',
         'batchTag.newTags': 'Novas Tags',
         'batchTag.addTags': 'Adicionar Tags',
+        'batchTag.commonTags': 'Tags em Comum',
+        'batchTag.removeTag': 'Remover tag',
+        'batchTag.noCommonTags': 'Nenhuma tag em comum entre as imagens selecionadas',
+        'batchTag.tagsRemoved': 'tags removidas de',
 
         // Admin
         'admin.dashboard': 'Painel Administrativo',
@@ -1201,6 +1214,15 @@ const translations = {
         'topbar.title': 'ELIS Scientific Integrity',
         'topbar.subtitle': 'Advanced tools for scientific image analysis',
 
+        // Notifications
+        'notifications.title': 'Notifications',
+        'notifications.unread': 'unread',
+        'notifications.markAllRead': 'Mark all as read',
+        'notifications.clearAll': 'Clear all',
+        'notifications.empty': 'No notifications',
+        'notifications.emptyDesc': 'You will be notified when processes complete',
+        'notifications.justNow': 'Just now',
+
         // Common
         'common.loading': 'Loading...',
         'common.pleaseWait': 'Please wait...',
@@ -1409,6 +1431,10 @@ const translations = {
         'batchTag.addToExisting': 'They will be added to existing tags.',
         'batchTag.newTags': 'New Tags',
         'batchTag.addTags': 'Add Tags',
+        'batchTag.commonTags': 'Common Tags',
+        'batchTag.removeTag': 'Remove tag',
+        'batchTag.noCommonTags': 'No common tags among selected images',
+        'batchTag.tagsRemoved': 'tags removed from',
 
         // Admin
         'admin.dashboard': 'Admin Dashboard',

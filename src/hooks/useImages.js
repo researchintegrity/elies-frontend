@@ -176,30 +176,40 @@ export const useImages = () => {
         }
     }, [t]);
 
-    const addImageTypes = useCallback(async (image, types) => {
+    const addImageTypes = useCallback(async (image, types, options = {}) => {
+        const { silent = false } = options;
         try {
             const updatedImage = await api.addImageTypes(image.id, types);
             setImages(prev => prev.map(img =>
                 img.id === image.id ? { ...img, imageType: updatedImage.image_type } : img
             ));
-            showToast(t('images.tagsAddedSuccess'), 'success');
+            if (!silent) {
+                showToast(t('images.tagsAddedSuccess'), 'success');
+            }
             return true;
         } catch (err) {
-            showAlert(t('common.error'), `${t('images.tagsAddError')}: ${err.message}`, 'error');
+            if (!silent) {
+                showAlert(t('common.error'), `${t('images.tagsAddError')}: ${err.message}`, 'error');
+            }
             return false;
         }
     }, [t]);
 
-    const removeImageType = useCallback(async (image, typeName) => {
+    const removeImageType = useCallback(async (image, typeName, options = {}) => {
+        const { silent = false } = options;
         try {
             const updatedImage = await api.removeImageType(image.id, typeName);
             setImages(prev => prev.map(img =>
                 img.id === image.id ? { ...img, imageType: updatedImage.image_type } : img
             ));
-            showToast(t('images.tagRemovedSuccess'), 'success');
+            if (!silent) {
+                showToast(t('images.tagRemovedSuccess'), 'success');
+            }
             return true;
         } catch (err) {
-            showAlert(t('common.error'), `${t('images.tagRemoveError')}: ${err.message}`, 'error');
+            if (!silent) {
+                showAlert(t('common.error'), `${t('images.tagRemoveError')}: ${err.message}`, 'error');
+            }
             return false;
         }
     }, [t]);
