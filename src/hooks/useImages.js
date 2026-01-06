@@ -112,6 +112,31 @@ export const useImages = () => {
         }
     }, []);
 
+    /**
+     * Upload multiple images in a batch with progress tracking.
+     * @param {File[]} files - Array of image files to upload
+     * @returns {Promise<{success: boolean, job_id?: string, image_ids?: string[], error?: string}>}
+     */
+    const uploadImagesBatch = useCallback(async (files) => {
+        try {
+            const formData = new FormData();
+            files.forEach(file => {
+                formData.append('files', file);
+            });
+
+            const response = await api.post('/images/upload/batch', formData, true);
+            return {
+                success: true,
+                job_id: response.job_id,
+                image_ids: response.image_ids,
+                uploaded_count: response.uploaded_count
+            };
+        } catch (err) {
+            console.error('Error uploading batch:', err);
+            return { success: false, error: err.message };
+        }
+    }, []);
+
     const deleteImage = useCallback(async (image, options = {}) => {
         if (image.sourceType === 'extracted') {
             showAlert(
@@ -225,6 +250,7 @@ export const useImages = () => {
         pagination,
         fetchImages,
         uploadImage,
+        uploadImagesBatch,
         deleteImage,
         addImageTypes,
         removeImageType,

@@ -10,8 +10,10 @@ import {
   FiUpload
 } from 'react-icons/fi';
 import { useImages } from '../hooks/useImages';
+import { useIndexingProgress } from '../hooks/useIndexingProgress';
 import { useLanguage } from '../context/LanguageContext';
 import { showAlert, showToast } from '../utils/alert';
+import IndexingProgressBar from '../components/common/IndexingProgressBar';
 
 // Format bytes to KB, MB, GB
 function formatBytes(bytes, decimals = 2) {
@@ -25,7 +27,9 @@ function formatBytes(bytes, decimals = 2) {
 
 const UploadImagePage = () => {
   const [files, setFiles] = useState([]);
-  const { uploadImage } = useImages();
+  const [isUploading, setIsUploading] = useState(false);
+  const { uploadImagesBatch } = useImages();
+  const { indexingStatus, isIndexing, startIndexingPolling, reset: resetIndexing } = useIndexingProgress();
   const { t } = useLanguage();
 
   const onDrop = useCallback((acceptedFiles) => {
@@ -49,6 +53,7 @@ const UploadImagePage = () => {
   const removeAllFiles = () => {
     files.forEach(file => URL.revokeObjectURL(file.preview));
     setFiles([]);
+    resetIndexing();
   };
 
   useEffect(() => {
@@ -70,39 +75,56 @@ const UploadImagePage = () => {
       return;
     }
 
-    console.log("Starting file upload...");
+    setIsUploading(true);
+    resetIndexing();
 
-    let successCount = 0;
-    let failureCount = 0;
-
-    for (const file of files) {
-      console.log(`Uploading Image: ${file.name} `);
-
-      const result = await uploadImage(file);
+    try {
+      // Use batch upload API
+      const result = await uploadImagesBatch(files);
 
       if (result.success) {
-        console.log(`Success: ${file.name}`);
-        successCount++;
-      } else {
-        console.error(`Failed: ${file.name}`, result.error);
-        failureCount++;
-        showToast(`${t('common.error')}: ${file.name}: ${result.error}`, 'error');
-      }
-    }
+        showToast(
+          `${result.uploaded_count} ${t('upload.imagesUploaded') || 'images uploaded'}`,
+          'success'
+        );
 
-    if (successCount > 0) {
-      if (failureCount === 0) {
-        showAlert(t('common.success'), `${successCount} ${t('upload.imagesUploaded')}`, 'success');
-        removeAllFiles();
+        // Start polling for indexing progress
+        if (result.job_id) {
+          startIndexingPolling(result.job_id);
+        }
+
+        // Clear files after successful upload
+        files.forEach(file => URL.revokeObjectURL(file.preview));
+        setFiles([]);
       } else {
-        showAlert(t('upload.uploadPartial'), `${successCount} ${t('upload.successCount')}, ${failureCount} ${t('upload.failureCount')}.`, 'warning');
+        showAlert(t('common.error'), result.error || t('upload.uploadFailed'), 'error');
       }
-    } else {
-      showAlert(t('common.error'), t('upload.uploadFailed'), 'error');
+    } catch (err) {
+      console.error('Upload error:', err);
+      showAlert(t('common.error'), err.message || t('upload.uploadFailed'), 'error');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleIndexingComplete = (status) => {
+    if (status.status === 'completed') {
+      showAlert(
+        t('common.success'),
+        `${status.indexed_images} ${t('upload.imagesIndexed') || 'images indexed successfully'}`,
+        'success'
+      );
+    } else if (status.status === 'partial') {
+      showAlert(
+        t('upload.uploadPartial') || 'Partially Completed',
+        `${status.indexed_images} indexed, ${status.failed_images} failed`,
+        'warning'
+      );
     }
   };
 
   const hasFiles = files.length > 0;
+  const isProcessing = isUploading || isIndexing;
 
   return (
     <div className="flex justify-center items-center min-h-[80vh] p-8">
@@ -124,9 +146,17 @@ const UploadImagePage = () => {
           </p>
         </div>
 
+        {/* Indexing Progress Bar */}
+        {(isIndexing || indexingStatus?.status === 'completed' || indexingStatus?.status === 'partial') && (
+          <IndexingProgressBar
+            status={indexingStatus}
+            onComplete={handleIndexingComplete}
+          />
+        )}
+
         {/* Dropzone or File List */}
         <input {...getInputProps()} />
-        {!hasFiles ? (
+        {!hasFiles && !isIndexing ? (
           <div
             {...getRootProps()}
             className={`border-2 border-dashed rounded-2xl px-8 py-16 text-center cursor-pointer 
@@ -153,7 +183,7 @@ const UploadImagePage = () => {
               </span>
             </div>
           </div>
-        ) : (
+        ) : hasFiles && (
           <div className="w-full animate-fade-in">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg text-gray-900 dark:text-white font-semibold">
@@ -162,8 +192,10 @@ const UploadImagePage = () => {
               <button
                 className="bg-transparent border border-gray-200 dark:border-gray-700 text-gray-500 
                   px-4 py-2 rounded-lg cursor-pointer flex items-center gap-2 text-sm transition-all duration-200
-                  hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white hover:border-gray-300"
+                  hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white hover:border-gray-300
+                  disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={open}
+                disabled={isProcessing}
               >
                 <FiPlus /> {t('common.addMore')}
               </button>
@@ -175,6 +207,7 @@ const UploadImagePage = () => {
                   key={file.id}
                   file={file}
                   onRemove={removeFile}
+                  disabled={isProcessing}
                 />
               ))}
             </div>
@@ -189,7 +222,7 @@ const UploadImagePage = () => {
               hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800
               disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={removeAllFiles}
-            disabled={!hasFiles}
+            disabled={!hasFiles || isProcessing}
           >
             {t('common.cancel')}
           </button>
@@ -199,9 +232,17 @@ const UploadImagePage = () => {
               hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary-500/30
               disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
             onClick={handleSubmit}
-            disabled={!hasFiles}
+            disabled={!hasFiles || isProcessing}
           >
-            <FiCheck /> {t('upload.completeUpload')}
+            {isUploading ? (
+              <>
+                <span className="animate-spin">⟳</span> {t('upload.uploading') || 'Uploading...'}
+              </>
+            ) : (
+              <>
+                <FiCheck /> {t('upload.completeUpload')}
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -211,7 +252,7 @@ const UploadImagePage = () => {
 
 
 // Image File Item Component
-const ImageFileItem = ({ file, onRemove }) => {
+const ImageFileItem = ({ file, onRemove, disabled = false }) => {
   return (
     <div className="flex items-center px-4 py-4 bg-gray-50 dark:bg-dark-card/50 border border-gray-200 dark:border-gray-700 
       rounded-xl gap-6 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-dark-card">
@@ -245,8 +286,10 @@ const ImageFileItem = ({ file, onRemove }) => {
       <button
         className="bg-transparent border-none text-gray-400 cursor-pointer p-2 rounded-lg 
           transition-all duration-200 flex items-center justify-center
-          hover:bg-red-500/10 hover:text-red-500"
+          hover:bg-red-500/10 hover:text-red-500
+          disabled:opacity-50 disabled:cursor-not-allowed"
         onClick={() => onRemove(file.id)}
+        disabled={disabled}
       >
         <FiTrash2 />
       </button>
