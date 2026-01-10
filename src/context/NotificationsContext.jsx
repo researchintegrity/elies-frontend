@@ -2,20 +2,27 @@
 /**
  * Global Notifications Context
  * 
- * Provides notification state management for worker process completion alerts.
- * Tracks PDF extraction and analysis task completions.
+ * Provides real-time notification management using a hybrid approach:
+ * 1. Server-Sent Events (SSE) for instant updates (if supported by backend configuration)
+ * 2. Polling as a robust fallback to ensure notifications are delivered even if SSE fails
+ *    or is blocked by proxies/firewalls.
+ * 
+ * Connects to /jobs/stream and polls /jobs/stats or /jobs.
  * 
  * @module NotificationsContext
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import { api } from '../services/api';
+import { API_BASE_URL } from '../config/api';
 import { useAuth } from './AuthContext';
+import { showToast } from '../utils/alert';
 
 // =============================================================================
 // Constants
 // =============================================================================
-const POLLING_INTERVAL = 15000; // 15 seconds
-const MAX_NOTIFICATIONS = 50; // Maximum notifications to store
+const MAX_NOTIFICATIONS = 50;
+const RECONNECT_DELAY = 3000; // 3 seconds before reconnect attempt
+const MAX_RECONNECT_ATTEMPTS = 5;
+const POLL_INTERVAL = 3000; // Poll every 3 seconds
 
 // =============================================================================
 // Context Definition
@@ -43,11 +50,47 @@ export const NotificationsProvider = ({ children }) => {
     // --- State ---
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
-    const [isPolling, setIsPolling] = useState(true);
+    const [isConnected, setIsConnected] = useState(false);
+    const [connectionError, setConnectionError] = useState(null);
 
-    // Track previous states to detect changes
-    const prevDocumentsRef = useRef(new Map()); // docId -> extraction_status
-    const prevAnalysesRef = useRef(new Map()); // analysisId -> status
+    // Refs for SSE management
+    const eventSourceRef = useRef(null);
+    const reconnectAttempts = useRef(0);
+    const reconnectTimeoutRef = useRef(null);
+
+    // Refs for Polling management
+    const pollIntervalRef = useRef(null);
+    const knownJobStatuses = useRef({}); // Map of job_id -> status
+
+    // Event listeners - used for cross-component communication
+    const listenersRef = useRef(new Set());
+
+    // ==========================================================================
+    // Event Listener System (for Analysis Dashboard updates)
+    // ==========================================================================
+
+    /**
+     * Subscribe to job events.
+     * @param {Function} callback - Called with (eventType, data) when job events occur
+     * @returns {Function} Unsubscribe function
+     */
+    const subscribeToEvents = useCallback((callback) => {
+        listenersRef.current.add(callback);
+        return () => listenersRef.current.delete(callback);
+    }, []);
+
+    /**
+     * Notify all listeners of an event
+     */
+    const notifyListeners = useCallback((eventType, data) => {
+        listenersRef.current.forEach(callback => {
+            try {
+                callback(eventType, data);
+            } catch (err) {
+                console.error('Error in event listener:', err);
+            }
+        });
+    }, []);
 
     // ==========================================================================
     // Notification Management
@@ -55,11 +98,6 @@ export const NotificationsProvider = ({ children }) => {
 
     /**
      * Add a new notification.
-     * @param {Object} notification - Notification object
-     * @param {string} notification.type - 'pdf_extraction' | 'analysis'
-     * @param {string} notification.status - 'completed' | 'failed'
-     * @param {string} notification.title - Notification title
-     * @param {string} notification.message - Notification message
      */
     const addNotification = useCallback((notification) => {
         const newNotification = {
@@ -79,7 +117,6 @@ export const NotificationsProvider = ({ children }) => {
 
     /**
      * Mark a notification as read.
-     * @param {string} notificationId - Notification ID
      */
     const markAsRead = useCallback((notificationId) => {
         setNotifications(prev =>
@@ -105,173 +142,367 @@ export const NotificationsProvider = ({ children }) => {
     }, []);
 
     // ==========================================================================
-    // Polling Logic
+    // Polling System (Fallback)
     // ==========================================================================
 
-    /**
-     * Check for document extraction status changes.
-     */
-    const checkDocumentUpdates = useCallback(async () => {
-        try {
-            // Use paginated API format (per_page max is 24 on backend)
-            const response = await api.get('/documents', { page: 1, per_page: 24 });
-            console.log(response);
-            // Backend returns { items: [...], total, page, ... }
-            const data = response?.items || [];
-            if (!Array.isArray(data)) return;
+    const handleJobUpdate = useCallback((job) => {
+        // Job type labels for notifications
+        const typeLabels = {
+            'image_extraction': 'Extração de PDF',
+            'image_upload': 'Upload de Imagem',
+            'panel_extraction': 'Extração de Painel',
+            'copy_move_single': 'Copy-Move',
+            'copy_move_cross': 'Copy-Move Cross',
+            'trufor': 'TruFor',
+            'provenance': 'Proveniência',
+            'watermark_removal': 'Remoção de Marca D\'água'
+        };
 
-            const currentDocs = new Map();
+        const jobTypeName = typeLabels[job.job_type] || job.job_type || 'Job';
+        const data = {
+            job_id: job.job_id,
+            job_type: job.job_type,
+            status: job.status,
+            title: job.title,
+            error: job.error ? job.error[0] : null
+        };
 
-            data.forEach(doc => {
-                const docId = doc._id;
-                const status = doc.extraction_status;
-                currentDocs.set(docId, status);
-
-                // Check if this document changed from processing/pending to completed/failed
-                const prevStatus = prevDocumentsRef.current.get(docId);
-
-                if (prevStatus && (prevStatus === 'processing' || prevStatus === 'pending')) {
-                    if (status === 'completed') {
-                        addNotification({
-                            type: 'pdf_extraction',
-                            status: 'completed',
-                            title: 'PDF Processado',
-                            message: `"${doc.filename}" foi processado com sucesso.`,
-                            documentId: docId,
-                            filename: doc.filename
-                        });
-                    } else if (status === 'failed') {
-                        addNotification({
-                            type: 'pdf_extraction',
-                            status: 'failed',
-                            title: 'Falha no Processamento',
-                            message: `Erro ao processar "${doc.filename}".`,
-                            documentId: docId,
-                            filename: doc.filename
-                        });
-                    }
-                }
+        if (job.status === 'completed') {
+            addNotification({
+                type: job.job_type,
+                status: 'completed',
+                title: `${jobTypeName} Concluído`,
+                message: job.title || `${jobTypeName} foi concluído com sucesso.`,
+                jobId: job.job_id
             });
-
-            prevDocumentsRef.current = currentDocs;
-        } catch (err) {
-            console.warn('Error checking document updates:', err);
+            showToast(job.title || `${jobTypeName} Concluído`, 'success');
+            notifyListeners('job_completed', data);
+        } else if (job.status === 'failed') {
+            addNotification({
+                type: job.job_type,
+                status: 'failed',
+                title: `${jobTypeName} Falhou`,
+                message: data.error || `Erro ao processar ${jobTypeName}.`,
+                jobId: job.job_id
+            });
+            showToast(data.error || `${jobTypeName} Falhou`, 'error');
+            notifyListeners('job_failed', data);
+        } else {
+            notifyListeners('job_progress', data);
         }
-    }, [addNotification]);
+    }, [addNotification, notifyListeners]);
 
-    /**
-     * Check for analysis status changes.
-     */
-    const checkAnalysisUpdates = useCallback(async () => {
-        try {
-            // Fetch recent analyses (processing and recently completed)
-            const [processingRes, recentRes] = await Promise.all([
-                api.listAnalyses({ status: 'processing', per_page: 20 }),
-                api.listAnalyses({ per_page: 30, sort_by: 'updated_at', order: 'desc' })
-            ]);
-
-            const processingAnalyses = processingRes?.data || [];
-            const recentAnalyses = recentRes?.data || [];
-
-            // Combine and deduplicate
-            const allAnalyses = [...processingAnalyses];
-            recentAnalyses.forEach(a => {
-                if (!allAnalyses.find(x => x._id === a._id)) {
-                    allAnalyses.push(a);
-                }
-            });
-
-            const currentAnalyses = new Map();
-
-            // Analysis type labels
-            const typeLabels = {
-                'single_image_copy_move': 'Copy-Move',
-                'cross_image_copy_move': 'Copy-Move Cross',
-                'trufor': 'TruFor',
-                'provenance': 'Provenance',
-                'screening_tool': 'Screening Tool'
-            };
-
-            allAnalyses.forEach(analysis => {
-                const analysisId = analysis._id;
-                const status = analysis.status;
-                currentAnalyses.set(analysisId, status);
-
-                // Check if this analysis changed from processing/pending to completed/failed
-                const prevStatus = prevAnalysesRef.current.get(analysisId);
-
-                if (prevStatus && (prevStatus === 'processing' || prevStatus === 'pending')) {
-                    const typeName = typeLabels[analysis.analysis_type] || analysis.analysis_type;
-
-                    if (status === 'completed') {
-                        addNotification({
-                            type: 'analysis',
-                            status: 'completed',
-                            title: `${typeName} Concluído`,
-                            message: `Análise ${typeName} foi concluída com sucesso.`,
-                            analysisId: analysisId,
-                            analysisType: analysis.analysis_type
-                        });
-                    } else if (status === 'failed') {
-                        addNotification({
-                            type: 'analysis',
-                            status: 'failed',
-                            title: `${typeName} Falhou`,
-                            message: `Erro na análise ${typeName}.`,
-                            analysisId: analysisId,
-                            analysisType: analysis.analysis_type
-                        });
-                    }
-                }
-            });
-
-            prevAnalysesRef.current = currentAnalyses;
-        } catch (err) {
-            console.warn('Error checking analysis updates:', err);
-        }
-    }, [addNotification]);
-
-    /**
-     * Run all checks.
-     */
-    const checkForUpdates = useCallback(async () => {
+    const pollJobs = useCallback(async () => {
         if (!isAuthenticated) return;
 
-        await Promise.all([
-            checkDocumentUpdates(),
-            checkAnalysisUpdates()
-        ]);
-    }, [isAuthenticated, checkDocumentUpdates, checkAnalysisUpdates]);
+        try {
+            const token = localStorage.getItem('authToken');
+            if (!token) return;
+
+            // Fetch recent jobs to check status
+            const response = await fetch(`${API_BASE_URL}/jobs?per_page=20&page=1`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) return;
+
+            const data = await response.json();
+            const jobs = data.items || [];
+
+            jobs.forEach(job => {
+                const prevStatus = knownJobStatuses.current[job.job_id];
+                const currentStatus = job.status;
+
+                // If we haven't seen this job before, just track it
+                if (!prevStatus) {
+                    knownJobStatuses.current[job.job_id] = currentStatus;
+                    // Check if it's a very recent completion (within last 2 intervals)
+                    // This helps show notifications for jobs that finished just before page load
+                    const isRecent = job.updated_at && (new Date() - new Date(job.updated_at)) < (POLL_INTERVAL * 2);
+
+                    if (isRecent && (currentStatus === 'completed' || currentStatus === 'failed')) {
+                        handleJobUpdate(job);
+                    }
+                    return;
+                }
+
+                // If status changed
+                if (prevStatus !== currentStatus) {
+                    knownJobStatuses.current[job.job_id] = currentStatus;
+
+                    // Only notify on final states or significant progress
+                    if (currentStatus === 'completed' || currentStatus === 'failed') {
+                        handleJobUpdate(job);
+                    }
+                }
+            });
+
+        } catch (error) {
+            console.error('Polling error:', error);
+        }
+    }, [isAuthenticated, handleJobUpdate]);
 
     // ==========================================================================
-    // Polling Effect
+    // SSE Connection Management
     // ==========================================================================
 
+    /**
+     * Handle incoming SSE message
+     */
+    const handleMessage = useCallback((event) => {
+        try {
+            const data = JSON.parse(event.data);
+
+            if (data.job_id) {
+                knownJobStatuses.current[data.job_id] = data.status;
+            }
+
+            // Job type labels for notifications
+            const typeLabels = {
+                'image_extraction': 'Extração de PDF',
+                'image_upload': 'Upload de Imagem',
+                'panel_extraction': 'Extração de Painel',
+                'copy_move_single': 'Copy-Move',
+                'copy_move_cross': 'Copy-Move Cross',
+                'trufor': 'TruFor',
+                'provenance': 'Proveniência',
+                'watermark_removal': 'Remoção de Marca D\'água'
+            };
+
+            const jobTypeName = typeLabels[data.job_type] || data.job_type || 'Job';
+
+            // Handle different event types
+            switch (data.event) {
+                case 'job_started':
+                    // Optionally show a "started" notification
+                    break;
+
+                case 'job_progress':
+                    // Could update a progress indicator if needed
+                    notifyListeners('job_progress', data);
+                    break;
+
+                case 'job_completed':
+                    addNotification({
+                        type: data.job_type,
+                        status: 'completed',
+                        title: `${jobTypeName} Concluído`,
+                        message: data.title || `${jobTypeName} foi concluído com sucesso.`,
+                        jobId: data.job_id
+                    });
+                    showToast(data.title || `${jobTypeName} Concluído`, 'success');
+                    notifyListeners('job_completed', data);
+                    break;
+
+                case 'job_failed':
+                    addNotification({
+                        type: data.job_type,
+                        status: 'failed',
+                        title: `${jobTypeName} Falhou`,
+                        message: data.error || `Erro ao processar ${jobTypeName}.`,
+                        jobId: data.job_id
+                    });
+                    showToast(data.error || `${jobTypeName} Falhou`, 'error');
+                    notifyListeners('job_failed', data);
+                    break;
+
+                default:
+                    console.log('Unknown SSE event:', data.event);
+            }
+        } catch (err) {
+            console.error('Error parsing SSE message:', err);
+        }
+    }, [addNotification, notifyListeners]);
+
+    /**
+     * Connect to SSE stream
+     */
+    const connect = useCallback(() => {
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+            console.warn('No auth token, cannot connect to SSE');
+            return;
+        }
+
+        // Close existing connection
+        if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+        }
+
+        // Clear any pending reconnect
+        if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+            reconnectTimeoutRef.current = null;
+        }
+
+        // Create SSE connection using fetch with headers (EventSource doesn't support headers)
+        // We'll use a custom implementation with fetch and ReadableStream
+        const controller = new AbortController();
+
+        fetch(`${API_BASE_URL}/jobs/stream`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'text/event-stream',
+                'Cache-Control': 'no-cache'
+            },
+            signal: controller.signal
+        }).then(response => {
+            if (!response.ok) {
+                throw new Error(`SSE connection failed: ${response.status}`);
+            }
+
+            setIsConnected(true);
+            setConnectionError(null);
+            reconnectAttempts.current = 0;
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            const processStream = async () => {
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read();
+
+                        if (done) {
+                            console.log('SSE stream closed');
+                            setIsConnected(false);
+                            scheduleReconnect();
+                            break;
+                        }
+
+                        buffer += decoder.decode(value, { stream: true });
+
+                        // Process complete messages
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const data = line.slice(6);
+                                if (data.trim()) {
+                                    handleMessage({ data });
+                                }
+                            }
+                            // Ignore keepalive comments (lines starting with ':')
+                        }
+                    }
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error('SSE stream error:', err);
+                        setIsConnected(false);
+                        scheduleReconnect();
+                    }
+                }
+            };
+
+            processStream();
+
+            // Store controller for cleanup
+            eventSourceRef.current = { close: () => controller.abort() };
+
+        }).catch(err => {
+            if (err.name !== 'AbortError') {
+                console.error('SSE connection error:', err);
+                setConnectionError(err.message);
+                setIsConnected(false);
+                scheduleReconnect();
+            }
+        });
+
+    }, [handleMessage]);
+
+    /**
+     * Schedule a reconnection attempt
+     */
+    const scheduleReconnect = useCallback(() => {
+        if (reconnectAttempts.current >= MAX_RECONNECT_ATTEMPTS) {
+            console.warn('Max SSE reconnect attempts reached');
+            setConnectionError('Unable to connect to notifications server');
+            return;
+        }
+
+        reconnectAttempts.current++;
+        const delay = RECONNECT_DELAY * reconnectAttempts.current;
+
+        console.log(`Scheduling SSE reconnect in ${delay}ms (attempt ${reconnectAttempts.current})`);
+
+        reconnectTimeoutRef.current = setTimeout(() => {
+            if (localStorage.getItem('authToken')) {
+                connect();
+            }
+        }, delay);
+    }, [connect]);
+
+    /**
+     * Disconnect from SSE stream
+     */
+    const disconnect = useCallback(() => {
+        if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+        }
+        if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+            reconnectTimeoutRef.current = null;
+        }
+        setIsConnected(false);
+        reconnectAttempts.current = 0;
+    }, []);
+
+    // ==========================================================================
+    // Effects
+    // ==========================================================================
+
+    // Connect/disconnect based on auth state
     useEffect(() => {
-        if (!isAuthenticated || !isPolling) return;
+        if (isAuthenticated) {
+            // Start SSE
+            connect();
 
-        // Initial check
-        checkForUpdates();
+            // Start Polling
+            pollJobs(); // Initial poll
+            pollIntervalRef.current = setInterval(pollJobs, POLL_INTERVAL);
+        } else {
+            disconnect();
+            if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
+            }
+        }
 
-        // Set up interval
-        const interval = setInterval(checkForUpdates, POLLING_INTERVAL);
-
-        return () => clearInterval(interval);
-    }, [isAuthenticated, isPolling, checkForUpdates]);
+        return () => {
+            disconnect();
+            if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
+            }
+        };
+    }, [isAuthenticated, connect, disconnect, pollJobs]);
 
     // ==========================================================================
     // Context Value
     // ==========================================================================
     const value = {
+        // Notifications
         notifications,
         unreadCount,
-        isPolling,
-        setIsPolling,
         addNotification,
         markAsRead,
         markAllAsRead,
         clearAll,
-        checkForUpdates // Manual trigger
+
+        // Connection state
+        isConnected,
+        connectionError,
+        reconnect: connect,
+
+        // Event subscription (for Analysis Dashboard real-time updates)
+        subscribeToEvents
     };
 
     return (

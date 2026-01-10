@@ -52,6 +52,7 @@ import {
     FiRotateCcw
 } from 'react-icons/fi';
 import { useLanguage } from '../context/LanguageContext';
+import { useNotifications } from '../context/NotificationsContext';
 import { api } from '../services/api';
 import { API_BASE_URL } from '../config/api';
 import { showAlert, showToast } from '../utils/alert';
@@ -70,7 +71,6 @@ const getFullImageUrl = (imageId) => {
 };
 
 // --- Constants ---
-const AUTO_REFRESH_INTERVAL = 5000; // 5 seconds for processing analyses
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
@@ -118,6 +118,11 @@ const ANALYSIS_TYPE_CONFIG = {
         icon: FiExternalLink,
         color: 'gray',
         labelKey: 'analysisDashboard.types.screeningTool'
+    },
+    document_extraction: {
+        icon: FiFileText,
+        color: 'cyan',
+        labelKey: 'analysisDashboard.types.documentExtraction' // Need to ensure this translation key exists or provide fallback
     }
 };
 
@@ -737,7 +742,13 @@ const AnalysisListRowCompact = ({ analysis, isActive, onClick, onFilterByImage, 
 
 // Details Panel for Split View
 const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage, onViewResults, onNext, onPrev, hasNext, hasPrev, activeTab: externalActiveTab, onTabChange, t, locale }) => {
-    const [internalActiveTab, setInternalActiveTab] = useState(analysis.type === 'cross_image_copy_move' ? 'comparison' : 'source');
+    // Determine default tab: error for failed, comparison for cross-image, source otherwise
+    const getDefaultTab = () => {
+        if (analysis.status === 'failed' && analysis.error) return 'error';
+        if (analysis.type === 'cross_image_copy_move') return 'comparison';
+        return 'source';
+    };
+    const [internalActiveTab, setInternalActiveTab] = useState(getDefaultTab());
 
     // Sync with external tab state if provided
     const activeTab = externalActiveTab || internalActiveTab;
@@ -1025,6 +1036,7 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
                         {activeTab === 'comparison' && t('analysisDashboard.tabComparison')}
                         {activeTab === 'result' && availableResults.length > 0 && availableResults[currentResultIndex] && t(availableResults[currentResultIndex].label)}
                         {activeTab === 'result' && (!availableResults.length || !availableResults[currentResultIndex]) && t('analysisDashboard.tabResult')}
+                        {activeTab === 'error' && (t('analysisDashboard.tabError') || 'Error Log')}
                     </div>
                 </div>
 
@@ -1253,16 +1265,40 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
                                     </>
                                 )}
                             </div>
+                        ) : activeTab === 'error' && analysis.status === 'failed' && analysis.error ? (
+                            <div className="w-full h-full flex items-center justify-center p-8">
+                                <div className="max-w-2xl w-full bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6 shadow-lg">
+                                    <div className="flex items-start gap-4">
+                                        <div className="flex-shrink-0">
+                                            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-800/30 flex items-center justify-center">
+                                                <FiAlertCircle size={24} className="text-red-600 dark:text-red-400" />
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="text-lg font-semibold text-red-800 dark:text-red-300 mb-2">
+                                                {t('analysisDashboard.analysisFailed') || 'Analysis Failed'}
+                                            </h3>
+                                            <div className="bg-red-100/50 dark:bg-red-950/50 rounded-lg p-4 mt-3">
+                                                <pre className="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap break-words font-mono leading-relaxed">
+                                                    {analysis.error}
+                                                </pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         ) : (
                             <div className="text-gray-400 flex flex-col items-center gap-2">
                                 {/* Fallback for no preview */}
                                 <span className="text-sm">Preview not available</span>
-                                <button
-                                    onClick={() => onViewResults(analysis)}
-                                    className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
-                                >
-                                    {t('analysisDashboard.viewResults') || 'View Full Results'}
-                                </button>
+                                {analysis.status === 'completed' && (
+                                    <button
+                                        onClick={() => onViewResults(analysis)}
+                                        className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+                                    >
+                                        {t('analysisDashboard.viewResults') || 'View Full Results'}
+                                    </button>
+                                )}
                             </div>
                         )
                     )}
@@ -1313,6 +1349,20 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
                             {t('analysisDashboard.tabResult')}
                         </button>
                     )}
+                    {analysis.status === 'failed' && analysis.error && (
+                        <button
+                            onClick={() => setActiveTab('error')}
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'error'
+                                ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-400 shadow-sm'
+                                : 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
+                                }`}
+                        >
+                            <span className="flex items-center gap-1">
+                                <FiAlertCircle size={12} />
+                                {t('analysisDashboard.tabError') || 'Error'}
+                            </span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -1334,6 +1384,21 @@ const AnalysisDetailsPanel = ({ analysis, onClose, onReproduce, onFilterByImage,
                         </div>
                     </div>
                 </div>
+
+                {/* Error Log for Failed Analyses */}
+                {analysis.status === 'failed' && analysis.error && (
+                    <div className="mb-6">
+                        <h4 className="text-sm font-semibold text-red-600 dark:text-red-400 mb-3 flex items-center gap-2">
+                            <FiAlertCircle size={14} />
+                            {t('analysisDashboard.errorLog') || 'Error Log'}
+                        </h4>
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                            <pre className="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap break-words font-mono">
+                                {analysis.error}
+                            </pre>
+                        </div>
+                    </div>
+                )}
 
                 {/* Parameters */}
                 {analysis.parameters && Object.keys(analysis.parameters).length > 0 && (
@@ -1683,6 +1748,7 @@ const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale })
 // --- Main Component ---
 const AnalysisDashboardPage = () => {
     const { t, locale } = useLanguage();
+    const { subscribeToEvents } = useNotifications();
 
     // State
     const [analyses, setAnalyses] = useState([]);
@@ -1741,23 +1807,84 @@ const AnalysisDashboardPage = () => {
             // Build query params
             const params = {
                 page: currentPage,
-                per_page: pageSize
+                per_page: pageSize,
+                sort_by: 'created_at',
+                order: 'desc'
             };
 
             if (filters.type) params.type = filters.type;
             if (filters.status) params.status = filters.status;
-            if (filters.source_image_id) params.source_image_id = filters.source_image_id;
-            if (filters.date_from) params.date_from = new Date(filters.date_from).toISOString();
-            if (filters.date_to) params.date_to = new Date(filters.date_to).toISOString();
+            if (filters.date_from) params.date_from = filters.date_from;
+            if (filters.date_to) params.date_to = filters.date_to;
 
-            const response = await api.get('/analyses', params);
+            // Fetch Analyses
+            const analysesPromise = api.get('/analyses', params);
 
-            if (response.success) {
-                setAnalyses(response.data);
-                setTotalItems(response.pagination.total_items);
-                setTotalPages(response.pagination.total_pages);
+            // Fetch Documents (also paginated, but we'll try to merge best effort)
+            // Ideally backend would have a unified 'events' feed, but we'll simulate it.
+            const documentsPromise = api.get('/documents', {
+                page: currentPage,
+                per_page: pageSize
+            });
+
+            const [analysesRes, documentsRes] = await Promise.all([analysesPromise, documentsPromise]);
+
+            if (analysesRes.success) {
+                let mergedItems = [...analysesRes.data];
+
+                // Process Documents if successful
+                if (documentsRes && documentsRes.items) {
+                    let mappedDocs = documentsRes.items.map(doc => ({
+                        _id: doc._id,
+                        id: doc._id,
+                        type: 'document_extraction', // Custom type for UI
+                        status: doc.extraction_status === 'processing' ? 'processing' :
+                            doc.extraction_status === 'completed' ? 'completed' :
+                                doc.extraction_status === 'failed' ? 'failed' : 'pending',
+                        created_at: doc.uploaded_date,
+                        updated_at: doc.uploaded_date, // fallback
+                        source_image_id: null, // No source image for a PDF
+                        parameters: { filename: doc.filename }, // Store filename here
+                        results: { extracted_count: doc.extracted_image_count },
+                        user_id: doc.user_id
+                    }));
+
+                    // Apply client-side filtering for documents (since backend doesn't support it yet)
+                    if (filters.type) {
+                        if (filters.type !== 'document_extraction') {
+                            mappedDocs = []; // If filtering by specific analysis type, hide docs
+                        }
+                    }
+
+                    if (filters.status) {
+                        mappedDocs = mappedDocs.filter(doc => doc.status === filters.status);
+                    }
+
+                    if (filters.date_from) {
+                        const fromDate = new Date(filters.date_from);
+                        mappedDocs = mappedDocs.filter(doc => new Date(doc.created_at) >= fromDate);
+                    }
+
+                    if (filters.date_to) {
+                        const toDate = new Date(filters.date_to);
+                        mappedDocs = mappedDocs.filter(doc => new Date(doc.created_at) <= toDate);
+                    }
+
+                    // Simple merge strategy: Add docs to the list
+                    // Note: This messes up server-side pagination slightly since we are
+                    // merging two paginated lists. A true fix requires backend changes.
+                    // For now, we concat and re-sort.
+                    mergedItems = [...mergedItems, ...mappedDocs];
+                    mergedItems.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                }
+
+                setAnalyses(mergedItems);
+
+                // Use the analyses pagination as the "master" for now
+                setTotalItems(analysesRes.pagination.total_items);
+                setTotalPages(analysesRes.pagination.total_pages);
             } else {
-                throw new Error(response.message || 'Failed to fetch analyses');
+                throw new Error(analysesRes.message || 'Failed to fetch analyses');
             }
         } catch (err) {
             console.error('Failed to fetch analyses:', err);
@@ -1791,17 +1918,19 @@ const AnalysisDashboardPage = () => {
         fetchStats();
     }, [fetchStats, analyses]);
 
-    // Auto-refresh for processing analyses
+    // Real-time updates via SSE
     useEffect(() => {
-        const hasProcessing = analyses.some(a => a.status === 'processing' || a.status === 'pending');
-        if (!hasProcessing) return;
+        const unsubscribe = subscribeToEvents((eventType, data) => {
+            if (eventType === 'job_completed' || eventType === 'job_failed') {
+                // Refresh list if a relevant analysis job finished
+                console.log('Job update received:', eventType, data);
+                fetchAnalyses(true); // Silent refresh
+                fetchStats(); // Update stats too
+            }
+        });
 
-        const intervalId = setInterval(() => {
-            fetchAnalyses(true); // Silent refresh
-        }, AUTO_REFRESH_INTERVAL);
-
-        return () => clearInterval(intervalId);
-    }, [analyses, fetchAnalyses]);
+        return unsubscribe;
+    }, [subscribeToEvents, fetchAnalyses, fetchStats]);
 
     // Clear selection when view mode or split view changes
     useEffect(() => {

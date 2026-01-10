@@ -227,18 +227,18 @@ export const useDocuments = () => {
             setDocuments(prev => prev.filter(d => d.id !== doc.id));
 
             // Update pagination count
-            setPagination(prev => {  
-                const newTotal = Math.max(0, prev.totalDocuments - 1);  
-                const pageSize = prev.pageSize || DEFAULT_PAGE_SIZE;  
-                const totalPages = Math.max(1, Math.ceil(newTotal / pageSize));  
-                const newCurrentPage = Math.min(prev.currentPage, totalPages);  
+            setPagination(prev => {
+                const newTotal = Math.max(0, prev.totalDocuments - 1);
+                const pageSize = prev.pageSize || DEFAULT_PAGE_SIZE;
+                const totalPages = Math.max(1, Math.ceil(newTotal / pageSize));
+                const newCurrentPage = Math.min(prev.currentPage, totalPages);
 
-                return {  
-                    ...prev,  
-                    totalDocuments: newTotal,  
-                    currentPage: newCurrentPage  
-                };  
-            });  
+                return {
+                    ...prev,
+                    totalDocuments: newTotal,
+                    currentPage: newCurrentPage
+                };
+            });
 
             showToast(t('document.deleteSuccess'), 'success');
             return true;

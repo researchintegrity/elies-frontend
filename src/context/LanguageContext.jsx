@@ -971,7 +971,8 @@ const translations = {
         'analysisDashboard.types.trufor': 'TruFor',
         'analysisDashboard.types.cbir': 'Busca CBIR',
         'analysisDashboard.types.provenance': 'Proveniência',
-        'analysisDashboard.types.screeningTool': 'Ferramenta de Análise',
+        'analysisDashboard.types.screeningTool': 'Ferramenta de Triagem',
+        'analysisDashboard.types.documentExtraction': 'Extração de Documento',
         'analysisDashboard.status.pending': 'Pendente',
         'analysisDashboard.status.processing': 'Processando',
         'analysisDashboard.status.completed': 'Concluída',
@@ -1044,6 +1045,9 @@ const translations = {
         'analysisDashboard.resultTypes.clusters': 'Agrupamentos',
         'analysisDashboard.resultTypes.result_image': 'Resultado',
         'analysisDashboard.deleted': 'Deletada',
+        'analysisDashboard.tabError': 'Erro',
+        'analysisDashboard.errorLog': 'Log de Erro',
+        'analysisDashboard.analysisFailed': 'A análise falhou',
 
         // Image Analysis - Save to Dashboard
         'analysis.saveToDashboard': 'Salvar no Painel',
@@ -2132,6 +2136,7 @@ const translations = {
         'analysisDashboard.types.cbir': 'CBIR Search',
         'analysisDashboard.types.provenance': 'Provenance',
         'analysisDashboard.types.screeningTool': 'Screening Tool',
+        'analysisDashboard.types.documentExtraction': 'Document Extraction',
         'analysisDashboard.status.pending': 'Pending',
         'analysisDashboard.status.processing': 'Processing',
         'analysisDashboard.status.completed': 'Completed',
@@ -2204,6 +2209,9 @@ const translations = {
         'analysisDashboard.resultTypes.clusters': 'Clusters',
         'analysisDashboard.resultTypes.result_image': 'Result Overlay',
         'analysisDashboard.deleted': 'Deleted',
+        'analysisDashboard.tabError': 'Error',
+        'analysisDashboard.errorLog': 'Error Log',
+        'analysisDashboard.analysisFailed': 'Analysis Failed',
 
         // Image Analysis - Save to Dashboard
         'analysis.saveToDashboard': 'Save to Dashboard',
