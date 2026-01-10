@@ -20,9 +20,54 @@ import { showToast } from '../utils/alert';
 // Constants
 // =============================================================================
 const MAX_NOTIFICATIONS = 50;
-const RECONNECT_DELAY = 3000; // 3 seconds before reconnect attempt
+const RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;
-const POLL_INTERVAL = 3000; // Poll every 3 seconds
+const POLL_INTERVAL = 3000;
+const STORAGE_KEY = 'elis_notifications';
+
+// Job type labels for notifications (used by SSE and Polling)
+const JOB_TYPE_LABELS = {
+    'image_extraction': 'Extração de PDF',
+    'image_upload': 'Upload de Imagem',
+    'panel_extraction': 'Extração de Painel',
+    'copy_move_single': 'Copy-Move',
+    'copy_move_cross': 'Copy-Move Cross',
+    'trufor': 'TruFor',
+    'provenance': 'Proveniência',
+    'watermark_removal': 'Remoção de Marca D\'água'
+};
+
+// =============================================================================
+// LocalStorage Helpers (simple & safe)
+// =============================================================================
+
+/** Load notifications from localStorage */
+const loadFromStorage = () => {
+    try {
+        const data = localStorage.getItem(STORAGE_KEY);
+        return data ? JSON.parse(data) : [];
+    } catch {
+        return [];
+    }
+};
+
+/** Save notifications to localStorage */
+const saveToStorage = (notifications) => {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
+    } catch {
+        // Ignore storage errors (quota exceeded, etc.)
+    }
+};
+
+/** Clear notifications from localStorage */
+const clearStorage = () => {
+    try {
+        localStorage.removeItem(STORAGE_KEY);
+    } catch {
+        // Ignore
+    }
+};
 
 // =============================================================================
 // Context Definition
@@ -47,9 +92,17 @@ export const useNotifications = () => {
 export const NotificationsProvider = ({ children }) => {
     const { isAuthenticated } = useAuth();
 
-    // --- State ---
-    const [notifications, setNotifications] = useState([]);
-    const [unreadCount, setUnreadCount] = useState(0);
+    // -------------------------------------------------------------------------
+    // State - Load from localStorage on init (only once)
+    // -------------------------------------------------------------------------
+    const [notifications, setNotifications] = useState(() => {
+        const stored = loadFromStorage();
+        return stored;
+    });
+    const [unreadCount, setUnreadCount] = useState(() => {
+        const stored = loadFromStorage();
+        return stored.filter(n => !n.read).length;
+    });
     const [isConnected, setIsConnected] = useState(false);
     const [connectionError, setConnectionError] = useState(null);
 
@@ -64,6 +117,30 @@ export const NotificationsProvider = ({ children }) => {
 
     // Event listeners - used for cross-component communication
     const listenersRef = useRef(new Set());
+
+    // Track previous auth state to detect logout
+    const wasAuthenticated = useRef(isAuthenticated);
+
+    // -------------------------------------------------------------------------
+    // Persist to localStorage when notifications change
+    // -------------------------------------------------------------------------
+    useEffect(() => {
+        saveToStorage(notifications);
+    }, [notifications]);
+
+    // -------------------------------------------------------------------------
+    // Clear storage on logout (only on actual logout, not initial load)
+    // -------------------------------------------------------------------------
+    useEffect(() => {
+        if (wasAuthenticated.current && !isAuthenticated) {
+            // User actually logged out
+            clearStorage();
+            setNotifications([]);
+            setUnreadCount(0);
+            knownJobStatuses.current = {};
+        }
+        wasAuthenticated.current = isAuthenticated;
+    }, [isAuthenticated]);
 
     // ==========================================================================
     // Event Listener System (for Analysis Dashboard updates)
@@ -117,12 +194,17 @@ export const NotificationsProvider = ({ children }) => {
 
     /**
      * Mark a notification as read.
+     * Only decrements unreadCount if notification was actually unread.
      */
     const markAsRead = useCallback((notificationId) => {
-        setNotifications(prev =>
-            prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
-        );
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        setNotifications(prev => {
+            const notification = prev.find(n => n.id === notificationId);
+            // Only decrement if it was unread
+            if (notification && !notification.read) {
+                setUnreadCount(count => Math.max(0, count - 1));
+            }
+            return prev.map(n => n.id === notificationId ? { ...n, read: true } : n);
+        });
     }, []);
 
     /**
@@ -146,19 +228,7 @@ export const NotificationsProvider = ({ children }) => {
     // ==========================================================================
 
     const handleJobUpdate = useCallback((job) => {
-        // Job type labels for notifications
-        const typeLabels = {
-            'image_extraction': 'Extração de PDF',
-            'image_upload': 'Upload de Imagem',
-            'panel_extraction': 'Extração de Painel',
-            'copy_move_single': 'Copy-Move',
-            'copy_move_cross': 'Copy-Move Cross',
-            'trufor': 'TruFor',
-            'provenance': 'Proveniência',
-            'watermark_removal': 'Remoção de Marca D\'água'
-        };
-
-        const jobTypeName = typeLabels[job.job_type] || job.job_type || 'Job';
+        const jobTypeName = JOB_TYPE_LABELS[job.job_type] || job.job_type || 'Job';
         const data = {
             job_id: job.job_id,
             job_type: job.job_type,
@@ -216,16 +286,11 @@ export const NotificationsProvider = ({ children }) => {
                 const prevStatus = knownJobStatuses.current[job.job_id];
                 const currentStatus = job.status;
 
-                // If we haven't seen this job before, just track it
+                // If we haven't seen this job before, just track it (don't notify)
+                // Notifications are persisted in localStorage, so we don't need
+                // to "recover" completions on page load
                 if (!prevStatus) {
                     knownJobStatuses.current[job.job_id] = currentStatus;
-                    // Check if it's a very recent completion (within last 2 intervals)
-                    // This helps show notifications for jobs that finished just before page load
-                    const isRecent = job.updated_at && (new Date() - new Date(job.updated_at)) < (POLL_INTERVAL * 2);
-
-                    if (isRecent && (currentStatus === 'completed' || currentStatus === 'failed')) {
-                        handleJobUpdate(job);
-                    }
                     return;
                 }
 
@@ -260,19 +325,7 @@ export const NotificationsProvider = ({ children }) => {
                 knownJobStatuses.current[data.job_id] = data.status;
             }
 
-            // Job type labels for notifications
-            const typeLabels = {
-                'image_extraction': 'Extração de PDF',
-                'image_upload': 'Upload de Imagem',
-                'panel_extraction': 'Extração de Painel',
-                'copy_move_single': 'Copy-Move',
-                'copy_move_cross': 'Copy-Move Cross',
-                'trufor': 'TruFor',
-                'provenance': 'Proveniência',
-                'watermark_removal': 'Remoção de Marca D\'água'
-            };
-
-            const jobTypeName = typeLabels[data.job_type] || data.job_type || 'Job';
+            const jobTypeName = JOB_TYPE_LABELS[data.job_type] || data.job_type || 'Job';
 
             // Handle different event types
             switch (data.event) {
