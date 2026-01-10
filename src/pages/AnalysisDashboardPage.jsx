@@ -283,9 +283,9 @@ const ParametersDisplay = ({ parameters, sourceImageId, targetImageId, t, defaul
     return (
         <div className="space-y-1">
             {finalDisplay.map((item, idx) => (
-                <div key={item.key + idx} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs">
-                    <span className="text-gray-500 dark:text-gray-400 font-medium">{item.key}:</span>
-                    <span className="text-gray-900 dark:text-gray-200 font-mono break-all text-right">
+                <div key={item.key + idx} className="flex flex-col sm:flex-row sm:items-center sm:justify-start gap-4 text-xs">
+                    <span className="text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">{item.key}:</span>
+                    <span className="text-gray-900 dark:text-gray-200 font-mono break-all text-left">
                         {typeof item.value === 'boolean' ? (item.value ? 'Yes' : 'No') : String(item.value)}
                     </span>
                 </div>
