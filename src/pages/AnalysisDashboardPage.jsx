@@ -2175,6 +2175,33 @@ const AnalysisDashboardPage = () => {
     // Check if any filters are active
     const hasActiveFilters = Object.values(filters).some(v => v !== null);
 
+    // Client-side text search filtering
+    const filteredAnalyses = useMemo(() => {
+        if (!searchQuery.trim()) return analyses;
+
+        const query = searchQuery.toLowerCase().trim();
+        return analyses.filter(analysis => {
+            // Search in ID
+            if (analysis._id?.toLowerCase().includes(query)) return true;
+            // Search in type
+            if (analysis.type?.toLowerCase().includes(query)) return true;
+            // Search in status
+            if (analysis.status?.toLowerCase().includes(query)) return true;
+            // Search in source image ID
+            if (analysis.source_image_id?.toLowerCase().includes(query)) return true;
+            // Search in target image ID
+            if (analysis.target_image_id?.toLowerCase().includes(query)) return true;
+            // Search in error message
+            if (analysis.error?.toLowerCase().includes(query)) return true;
+            // Search in parameters (convert to string for searching)
+            if (analysis.parameters) {
+                const paramsStr = JSON.stringify(analysis.parameters).toLowerCase();
+                if (paramsStr.includes(query)) return true;
+            }
+            return false;
+        });
+    }, [analyses, searchQuery]);
+
     // Memoized navigation handlers for split view to avoid creating new functions on every render
     const navigationHandlers = useMemo(() => {
         if (!selectedAnalysis) {
@@ -2470,7 +2497,7 @@ const AnalysisDashboardPage = () => {
                                 {t('common.tryAgain')}
                             </button>
                         </div>
-                    ) : analyses.length === 0 ? (
+                    ) : filteredAnalyses.length === 0 ? (
                         <EmptyState
                             title={t('analysisDashboard.noAnalyses')}
                             description={hasActiveFilters || searchQuery ? t('analysisDashboard.noMatchingAnalyses') : t('analysisDashboard.noAnalysesDescription')}
@@ -2487,7 +2514,7 @@ const AnalysisDashboardPage = () => {
                         }>
                             {/* Grid View */}
                             {viewMode === 'grid' && !isSplitView && (
-                                analyses.map(analysis => (
+                                filteredAnalyses.map(analysis => (
                                     <AnalysisCard
                                         key={analysis._id}
                                         analysis={analysis}
@@ -2508,7 +2535,7 @@ const AnalysisDashboardPage = () => {
                             {/* List View (full) */}
                             {viewMode === 'list' && !isSplitView && (
                                 <div className="space-y-3">
-                                    {analyses.map(analysis => (
+                                    {filteredAnalyses.map(analysis => (
                                         <AnalysisRow
                                             key={analysis._id}
                                             analysis={analysis}
@@ -2531,7 +2558,7 @@ const AnalysisDashboardPage = () => {
                             {isSplitView && (
                                 <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden flex flex-col h-full">
                                     <div className="flex-1 overflow-y-auto min-h-0">
-                                        {analyses.map(analysis => (
+                                        {filteredAnalyses.map(analysis => (
                                             <AnalysisListRowCompact
                                                 key={analysis._id}
                                                 analysis={analysis}
@@ -2567,7 +2594,7 @@ const AnalysisDashboardPage = () => {
                     )}
 
                     {/* Pagination - only show when not in split view or no selection */}
-                    {!loading && !error && analyses.length > 0 && !isSplitView && (
+                    {!loading && !error && filteredAnalyses.length > 0 && !isSplitView && (
                         <Pagination
                             currentPage={currentPage}
                             totalPages={totalPages}
