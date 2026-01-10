@@ -95,7 +95,7 @@ const NotificationItem = ({ notification, onMarkRead, t }) => {
 // Main Dropdown Component
 // =============================================================================
 const NotificationsDropdown = () => {
-    const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } = useNotifications();
+    const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll, isPolling } = useNotifications();
     const { t } = useLanguage();
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -133,6 +133,13 @@ const NotificationsDropdown = () => {
                     }`}
             >
                 <FiBell className="w-5 h-5" />
+
+                {/* Polling Active Indicator - Pulsing Green Dot */}
+                {isPolling && unreadCount === 0 && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white dark:ring-gray-900">
+                        <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-75"></span>
+                    </span>
+                )}
 
                 {/* Unread Badge */}
                 {unreadCount > 0 && (

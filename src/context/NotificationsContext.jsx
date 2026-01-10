@@ -105,6 +105,7 @@ export const NotificationsProvider = ({ children }) => {
     });
     const [isConnected, setIsConnected] = useState(false);
     const [connectionError, setConnectionError] = useState(null);
+    const [isPolling, setIsPolling] = useState(false); // Track if polling is active
 
     // Refs for SSE management
     const eventSourceRef = useRef(null);
@@ -518,10 +519,12 @@ export const NotificationsProvider = ({ children }) => {
             connect();
 
             // Start Polling
+            setIsPolling(true);
             pollJobs(); // Initial poll
             pollIntervalRef.current = setInterval(pollJobs, POLL_INTERVAL);
         } else {
             disconnect();
+            setIsPolling(false);
             if (pollIntervalRef.current) {
                 clearInterval(pollIntervalRef.current);
                 pollIntervalRef.current = null;
@@ -551,6 +554,7 @@ export const NotificationsProvider = ({ children }) => {
 
         // Connection state
         isConnected,
+        isPolling,
         connectionError,
         reconnect: connect,
 
