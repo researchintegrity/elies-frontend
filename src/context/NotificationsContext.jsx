@@ -14,6 +14,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../config/api';
 import { useAuth } from './AuthContext';
+import { useLanguage } from './LanguageContext';
 import { showToast } from '../utils/alert';
 
 // =============================================================================
@@ -24,18 +25,6 @@ const RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const POLL_INTERVAL = 3000;
 const STORAGE_KEY = 'elis_notifications';
-
-// Job type labels for notifications (used by SSE and Polling)
-const JOB_TYPE_LABELS = {
-    'image_extraction': 'Extração de PDF',
-    'image_upload': 'Upload de Imagem',
-    'panel_extraction': 'Extração de Painel',
-    'copy_move_single': 'Copy-Move',
-    'copy_move_cross': 'Copy-Move Cross',
-    'trufor': 'TruFor',
-    'provenance': 'Proveniência',
-    'watermark_removal': 'Remoção de Marca D\'água'
-};
 
 // =============================================================================
 // LocalStorage Helpers (simple & safe)
@@ -91,6 +80,7 @@ export const useNotifications = () => {
 // =============================================================================
 export const NotificationsProvider = ({ children }) => {
     const { isAuthenticated } = useAuth();
+    const { t } = useLanguage();
 
     // -------------------------------------------------------------------------
     // State - Load from localStorage on init (only once)
@@ -229,7 +219,8 @@ export const NotificationsProvider = ({ children }) => {
     // ==========================================================================
 
     const handleJobUpdate = useCallback((job) => {
-        const jobTypeName = JOB_TYPE_LABELS[job.job_type] || job.job_type || 'Job';
+        // Get translated job type name
+        const jobTypeName = t(`notifications.jobType.${job.job_type}`) || job.job_type || 'Job';
         const data = {
             job_id: job.job_id,
             job_type: job.job_type,
@@ -239,29 +230,33 @@ export const NotificationsProvider = ({ children }) => {
         };
 
         if (job.status === 'completed') {
+            const completed = t('notifications.completed');
+            const completedMsg = t('notifications.completedMessage');
             addNotification({
                 type: job.job_type,
                 status: 'completed',
-                title: `${jobTypeName} Concluído`,
-                message: job.title || `${jobTypeName} foi concluído com sucesso.`,
+                title: `${jobTypeName} ${completed}`,
+                message: job.title || `${jobTypeName} ${completedMsg}`,
                 jobId: job.job_id
             });
-            showToast(job.title || `${jobTypeName} Concluído`, 'success');
+            showToast(job.title || `${jobTypeName} ${completed}`, 'success');
             notifyListeners('job_completed', data);
         } else if (job.status === 'failed') {
+            const failed = t('notifications.failed');
+            const failedMsg = t('notifications.failedMessage');
             addNotification({
                 type: job.job_type,
                 status: 'failed',
-                title: `${jobTypeName} Falhou`,
-                message: data.error || `Erro ao processar ${jobTypeName}.`,
+                title: `${jobTypeName} ${failed}`,
+                message: data.error || `${failedMsg} ${jobTypeName}.`,
                 jobId: job.job_id
             });
-            showToast(data.error || `${jobTypeName} Falhou`, 'error');
+            showToast(data.error || `${jobTypeName} ${failed}`, 'error');
             notifyListeners('job_failed', data);
         } else {
             notifyListeners('job_progress', data);
         }
-    }, [addNotification, notifyListeners]);
+    }, [addNotification, notifyListeners, t]);
 
     const pollJobs = useCallback(async () => {
         if (!isAuthenticated) return;
@@ -326,7 +321,8 @@ export const NotificationsProvider = ({ children }) => {
                 knownJobStatuses.current[data.job_id] = data.status;
             }
 
-            const jobTypeName = JOB_TYPE_LABELS[data.job_type] || data.job_type || 'Job';
+            // Get translated job type name
+            const jobTypeName = t(`notifications.jobType.${data.job_type}`) || data.job_type || 'Job';
 
             // Handle different event types
             switch (data.event) {
@@ -339,29 +335,35 @@ export const NotificationsProvider = ({ children }) => {
                     notifyListeners('job_progress', data);
                     break;
 
-                case 'job_completed':
+                case 'job_completed': {
+                    const completed = t('notifications.completed');
+                    const completedMsg = t('notifications.completedMessage');
                     addNotification({
                         type: data.job_type,
                         status: 'completed',
-                        title: `${jobTypeName} Concluído`,
-                        message: data.title || `${jobTypeName} foi concluído com sucesso.`,
+                        title: `${jobTypeName} ${completed}`,
+                        message: data.title || `${jobTypeName} ${completedMsg}`,
                         jobId: data.job_id
                     });
-                    showToast(data.title || `${jobTypeName} Concluído`, 'success');
+                    showToast(data.title || `${jobTypeName} ${completed}`, 'success');
                     notifyListeners('job_completed', data);
                     break;
+                }
 
-                case 'job_failed':
+                case 'job_failed': {
+                    const failed = t('notifications.failed');
+                    const failedMsg = t('notifications.failedMessage');
                     addNotification({
                         type: data.job_type,
                         status: 'failed',
-                        title: `${jobTypeName} Falhou`,
-                        message: data.error || `Erro ao processar ${jobTypeName}.`,
+                        title: `${jobTypeName} ${failed}`,
+                        message: data.error || `${failedMsg} ${jobTypeName}.`,
                         jobId: data.job_id
                     });
-                    showToast(data.error || `${jobTypeName} Falhou`, 'error');
+                    showToast(data.error || `${jobTypeName} ${failed}`, 'error');
                     notifyListeners('job_failed', data);
                     break;
+                }
 
                 default:
                     console.log('Unknown SSE event:', data.event);
@@ -369,7 +371,7 @@ export const NotificationsProvider = ({ children }) => {
         } catch (err) {
             console.error('Error parsing SSE message:', err);
         }
-    }, [addNotification, notifyListeners]);
+    }, [addNotification, notifyListeners, t]);
 
     /**
      * Connect to SSE stream
