@@ -600,8 +600,41 @@ export const api = {
     getRelationshipGraph: async (imageId, maxDepth = 5) => {
         return api.get(`/relationships/image/${imageId}/graph`, { max_depth: maxDepth });
     },
+
+    // --- Jobs API ---
+
+    /**
+     * Get job statistics for dashboard
+     * @returns {Promise<{total_jobs: number, pending: number, processing: number, completed: number, failed: number, by_type: Object}>}
+     */
+    getJobStats: async () => {
+        return api.get('/jobs/stats');
+    },
+
+    /**
+     * List jobs with pagination and filters
+     * @param {Object} params - Query parameters
+     * @param {string} params.job_type - Filter by job type
+     * @param {string} params.status - Filter by status
+     * @param {number} params.page - Page number (default: 1)
+     * @param {number} params.per_page - Items per page (default: 20)
+     * @returns {Promise<{items: Array, total: number, page: number, per_page: number, total_pages: number}>}
+     */
+    listJobs: async (params = {}) => {
+        return api.get('/jobs', params);
+    },
+
+    /**
+     * Get a specific job by ID
+     * @param {string} jobId - Job ID
+     * @returns {Promise<Object>} Job details
+     */
+    getJob: async (jobId) => {
+        return api.get(`/jobs/${jobId}`);
+    },
 };
 
 export { API_BASE_URL };
 export default api;
+
 

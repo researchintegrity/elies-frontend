@@ -61,6 +61,20 @@ const translations = {
         'notifications.empty': 'Nenhuma notificação',
         'notifications.emptyDesc': 'Você será notificado quando processos terminarem',
         'notifications.justNow': 'Agora',
+        // Job types
+        'notifications.jobType.image_extraction': 'Extração de PDF',
+        'notifications.jobType.image_upload': 'Upload de Imagem',
+        'notifications.jobType.panel_extraction': 'Extração de Painel',
+        'notifications.jobType.copy_move_single': 'Copy-Move',
+        'notifications.jobType.copy_move_cross': 'Copy-Move Cross',
+        'notifications.jobType.trufor': 'TruFor',
+        'notifications.jobType.provenance': 'Proveniência',
+        'notifications.jobType.watermark_removal': 'Remoção de Marca d\'água',
+        // Job status messages
+        'notifications.completed': 'Concluído',
+        'notifications.failed': 'Falhou',
+        'notifications.completedMessage': 'foi concluído com sucesso.',
+        'notifications.failedMessage': 'Erro ao processar',
 
         // Common
         'common.loading': 'Carregando...',
@@ -971,7 +985,8 @@ const translations = {
         'analysisDashboard.types.trufor': 'TruFor',
         'analysisDashboard.types.cbir': 'Busca CBIR',
         'analysisDashboard.types.provenance': 'Proveniência',
-        'analysisDashboard.types.screeningTool': 'Ferramenta de Análise',
+        'analysisDashboard.types.screeningTool': 'Ferramenta de Triagem',
+        'analysisDashboard.types.documentExtraction': 'Extração de Documento',
         'analysisDashboard.status.pending': 'Pendente',
         'analysisDashboard.status.processing': 'Processando',
         'analysisDashboard.status.completed': 'Concluída',
@@ -1044,6 +1059,9 @@ const translations = {
         'analysisDashboard.resultTypes.clusters': 'Agrupamentos',
         'analysisDashboard.resultTypes.result_image': 'Resultado',
         'analysisDashboard.deleted': 'Deletada',
+        'analysisDashboard.tabError': 'Erro',
+        'analysisDashboard.errorLog': 'Log de Erro',
+        'analysisDashboard.analysisFailed': 'A análise falhou',
 
         // Image Analysis - Save to Dashboard
         'analysis.saveToDashboard': 'Salvar no Painel',
@@ -1222,6 +1240,20 @@ const translations = {
         'notifications.empty': 'No notifications',
         'notifications.emptyDesc': 'You will be notified when processes complete',
         'notifications.justNow': 'Just now',
+        // Job types
+        'notifications.jobType.image_extraction': 'PDF Extraction',
+        'notifications.jobType.image_upload': 'Image Upload',
+        'notifications.jobType.panel_extraction': 'Panel Extraction',
+        'notifications.jobType.copy_move_single': 'Copy-Move',
+        'notifications.jobType.copy_move_cross': 'Copy-Move Cross',
+        'notifications.jobType.trufor': 'TruFor',
+        'notifications.jobType.provenance': 'Provenance',
+        'notifications.jobType.watermark_removal': 'Watermark Removal',
+        // Job status messages
+        'notifications.completed': 'Completed',
+        'notifications.failed': 'Failed',
+        'notifications.completedMessage': 'completed successfully.',
+        'notifications.failedMessage': 'Error processing',
 
         // Common
         'common.loading': 'Loading...',
@@ -2132,6 +2164,7 @@ const translations = {
         'analysisDashboard.types.cbir': 'CBIR Search',
         'analysisDashboard.types.provenance': 'Provenance',
         'analysisDashboard.types.screeningTool': 'Screening Tool',
+        'analysisDashboard.types.documentExtraction': 'Document Extraction',
         'analysisDashboard.status.pending': 'Pending',
         'analysisDashboard.status.processing': 'Processing',
         'analysisDashboard.status.completed': 'Completed',
@@ -2204,6 +2237,9 @@ const translations = {
         'analysisDashboard.resultTypes.clusters': 'Clusters',
         'analysisDashboard.resultTypes.result_image': 'Result Overlay',
         'analysisDashboard.deleted': 'Deleted',
+        'analysisDashboard.tabError': 'Error',
+        'analysisDashboard.errorLog': 'Error Log',
+        'analysisDashboard.analysisFailed': 'Analysis Failed',
 
         // Image Analysis - Save to Dashboard
         'analysis.saveToDashboard': 'Save to Dashboard',
