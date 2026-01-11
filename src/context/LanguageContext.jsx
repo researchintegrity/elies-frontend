@@ -61,6 +61,20 @@ const translations = {
         'notifications.empty': 'Nenhuma notificação',
         'notifications.emptyDesc': 'Você será notificado quando processos terminarem',
         'notifications.justNow': 'Agora',
+        // Job types
+        'notifications.jobType.image_extraction': 'Extração de PDF',
+        'notifications.jobType.image_upload': 'Upload de Imagem',
+        'notifications.jobType.panel_extraction': 'Extração de Painel',
+        'notifications.jobType.copy_move_single': 'Copy-Move',
+        'notifications.jobType.copy_move_cross': 'Copy-Move Cross',
+        'notifications.jobType.trufor': 'TruFor',
+        'notifications.jobType.provenance': 'Proveniência',
+        'notifications.jobType.watermark_removal': 'Remoção de Marca d\'água',
+        // Job status messages
+        'notifications.completed': 'Concluído',
+        'notifications.failed': 'Falhou',
+        'notifications.completedMessage': 'foi concluído com sucesso.',
+        'notifications.failedMessage': 'Erro ao processar',
 
         // Common
         'common.loading': 'Carregando...',
@@ -1226,6 +1240,20 @@ const translations = {
         'notifications.empty': 'No notifications',
         'notifications.emptyDesc': 'You will be notified when processes complete',
         'notifications.justNow': 'Just now',
+        // Job types
+        'notifications.jobType.image_extraction': 'PDF Extraction',
+        'notifications.jobType.image_upload': 'Image Upload',
+        'notifications.jobType.panel_extraction': 'Panel Extraction',
+        'notifications.jobType.copy_move_single': 'Copy-Move',
+        'notifications.jobType.copy_move_cross': 'Copy-Move Cross',
+        'notifications.jobType.trufor': 'TruFor',
+        'notifications.jobType.provenance': 'Provenance',
+        'notifications.jobType.watermark_removal': 'Watermark Removal',
+        // Job status messages
+        'notifications.completed': 'Completed',
+        'notifications.failed': 'Failed',
+        'notifications.completedMessage': 'completed successfully.',
+        'notifications.failedMessage': 'Error processing',
 
         // Common
         'common.loading': 'Loading...',
