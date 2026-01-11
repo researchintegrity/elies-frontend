@@ -104,11 +104,6 @@ const ANALYSIS_TYPE_CONFIG = {
         color: 'purple',
         labelKey: 'analysisDashboard.types.trufor'
     },
-    cbir_search: {
-        icon: FiSearch,
-        color: 'green',
-        labelKey: 'analysisDashboard.types.cbir'
-    },
     provenance: {
         icon: FiShare2,
         color: 'orange',
@@ -118,11 +113,6 @@ const ANALYSIS_TYPE_CONFIG = {
         icon: FiExternalLink,
         color: 'gray',
         labelKey: 'analysisDashboard.types.screeningTool'
-    },
-    document_extraction: {
-        icon: FiFileText,
-        color: 'cyan',
-        labelKey: 'analysisDashboard.types.documentExtraction' // Need to ensure this translation key exists or provide fallback
     }
 };
 
@@ -1817,70 +1807,11 @@ const AnalysisDashboardPage = () => {
             if (filters.date_from) params.date_from = filters.date_from;
             if (filters.date_to) params.date_to = filters.date_to;
 
-            // Fetch Analyses
-            const analysesPromise = api.get('/analyses', params);
-
-            // Fetch Documents (also paginated, but we'll try to merge best effort)
-            // Ideally backend would have a unified 'events' feed, but we'll simulate it.
-            const documentsPromise = api.get('/documents', {
-                page: currentPage,
-                per_page: pageSize
-            });
-
-            const [analysesRes, documentsRes] = await Promise.all([analysesPromise, documentsPromise]);
+            // Fetch Analyses only (document extraction belongs in Jobs dashboard)
+            const analysesRes = await api.get('/analyses', params);
 
             if (analysesRes.success) {
-                let mergedItems = [...analysesRes.data];
-
-                // Process Documents if successful
-                if (documentsRes && documentsRes.items) {
-                    let mappedDocs = documentsRes.items.map(doc => ({
-                        _id: doc._id,
-                        id: doc._id,
-                        type: 'document_extraction', // Custom type for UI
-                        status: doc.extraction_status === 'processing' ? 'processing' :
-                            doc.extraction_status === 'completed' ? 'completed' :
-                                doc.extraction_status === 'failed' ? 'failed' : 'pending',
-                        created_at: doc.uploaded_date,
-                        updated_at: doc.uploaded_date, // fallback
-                        source_image_id: null, // No source image for a PDF
-                        parameters: { filename: doc.filename }, // Store filename here
-                        results: { extracted_count: doc.extracted_image_count },
-                        user_id: doc.user_id
-                    }));
-
-                    // Apply client-side filtering for documents (since backend doesn't support it yet)
-                    if (filters.type) {
-                        if (filters.type !== 'document_extraction') {
-                            mappedDocs = []; // If filtering by specific analysis type, hide docs
-                        }
-                    }
-
-                    if (filters.status) {
-                        mappedDocs = mappedDocs.filter(doc => doc.status === filters.status);
-                    }
-
-                    if (filters.date_from) {
-                        const fromDate = new Date(filters.date_from);
-                        mappedDocs = mappedDocs.filter(doc => new Date(doc.created_at) >= fromDate);
-                    }
-
-                    if (filters.date_to) {
-                        const toDate = new Date(filters.date_to);
-                        mappedDocs = mappedDocs.filter(doc => new Date(doc.created_at) <= toDate);
-                    }
-
-                    // Simple merge strategy: Add docs to the list
-                    // Note: This messes up server-side pagination slightly since we are
-                    // merging two paginated lists. A true fix requires backend changes.
-                    // For now, we concat and re-sort.
-                    mergedItems = [...mergedItems, ...mappedDocs];
-                    mergedItems.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                }
-
-                setAnalyses(mergedItems);
-
-                // Use the analyses pagination as the "master" for now
+                setAnalyses(analysesRes.data);
                 setTotalItems(analysesRes.pagination.total_items);
                 setTotalPages(analysesRes.pagination.total_pages);
             } else {

@@ -446,9 +446,23 @@ export const NotificationsProvider = ({ children }) => {
                         }
                     }
                 } catch (err) {
-                    if (err.name !== 'AbortError') {
+                    // Gracefully handle stream interruptions (page refresh, navigation, etc.)
+                    // These are expected and shouldn't log as errors
+                    const isExpectedError =
+                        err.name === 'AbortError' ||
+                        (err.name === 'TypeError' && (
+                            err.message.includes('input stream') ||
+                            err.message.includes('network') ||
+                            err.message.includes('NetworkError')
+                        ));
+
+                    if (!isExpectedError) {
                         console.error('SSE stream error:', err);
-                        setIsConnected(false);
+                    }
+
+                    setIsConnected(false);
+                    // Only reconnect if not an abort (user-initiated disconnect)
+                    if (err.name !== 'AbortError') {
                         scheduleReconnect();
                     }
                 }
@@ -460,8 +474,20 @@ export const NotificationsProvider = ({ children }) => {
             eventSourceRef.current = { close: () => controller.abort() };
 
         }).catch(err => {
-            if (err.name !== 'AbortError') {
+            // Gracefully handle expected network errors (page refresh, server restart, etc.)
+            const isExpectedError =
+                err.name === 'AbortError' ||
+                (err.name === 'TypeError' && (
+                    err.message.includes('NetworkError') ||
+                    err.message.includes('network') ||
+                    err.message.includes('fetch')
+                ));
+
+            if (!isExpectedError) {
                 console.error('SSE connection error:', err);
+            }
+
+            if (err.name !== 'AbortError') {
                 setConnectionError(err.message);
                 setIsConnected(false);
                 scheduleReconnect();
@@ -475,8 +501,9 @@ export const NotificationsProvider = ({ children }) => {
      */
     const scheduleReconnect = useCallback(() => {
         if (reconnectAttempts.current >= MAX_RECONNECT_ATTEMPTS) {
-            console.warn('Max SSE reconnect attempts reached');
-            setConnectionError('Unable to connect to notifications server');
+            // SSE failed to connect, but polling is still active as fallback
+            // No need to log a warning - this is expected when backend is temporarily unavailable
+            setConnectionError(null); // Clear error since polling is working
             return;
         }
 
