@@ -52,7 +52,6 @@ import {
     FiRotateCcw
 } from 'react-icons/fi';
 import { useLanguage } from '../context/LanguageContext';
-import { useNotifications } from '../context/NotificationsContext';
 import { api } from '../services/api';
 import { API_BASE_URL } from '../config/api';
 import { showAlert, showToast } from '../utils/alert';
@@ -274,7 +273,7 @@ const ParametersDisplay = ({ parameters, sourceImageId, targetImageId, t, defaul
         <div className="space-y-1">
             {finalDisplay.map((item, idx) => (
                 <div key={item.key + idx} className="flex flex-col sm:flex-row sm:items-center sm:justify-start gap-4 text-xs">
-                     <span className="text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-full sm:max-w-[40%]">{item.key}:</span>
+                    <span className="text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-full sm:max-w-[40%]">{item.key}:</span>
                     <span className="text-gray-900 dark:text-gray-200 font-mono break-all text-left">
                         {typeof item.value === 'boolean' ? (item.value ? 'Yes' : 'No') : String(item.value)}
                     </span>
@@ -1738,7 +1737,6 @@ const AnalysisDetailModal = ({ analysis, onClose, onDownloadResult, t, locale })
 // --- Main Component ---
 const AnalysisDashboardPage = () => {
     const { t, locale } = useLanguage();
-    const { subscribeToEvents } = useNotifications();
 
     // State
     const [analyses, setAnalyses] = useState([]);
@@ -1848,20 +1846,6 @@ const AnalysisDashboardPage = () => {
     useEffect(() => {
         fetchStats();
     }, [fetchStats, analyses]);
-
-    // Real-time updates via SSE
-    useEffect(() => {
-        const unsubscribe = subscribeToEvents((eventType, data) => {
-            if (eventType === 'job_completed' || eventType === 'job_failed') {
-                // Refresh list if a relevant analysis job finished
-                console.log('Job update received:', eventType, data);
-                fetchAnalyses(true); // Silent refresh
-                fetchStats(); // Update stats too
-            }
-        });
-
-        return unsubscribe;
-    }, [subscribeToEvents, fetchAnalyses, fetchStats]);
 
     // Clear selection when view mode or split view changes
     useEffect(() => {
