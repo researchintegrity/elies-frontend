@@ -51,9 +51,6 @@ const PAGE_SIZE_OPTIONS = [10, 20, 50];
  * Maps backend job_type values to icons and labels
  */
 const JOB_TYPE_CONFIG = {
-    cbir_index: { icon: FiDatabase, color: 'blue', labelKey: 'jobsDashboard.types.cbirIndex' },
-    cbir_search: { icon: FiSearch, color: 'indigo', labelKey: 'jobsDashboard.types.cbirSearch' },
-    cbir_delete: { icon: FiTrash2, color: 'red', labelKey: 'jobsDashboard.types.cbirDelete' },
     copy_move_single: { icon: FiCopy, color: 'purple', labelKey: 'jobsDashboard.types.copyMoveSingle' },
     copy_move_cross: { icon: FiCopy, color: 'violet', labelKey: 'jobsDashboard.types.copyMoveCross' },
     trufor: { icon: FiShield, color: 'orange', labelKey: 'jobsDashboard.types.trufor' },
@@ -64,6 +61,7 @@ const JOB_TYPE_CONFIG = {
     image_deletion: { icon: FiTrash2, color: 'red', labelKey: 'jobsDashboard.types.imageDeletion' },
     document_deletion: { icon: FiTrash2, color: 'red', labelKey: 'jobsDashboard.types.documentDeletion' }
 };
+
 
 /**
  * Job status configuration
