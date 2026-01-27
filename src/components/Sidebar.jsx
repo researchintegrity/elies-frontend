@@ -21,6 +21,8 @@ import {
   FiCopy,
   FiActivity,
   FiFlag,
+  FiLoader,
+  FiPieChart,
 } from 'react-icons/fi';
 
 const Sidebar = ({ activePage, onNavigate, pages, isCollapsed = false, onToggle }) => {
@@ -206,9 +208,13 @@ const Sidebar = ({ activePage, onNavigate, pages, isCollapsed = false, onToggle 
           <NavItem pageKey={pages.PROVENANCE} icon={FiShare2} label={t('sidebar.provenance') || 'Provenance'} />
           <NavItem pageKey={pages.COPY_MOVE} icon={FiCopy} label={t('sidebar.copyMove') || 'Copy-Move Detection'} />
           <NavItem pageKey={pages.MANIPULATION_DETECTION} icon={FiShield} label={t('sidebar.manipulationDetection') || 'Manipulation Detection'} />
-          <NavItem pageKey={pages.ANALYSIS_DASHBOARD} icon={FiActivity} label={t('sidebar.analysisDashboard') || 'Analysis Dashboard'} />
           <DisabledItem icon={FiTag} label={t('sidebar.tags')} />
           <DisabledItem icon={FiLayers} label={t('sidebar.categories')} />
+        </NavSection>
+
+        <NavSection title={t('sidebar.dashboards') || 'Dashboards'}>
+          <NavItem pageKey={pages.ANALYSIS_DASHBOARD} icon={FiActivity} label={t('sidebar.analysisDashboard') || 'Analysis Dashboard'} />
+          <NavItem pageKey={pages.JOBS_DASHBOARD} icon={FiPieChart} label={t('sidebar.jobsDashboard') || 'Jobs Monitor'} />
         </NavSection>
 
         {/* Admin Section - Only visible to admins */}
