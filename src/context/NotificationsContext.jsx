@@ -24,7 +24,9 @@ const MAX_NOTIFICATIONS = 50;
 const RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const POLL_INTERVAL = 3000;
-const STORAGE_KEY = 'elis_notifications';
+const STORAGE_KEY = 'elies_notifications';
+// Key used before the ELIS -> ELIES rename; read as a fallback, removed on next save
+const LEGACY_STORAGE_KEY = 'elis_notifications';
 
 // =============================================================================
 // LocalStorage Helpers (simple & safe)
@@ -33,7 +35,7 @@ const STORAGE_KEY = 'elis_notifications';
 /** Load notifications from localStorage */
 const loadFromStorage = () => {
     try {
-        const data = localStorage.getItem(STORAGE_KEY);
+        const data = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
         return data ? JSON.parse(data) : [];
     } catch {
         return [];
@@ -44,6 +46,7 @@ const loadFromStorage = () => {
 const saveToStorage = (notifications) => {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
     } catch {
         // Ignore storage errors (quota exceeded, etc.)
     }
@@ -53,6 +56,7 @@ const saveToStorage = (notifications) => {
 const clearStorage = () => {
     try {
         localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
     } catch {
         // Ignore
     }

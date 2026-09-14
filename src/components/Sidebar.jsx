@@ -109,7 +109,7 @@ const Sidebar = ({ activePage, onNavigate, pages, isCollapsed = false, onToggle 
 
             {!isCollapsed && (
               <div className="animate-fade-in">
-                <h1 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">ELIS</h1>
+                <h1 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">ELIES</h1>
                 <p className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">{t('sidebar.platform')}</p>
               </div>
             )}

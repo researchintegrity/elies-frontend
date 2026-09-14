@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the Label Studio-style image annotation system implemented for the ELIS Scientific Integrity Platform. The system allows users to annotate images with multiple shape types (rectangles, ellipses, polygons) and assign labels for training manipulation detection models.
+This document describes the Label Studio-style image annotation system implemented for the ELIES Scientific Integrity Platform. The system allows users to annotate images with multiple shape types (rectangles, ellipses, polygons) and assign labels for training manipulation detection models.
 
 ## Features
 

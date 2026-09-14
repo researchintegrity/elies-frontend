@@ -5,7 +5,7 @@
  * Provides a comprehensive view of all past analyses with filtering,
  * pagination, and the ability to view details and reproduce analyses.
  * 
- * ELIS Scientific Integrity Platform
+ * ELIES Scientific Integrity Platform
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';

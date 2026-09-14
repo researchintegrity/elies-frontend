@@ -5,7 +5,7 @@
  * Detects duplicated regions within single images or across multiple images.
  * Combined mode selection with gallery for efficient workflow.
  *
- * ELIS Scientific Integrity Platform
+ * ELIES Scientific Integrity Platform
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';

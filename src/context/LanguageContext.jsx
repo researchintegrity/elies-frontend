@@ -7,7 +7,7 @@ const translations = {
         // Auth Page
         'auth.welcome': 'Bem-vindo de volta!',
         'auth.createAccount': 'Crie sua conta',
-        'auth.platformAccess': 'Plataforma ELIS de Integridade Científica',
+        'auth.platformAccess': 'Plataforma ELIES de Integridade Científica',
         'auth.username': 'Username',
         'auth.usernamePlaceholder': 'seu_username',
         'auth.fullName': 'Nome Completo',
@@ -24,7 +24,7 @@ const translations = {
         'auth.hasAccount': 'Já tem uma conta?',
         'auth.signupHere': 'Cadastre-se aqui',
         'auth.loginHere': 'Faça login',
-        'auth.copyright': '© 2024 ELIS Platform. Todos os direitos reservados.',
+        'auth.copyright': '© 2024 ELIES Platform. Todos os direitos reservados.',
 
         // Sidebar
         'sidebar.platform': 'Scientific Integrity',
@@ -50,7 +50,7 @@ const translations = {
         'sidebar.online': 'Online',
 
         // Topbar
-        'topbar.title': 'ELIS Scientific Integrity',
+        'topbar.title': 'ELIES Scientific Integrity',
         'topbar.subtitle': 'Ferramentas avançadas para análise de imagens científicas',
 
         // Notifications
@@ -1186,7 +1186,7 @@ const translations = {
         // Auth Page
         'auth.welcome': 'Welcome back!',
         'auth.createAccount': 'Create your account',
-        'auth.platformAccess': 'ELIS Scientific Integrity Platform',
+        'auth.platformAccess': 'ELIES Scientific Integrity Platform',
         'auth.username': 'Username',
         'auth.usernamePlaceholder': 'your_username',
         'auth.fullName': 'Full Name',
@@ -1203,7 +1203,7 @@ const translations = {
         'auth.hasAccount': 'Already have an account?',
         'auth.signupHere': 'Sign up here',
         'auth.loginHere': 'Log in',
-        'auth.copyright': '© 2024 ELIS Platform. All rights reserved.',
+        'auth.copyright': '© 2024 ELIES Platform. All rights reserved.',
 
         // Sidebar
         'sidebar.platform': 'Scientific Integrity',
@@ -1229,7 +1229,7 @@ const translations = {
         'sidebar.online': 'Online',
 
         // Topbar
-        'topbar.title': 'ELIS Scientific Integrity',
+        'topbar.title': 'ELIES Scientific Integrity',
         'topbar.subtitle': 'Advanced tools for scientific image analysis',
 
         // Notifications
@@ -2364,11 +2364,19 @@ const translations = {
 
 const LanguageContext = createContext(null);
 
+const LANGUAGE_STORAGE_KEY = 'elies-language';
+// Key used before the ELIS -> ELIES rename; read as a fallback so saved preferences survive
+const LEGACY_LANGUAGE_STORAGE_KEY = 'elis-language';
+
+/** Read the saved language, falling back to the pre-rename key */
+const getStoredLanguage = () =>
+    localStorage.getItem(LANGUAGE_STORAGE_KEY) || localStorage.getItem(LEGACY_LANGUAGE_STORAGE_KEY);
+
 export const LanguageProvider = ({ children }) => {
     // Get initial language from localStorage or default to Portuguese
     const [language, setLanguage] = useState(() => {
         if (typeof window !== 'undefined') {
-            return localStorage.getItem('elis-language') || 'pt';
+            return getStoredLanguage() || 'pt';
         }
         return 'pt';
     });
@@ -2377,7 +2385,7 @@ export const LanguageProvider = ({ children }) => {
     const toggleLanguage = useCallback(() => {
         setLanguage(prev => {
             const newLang = prev === 'pt' ? 'en' : 'pt';
-            localStorage.setItem('elis-language', newLang);
+            localStorage.setItem(LANGUAGE_STORAGE_KEY, newLang);
             return newLang;
         });
     }, []);
@@ -2386,7 +2394,7 @@ export const LanguageProvider = ({ children }) => {
     const setLang = useCallback((lang) => {
         if (lang === 'pt' || lang === 'en') {
             setLanguage(lang);
-            localStorage.setItem('elis-language', lang);
+            localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
         }
     }, []);
 
@@ -2442,7 +2450,7 @@ export const useLanguage = () => {
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export const translate = (key, params = {}) => {
-    const language = (typeof window !== 'undefined' && localStorage.getItem('elis-language')) || 'pt';
+    const language = (typeof window !== 'undefined' && getStoredLanguage()) || 'pt';
     let text = translations[language]?.[key] || translations['pt']?.[key] || key;
 
     // Simple interpolation

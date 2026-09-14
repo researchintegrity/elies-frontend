@@ -5,7 +5,7 @@
  * Detects manipulated/forged regions in images using TruFor deep learning model.
  * Matches layout standard of Copy-Move page.
  * 
- * ELIS Scientific Integrity Platform
+ * ELIES Scientific Integrity Platform
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';

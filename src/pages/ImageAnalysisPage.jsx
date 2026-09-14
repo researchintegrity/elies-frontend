@@ -2,7 +2,7 @@
  * Image Analysis Page
  * 
  * A dedicated page for forensics analysis of images.
- * ELIS Scientific Integrity Platform
+ * ELIES Scientific Integrity Platform
  */
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';

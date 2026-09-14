@@ -8,7 +8,7 @@
  * Original source: https://29a.ch/photo-forensics/
  * License: The original Forensically uses various open-source components.
  * 
- * This implementation provides similar functionality for the ELIS Scientific Integrity Platform,
+ * This implementation provides similar functionality for the ELIES Scientific Integrity Platform,
  * enabling researchers to analyze images for potential manipulations or inconsistencies.
  */
 

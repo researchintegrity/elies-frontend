@@ -1,6 +1,6 @@
-# ELIS Platform - Frontend
+# ELIES Platform - Frontend
 
-Frontend for the ELIS (Systemic Reading and Intelligence Extraction) platform, developed with React + Vite. The application provides a modern and responsive interface for PDF document management, image analysis, and AI-assisted annotations.
+Frontend for the ELIES platform, developed with React + Vite. The application provides a modern and responsive interface for PDF document management, image analysis, and AI-assisted annotations.
 
 ## Main Features
 

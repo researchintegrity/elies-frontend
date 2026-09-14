@@ -5,7 +5,7 @@
  * Features split-view layout with image list + detail panel for annotations,
  * analysis history, and related images.
  * 
- * ELIS Scientific Integrity Platform
+ * ELIES Scientific Integrity Platform
  */
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
