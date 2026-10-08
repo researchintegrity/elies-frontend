@@ -169,7 +169,10 @@ export const useCopyMoveInitialization = ({
 
                         // Fetch analysis to get result flags
                         const analysisData = await api.get(`/analyses/${analysisId}`);
-                        if (analysisData.results) {
+                        if (analysisData.results?.method === 'forgeryscope') {
+                            // Verdict, findings and report; its images exist only when duplication was found
+                            setAnalysisResults(analysisData.results);
+                        } else if (analysisData.results) {
                             // Set the results with flags that ResultsViewer expects
                             setAnalysisResults({
                                 matches_image: analysisData.results.matches_image || true,
