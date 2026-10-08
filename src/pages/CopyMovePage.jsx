@@ -43,7 +43,8 @@ import { showAlert, showToast } from '../utils/alert';
 import {
     IMAGES_PER_PAGE,
     POLL_INTERVAL,
-    MAX_POLL_ATTEMPTS,
+    maxPollAttempts,
+    methodSupportsMode,
     STEPS,
     STEP_LABELS,
     METHOD_TYPES,
@@ -203,12 +204,10 @@ const CopyMovePage = ({ onNavigate }) => {
         setCurrentPage(1);
     };
 
-    // Clear target when switching to single mode
+    // Clear target when switching to single mode; keep a method the mode supports
     useEffect(() => {
-        if (mode === 'single') {
-            setTargetImage(null);
-            if (methodType === 'keypoint') setMethodType('dense');
-        }
+        if (mode === 'single') setTargetImage(null);
+        if (!methodSupportsMode(methodType, mode)) setMethodType(mode === 'cross' ? 'keypoint' : 'dense');
     }, [mode, methodType]);
 
     // Poll for single analysis status
@@ -218,7 +217,7 @@ const CopyMovePage = ({ onNavigate }) => {
         const pollInterval = setInterval(async () => {
             try {
                 pollCount++;
-                if (pollCount > MAX_POLL_ATTEMPTS) { clearInterval(pollInterval); setIsAnalyzing(false); showToast(t('copyMove.timeout'), 'warning'); return; }
+                if (pollCount > maxPollAttempts(methodType)) { clearInterval(pollInterval); setIsAnalyzing(false); showToast(t('copyMove.timeout'), 'warning'); return; }
                 const analysis = await api.getAnalysisById(analysisId);
                 setAnalysisStatus(analysis.status);
                 if (analysis.status === 'completed') { setAnalysisResults(analysis.results); setIsAnalyzing(false); clearInterval(pollInterval); showToast(t('copyMove.completed'), 'success'); }
@@ -226,7 +225,7 @@ const CopyMovePage = ({ onNavigate }) => {
             } catch (err) { console.error('Error polling:', err); }
         }, POLL_INTERVAL);
         return () => clearInterval(pollInterval);
-    }, [analysisId, analysisStatus, t]);
+    }, [analysisId, analysisStatus, methodType, t]);
 
     // Handle image selection
     const handleImageClick = useCallback((image) => {
@@ -300,7 +299,7 @@ const CopyMovePage = ({ onNavigate }) => {
         try {
             let response;
             if (mode === 'single') {
-                response = await api.startCopyMoveAnalysis(sourceImage.id, parseInt(denseMethod, 10));
+                response = await api.startCopyMoveAnalysis(sourceImage.id, parseInt(denseMethod, 10), methodType);
             } else {
                 response = await api.startCrossImageCopyMoveAnalysis(sourceImage.id, targetImage.id, methodType, denseMethod, descriptor);
             }
@@ -650,9 +649,9 @@ const CopyMovePage = ({ onNavigate }) => {
                         {/* Method Selection */}
                         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-4">
                             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('copyMove.method')}</h3>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                                 {METHOD_TYPES.map(m => {
-                                    const isDisabled = m.id === 'keypoint' && mode === 'single';
+                                    const isDisabled = !m.modes.includes(mode);
                                     const Icon = m.icon;
                                     return (
                                         <button key={m.id} onClick={() => !isDisabled && setMethodType(m.id)} disabled={isDisabled}
@@ -673,6 +672,7 @@ const CopyMovePage = ({ onNavigate }) => {
                                 })}
                             </div>
                             {mode === 'single' && <p className="text-[10px] text-amber-600 mt-2 flex items-center gap-1"><FiInfo size={10} />{t('copyMove.keypointCrossOnly')}</p>}
+                            {mode === 'cross' && <p className="text-[10px] text-amber-600 mt-2 flex items-center gap-1"><FiInfo size={10} />{t('copyMove.forgeryscopeSingleOnly')}</p>}
                         </div>
 
                         {/* Advanced Options */}
@@ -693,6 +693,9 @@ const CopyMovePage = ({ onNavigate }) => {
                                                 {KEYPOINT_DESCRIPTORS.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                                             </select>
                                         </div>
+                                    )}
+                                    {methodType === 'forgeryscope' && (
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">{t('copyMove.forgeryscopeNoOptions')}</p>
                                     )}
                                     {methodType === 'dense' && (
                                         <div>
@@ -777,6 +780,16 @@ const CopyMovePage = ({ onNavigate }) => {
                                                     </div>
                                                 </div>
                                             </div>
+                                            {result.results?.verdict && (
+                                                <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                                                    <span className="text-xs text-gray-500">{t('copyMove.verdict')}</span>
+                                                    <span className={`text-sm font-semibold ${result.results.verdict === 'duplicated' ? 'text-amber-600' : 'text-green-600'}`}>
+                                                        {result.results.verdict === 'duplicated'
+                                                            ? `${t('copyMove.duplicationFound')} (${result.results.detections?.length || 0})`
+                                                            : t('copyMove.noDuplication')}
+                                                    </span>
+                                                </div>
+                                            )}
                                             {result.results?.num_matches !== undefined && (
                                                 <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
                                                     <div className="flex items-center justify-between">
@@ -914,7 +927,7 @@ const CopyMovePage = ({ onNavigate }) => {
                         </button>
                     )}
                     {currentStep === STEPS.CONFIGURE && (
-                        <button onClick={() => batchMode ? startBatchAnalysis(denseMethod, setCurrentStep) : handleRunAnalysis()} disabled={isAnalyzing || isAnalyzingBatch || (batchMode && batchImages.length === 0)}
+                        <button onClick={() => batchMode ? startBatchAnalysis(denseMethod, setCurrentStep, methodType) : handleRunAnalysis()} disabled={isAnalyzing || isAnalyzingBatch || (batchMode && batchImages.length === 0)}
                             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
                         >
                             {isAnalyzing || isAnalyzingBatch ? <><FiLoader className="animate-spin" size={16} />{batchMode || isAnalyzingBatch ? t('copyMove.analyzingBatch') || 'Analyzing...' : t('copyMove.analyzing')}</> : <><FiZap size={16} />{batchMode ? t('copyMove.analyzeBatch') || `Analyze ${batchImages.length} Images` : t('copyMove.analyze')}</>}

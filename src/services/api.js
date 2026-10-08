@@ -351,16 +351,15 @@ export const api = {
 
     /**
      * Start single-image copy-move detection analysis
-     * Note: Single-image detection only supports 'dense' method
      * @param {string} imageId - Image ID to analyze
-     * @param {string} method - Detection method (only 'dense' supported for single-image)
-     * @param {number} denseMethod - Dense method variant (1-5)
+     * @param {number} denseMethod - Dense method variant (1-5), only used when method='dense'
+     * @param {string} method - Detection method: 'dense' (default) or 'forgeryscope'
      * @returns {Promise<{message: string, analysis_id: string}>}
      */
-    startCopyMoveAnalysis: async (imageId, denseMethod = 2) => {
+    startCopyMoveAnalysis: async (imageId, denseMethod = 2, method = 'dense') => {
         return api.post('/analyses/copy-move/single', {
             image_id: imageId,
-            method: 'dense',  // Single-image only supports dense
+            method,
             dense_method: denseMethod
         });
     },

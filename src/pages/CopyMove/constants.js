@@ -1,10 +1,16 @@
 // src/pages/CopyMove/constants.js
-import { FiTarget, FiGrid } from 'react-icons/fi';
+import { FiTarget, FiGrid, FiCpu } from 'react-icons/fi';
 
 export const IMAGES_PER_PAGE = 18;
 export const POLL_INTERVAL = 2000;
 export const MAX_POLL_ATTEMPTS = 60;
 export const SIMILARITY_PER_PAGE = 12;
+
+// Forgeryscope runs several deep-learning models (on CPU by default) and can
+// wait in the queue behind other analyses: poll for up to 20 minutes.
+const MAX_POLL_ATTEMPTS_BY_METHOD = { forgeryscope: 600 };
+
+export const maxPollAttempts = (method) => MAX_POLL_ATTEMPTS_BY_METHOD[method] || MAX_POLL_ATTEMPTS;
 
 export const STEPS = {
     SELECT: 0,
@@ -14,10 +20,15 @@ export const STEPS = {
 
 export const STEP_LABELS = ['select', 'configure', 'results'];
 
+// `modes`: the analysis modes ('single', 'cross') a method supports
 export const METHOD_TYPES = [
-    { id: 'keypoint', name: 'Feature Matching', descriptionKey: 'copyMove.keypointDesc', icon: FiTarget },
-    { id: 'dense', name: 'Block Matching', descriptionKey: 'copyMove.denseDesc', icon: FiGrid }
+    { id: 'keypoint', name: 'Feature Matching', descriptionKey: 'copyMove.keypointDesc', icon: FiTarget, modes: ['cross'] },
+    { id: 'dense', name: 'Block Matching', descriptionKey: 'copyMove.denseDesc', icon: FiGrid, modes: ['single', 'cross'] },
+    { id: 'forgeryscope', name: 'Panel Duplication (AI)', descriptionKey: 'copyMove.forgeryscopeDesc', icon: FiCpu, modes: ['single'] }
 ];
+
+export const methodSupportsMode = (methodId, mode) =>
+    METHOD_TYPES.some(m => m.id === methodId && m.modes.includes(mode));
 
 export const DENSE_METHODS = [
     { id: 1, name: 'ZM-cart', description: 'Zernike Moments (Cartesian)' },

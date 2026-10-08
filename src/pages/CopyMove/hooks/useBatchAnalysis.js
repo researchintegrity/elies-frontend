@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api } from '../../../services/api';
 import { showToast } from '../../../utils/alert';
-import { MAX_POLL_ATTEMPTS, POLL_INTERVAL, STEPS } from '../constants';
+import { POLL_INTERVAL, STEPS, maxPollAttempts } from '../constants';
 
 export const useBatchAnalysis = (t) => {
     const [batchMode, setBatchMode] = useState(false);
@@ -11,7 +11,7 @@ export const useBatchAnalysis = (t) => {
     const [isAnalyzingBatch, setIsAnalyzingBatch] = useState(false);
 
     // Run batch analysis - submit all to queue, then poll in parallel
-    const startBatchAnalysis = async (denseMethod, setCurrentStep) => {
+    const startBatchAnalysis = async (denseMethod, setCurrentStep, method = 'dense') => {
         if (batchImages.length === 0) {
             showToast(t('copyMove.noImagesSelected') || 'No images selected', 'warning');
             return;
@@ -35,7 +35,7 @@ export const useBatchAnalysis = (t) => {
         const submissionResults = await Promise.all(
             batchImages.map(async (image) => {
                 try {
-                    const response = await api.startCopyMoveAnalysis(image.id, parseInt(denseMethod, 10));
+                    const response = await api.startCopyMoveAnalysis(image.id, parseInt(denseMethod, 10), method);
                     return { imageId: image.id, analysisId: response.analysis_id, status: 'processing' };
                 } catch (err) {
                     console.error(`Error submitting analysis for ${image.id}:`, err);
@@ -59,7 +59,7 @@ export const useBatchAnalysis = (t) => {
         let pollCount = 0;
         let currentResults = [...resultsWithIds];
 
-        while (pendingAnalyses.length > 0 && pollCount < MAX_POLL_ATTEMPTS) {
+        while (pendingAnalyses.length > 0 && pollCount < maxPollAttempts(method)) {
             await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
             pollCount++;
 
